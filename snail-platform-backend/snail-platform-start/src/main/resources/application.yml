@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: snail-platform
+  profiles:
+    active: ${SNAIL_PROFILE:dev}
+  threads:
+    virtual:
+      # 运行时 JDK≥21 才生效，JDK 17 静默关闭；产物仍按 17 编译
+      enabled: true
+  flyway:
+    enabled: true
+    # 单库单目录，脚本就放在本模块 resources/db/migration 下
+    locations: classpath:db/migration
+  cache:
+    type: caffeine
+    # 缓存名单点声明，业务侧不各自建缓存
+    cache-names: dictItem, menuTree, tenantConfig
+    caffeine:
+      spec: maximumSize=2000,expireAfterWrite=10m
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

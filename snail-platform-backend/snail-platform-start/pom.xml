@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-platform-start：唯一装配点。
+  只依赖业务模块（当前为 system 一个），framework 构件由传递依赖带入；ArchUnit 与冒烟测试住在这里。
+  spring-boot-maven-plugin 只在此声明，repackage 出可执行 jar。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-backend</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-platform-start</artifactId>
+    <packaging>jar</packaging>
+    <name>snail-platform-start</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-system</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>snail-platform</finalName>
+        <resources>
+            <!-- 与默认资源目录同路径，唯一差别：目录占位文件不进 jar -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>**/.gitkeep</exclude>
+                </excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <!-- 版本与 repackage 执行由 starter-parent 的 pluginManagement 提供；
+                 主类唯一，交给插件自动探测，不在 POM 里重复点名 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

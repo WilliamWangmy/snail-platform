@@ -1,0 +1,13 @@
+# 本机开发：连本机已启动的 MySQL 与 Valkey；默认值只指 127.0.0.1，端口或口令不同就用 SNAIL_* 环境变量覆盖
+spring:
+  datasource:
+    url: ${SNAIL_DB_URL:jdbc:mysql://127.0.0.1:3306/snail_platform}
+    username: ${SNAIL_DB_USERNAME:snail}
+    password: ${SNAIL_DB_PASSWORD:snail}
+  data:
+    redis:
+      url: ${SNAIL_REDIS_URL:redis://127.0.0.1:6379}
+
+logging:
+  level:
+    com.snail.platform: DEBUG
