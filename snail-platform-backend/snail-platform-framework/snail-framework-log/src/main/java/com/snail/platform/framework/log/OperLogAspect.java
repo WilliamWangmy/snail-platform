@@ -4,7 +4,8 @@ import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.servlet.JakartaServletUtil;
 import cn.hutool.json.JSONUtil;
-import com.snail.platform.framework.core.context.OperatorContextHolder;
+import com.snail.platform.framework.core.context.LoginUser;
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.web.TraceFilter;
 import jakarta.servlet.ServletRequest;
@@ -35,7 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 职责:@OperLog 标注方法的留痕采集——环绕通知内"请求线程取齐、异步线程落库":
- * 租户/操作人快照/traceId/请求面/入参在 proceed 之前采完,结果或异常在 proceed 之后定格,
+ * 租户/登录人快照(操作人)/traceId/请求面/入参在 proceed 之前采完,结果或异常在 proceed 之后定格,
  * 整条 OperLogRecord 交给单线程池落库;队列满丢日志告警、落库异常只记应用日志,业务永不为审计阻塞或失败。
  * 上游:打标的 Controller 写操作;下游:OperLogSink 实现(function 侧)。
  * 约束:入参/出参先 JSON 化再过 SensitiveDataMasker;二进制响应体(导出流)不序列化,只记占位文案;
@@ -73,7 +74,7 @@ public class OperLogAspect {
         long start = System.currentTimeMillis();
         // —— 以下全部发生在请求线程:上下文、入参、请求面一次取齐 ——
         Long tenantId = TenantContextHolder.get();
-        OperatorContextHolder.Operator operator = OperatorContextHolder.get();
+        LoginUser operator = LoginUserContextHolder.get();
         String traceId = MDC.get(TraceFilter.TRACE_ID);
         String method = joinPoint.getSignature().getDeclaringType().getSimpleName()
                 + "." + joinPoint.getSignature().getName();
@@ -103,7 +104,7 @@ public class OperLogAspect {
     }
 
     private void submit(Long tenantId, String traceId, OperLog operLog, String method,
-                        String requestMethod, OperatorContextHolder.Operator operator,
+                        String requestMethod, LoginUser operator,
                         String ip, String url, String param, String result,
                         int status, String errorMsg, long start) {
         OperLogRecord record = new OperLogRecord(tenantId, traceId, operLog.module(),

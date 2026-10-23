@@ -1,7 +1,7 @@
 package com.snail.platform.function.system.role.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.snail.platform.framework.core.context.AuditActorHolder;
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.db.datascope.DataScopeFilter;
 import com.snail.platform.function.system.org.service.OrgService;
 import com.snail.platform.function.system.role.entity.SysRole;
@@ -63,7 +63,7 @@ public class DataScopeService {
      * 拿不到当前登录者(未认证上下文的内部调用)同样返回 null——权限只在有人格的前提下成立。
      */
     public DataScopeFilter currentFilterOrNull() {
-        Long userId = AuditActorHolder.get();
+        Long userId = LoginUserContextHolder.userId();
         if (userId == null) {
             return null;
         }
