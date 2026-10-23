@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-platform-function：业务层聚合。
+  模块 = 上下文聚类，子域只到包级；跨模块只经 api 包，由 start 装配。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-backend</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-platform-function</artifactId>
+    <packaging>pom</packaging>
+
+    <name>snail-platform-function</name>
+
+    <modules>
+        <module>snail-function-system</module>
+    </modules>
+
+    <dependencies>
+        <!-- 层间映射由 MapStruct 生成，业务模块共用同一套注解与处理器 -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+        </dependency>
+    </dependencies>
+</project>

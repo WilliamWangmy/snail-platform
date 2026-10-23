@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-framework-log：traceId 过滤器与 MDC、操作日志注解与切面。
+  不落库：日志记录经端口下沉给 snail-function-system 的 log 子域。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-framework</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-framework-log</artifactId>
+    <name>snail-framework-log</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-core</artifactId>
+        </dependency>
+        <!-- Boot 4 无 spring-boot-starter-aop，切面走 aspectj starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+    </dependencies>
+</project>

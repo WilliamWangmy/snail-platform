@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-platform-framework：技术基建层聚合。
+  纯技术能力，无业务逻辑；本层 enforcer 规则保证 framework 永远不认识 function。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-backend</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-platform-framework</artifactId>
+    <packaging>pom</packaging>
+
+    <name>snail-platform-framework</name>
+
+    <modules>
+        <module>snail-framework-core</module>
+        <module>snail-framework-db</module>
+        <module>snail-framework-redis</module>
+        <module>snail-framework-security</module>
+        <module>snail-framework-log</module>
+        <module>snail-framework-excel</module>
+    </modules>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-framework-layer</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <phase>validate</phase>
+                        <configuration>
+                            <rules>
+                                <!-- 硬规则 1：框架不得认识业务 -->
+                                <bannedDependencies>
+                                    <searchTransitive>false</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.snail.platform:snail-function-*</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
