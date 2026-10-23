@@ -38,11 +38,15 @@
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <springdoc.version>3.1.1</springdoc.version>
         <swagger-annotations.version>2.2.55</swagger-annotations.version>
+        <!-- swagger-core 2.2.55 按 Jackson 2.22.1 构建,Boot BOM 的 2.21.5 触发 enforcer 上界规则;
+             Jackson 2 全项目只以传递依赖存在(enforcer 禁直引),抬到 2.22.1 与 swagger 对齐 -->
+        <jackson-2-bom.version>2.22.1</jackson-2-bom.version>
         <fastexcel.version>1.3.0</fastexcel.version>
         <archunit.version>1.5.1</archunit.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
+        <hutool.version>5.8.38</hutool.version>
 
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
@@ -87,6 +91,11 @@
                 <artifactId>snail-function-system</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.snail.platform</groupId>
+                <artifactId>snail-function-auth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- ORM：boot4 starter 线，方言在 snail-framework-db 固定为 MYSQL -->
             <dependency>
@@ -119,7 +128,7 @@
                 <version>${fastexcel.version}</version>
             </dependency>
 
-            <!-- 映射：编译期生成，PO 不出 outbound -->
+            <!-- 映射：编译期生成，只用于 PO 与契约对象间的 1:1 对位拷贝 -->
             <dependency>
                 <groupId>org.mapstruct</groupId>
                 <artifactId>mapstruct</artifactId>
@@ -133,6 +142,13 @@
                 <version>${nimbus-jose-jwt.version}</version>
             </dependency>
 
+            <!-- 通用工具单一收敛在 Hutool：验证码、BCrypt、日期、字符串等均用它，不自研 util -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+
             <!-- 边界护栏 -->
             <dependency>
                 <groupId>com.tngtech.archunit</groupId>
@@ -141,6 +157,15 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <!-- 全 reactor 共享:POJO 样板收敛在 Lombok,编译期生成,产物不带 -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 
     <build>
         <pluginManagement>

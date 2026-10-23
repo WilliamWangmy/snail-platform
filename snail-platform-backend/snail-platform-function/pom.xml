@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   snail-platform-function：业务层聚合。
-  模块 = 上下文聚类，子域只到包级；跨模块只经 api 包，由 start 装配。
+  模块 = 业务域，子域只到包级、域内五包 controller/service/mapper/entity/dto(converter 按需)；
+  跨模块走 api 契约是目标态，当前唯一例外是 auth 直取 system 的 PO/Mapper，由 start 装配。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -21,6 +22,7 @@
 
     <modules>
         <module>snail-function-system</module>
+        <module>snail-function-auth</module>
     </modules>
 
     <dependencies>

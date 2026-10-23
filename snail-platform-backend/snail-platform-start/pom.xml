@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   snail-platform-start：唯一装配点。
-  只依赖业务模块（当前为 system 一个），framework 构件由传递依赖带入；ArchUnit 与冒烟测试住在这里。
+  只依赖业务模块（system + auth），framework 构件由传递依赖带入；ArchUnit 与冒烟测试住在这里。
   spring-boot-maven-plugin 只在此声明，repackage 出可执行 jar。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -24,10 +24,26 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-system</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-auth</artifactId>
+        </dependency>
+
+        <!-- 接口文档：springdoc 3.x 对应 Boot 4；api-docs 与 swagger-ui 路径的放行已在 framework-security 白名单 -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Boot 4 把 Web 测试切片拆到独立构件,AutoConfigureMockMvc 在此 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

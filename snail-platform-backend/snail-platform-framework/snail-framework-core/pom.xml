@@ -39,5 +39,10 @@
             <groupId>io.swagger.core.v3</groupId>
             <artifactId>swagger-annotations-jakarta</artifactId>
         </dependency>
+        <!-- 工具唯一口径：验证码/BCrypt/日期等一律用 Hutool，见父 pom 说明 -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
     </dependencies>
 </project>

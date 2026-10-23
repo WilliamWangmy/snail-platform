@@ -14,7 +14,7 @@ spring:
   cache:
     type: caffeine
     # 缓存名单点声明，业务侧不各自建缓存
-    cache-names: dictItem, menuTree, tenantConfig
+    cache-names: dictItem, menuTree, tenantConfig, orgSubtree
     caffeine:
       spec: maximumSize=2000,expireAfterWrite=10m
 
@@ -23,3 +23,20 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+snail:
+  security:
+    jwt:
+      # 生产用 SNAIL_JWT_SECRET 覆盖,仓库只留开发占位;短于 32 字符拒绝启动
+      secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}
+      expire-minutes: 120
+  db:
+    tenant:
+      # 租户过滤豁免清单：平台级表、纯关系表、只增日志表；口径详见 docs/system-business-design.md
+      ignore-tables:
+        - sys_tenant
+        - sys_user_role
+        - sys_login_log
+        - sys_oper_log
+    pagination:
+      max-limit: 500
