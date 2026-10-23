@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,18 +38,21 @@ public class OperLogController {
         this.operLogService = operLogService;
     }
 
+    @PreAuthorize("hasAuthority('system:operlog:list')")
     @Operation(summary = "操作日志分页")
     @GetMapping("/page")
     public R<PageResult<OperLogListVO>> page(@Valid OperLogQuery query) {
         return R.ok(operLogService.page(query));
     }
 
+    @PreAuthorize("hasAuthority('system:operlog:list')")
     @Operation(summary = "操作日志详情(param/result 全文)")
     @GetMapping("/{id}")
     public R<OperLogDetailVO> detail(@PathVariable Long id) {
         return R.ok(operLogService.detail(id));
     }
 
+    @PreAuthorize("hasAuthority('system:operlog:export')")
     @Operation(summary = "导出操作日志 xlsx(超 5 万行拒)")
     @OperLog(module = "操作日志", businessType = BusinessType.EXPORT)
     @GetMapping("/export")

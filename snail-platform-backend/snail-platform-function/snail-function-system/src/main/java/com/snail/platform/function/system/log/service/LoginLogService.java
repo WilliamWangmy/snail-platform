@@ -9,6 +9,7 @@ import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
 import com.snail.platform.framework.excel.ExcelExporter;
+import com.snail.platform.framework.security.authority.AuthorityChecker;
 import com.snail.platform.function.system.log.dto.LoginLogExportRow;
 import com.snail.platform.function.system.log.dto.LoginLogQuery;
 import com.snail.platform.function.system.log.dto.LoginLogVO;
@@ -21,15 +22,15 @@ import org.springframework.stereotype.Service;
 
 /**
  * 职责:登录日志查询面——分页筛选(用户名/IP/结果/时间范围)与 xlsx 导出;写路径在 auth 的登录链,这里只读。
- * 租户钉死口径与 OperLogService 完全一致(ignore 表,边界只能由 Service 显式给):平台侧可按租户筛或不筛,
- * 其余租户锁本租户;tenant_id=0 的"归属不明失败"行只有平台侧看得见——它本就不属于任何租户。
+ * 租户钉死口径与 OperLogService 完全一致(ignore 表,边界只能由 Service 显式给):持有 platform:loginlog:all
+ * 者可跨租户筛,其余锁本租户;tenant_id=0 的"归属不明失败"行只有平台侧看得见——它本就不属于任何租户。
  * 上游:LoginLogController;下游:SysLoginLogMapper、ExcelExporter。
  */
 @Service
 public class LoginLogService {
 
-    /** 平台侧判定:默认租户 ID=1,与操作日志同一口径 */
-    private static final Long PLATFORM_TENANT_ID = 1L;
+    /** 跨租户判定权限码,与操作日志同一口径 */
+    private static final String PLATFORM_ALL = "platform:loginlog:all";
 
     /** 导出行数上限,超出拒绝 */
     private static final long EXPORT_ROW_LIMIT = 50_000L;
@@ -75,7 +76,7 @@ public class LoginLogService {
     }
 
     private boolean isPlatform() {
-        return PLATFORM_TENANT_ID.equals(TenantContextHolder.get());
+        return AuthorityChecker.has(PLATFORM_ALL);
     }
 
     private static boolean notBlank(String s) {

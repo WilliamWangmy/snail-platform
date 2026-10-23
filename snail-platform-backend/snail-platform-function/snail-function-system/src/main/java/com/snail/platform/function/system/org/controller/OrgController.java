@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,18 +38,21 @@ public class OrgController {
         this.orgService = orgService;
     }
 
+    @PreAuthorize("hasAuthority('system:org:list')")
     @Operation(summary = "组织整棵树")
     @GetMapping("/tree")
     public R<List<OrgNodeVO>> tree() {
         return R.ok(orgService.tree());
     }
 
+    @PreAuthorize("hasAuthority('system:org:list')")
     @Operation(summary = "组织子树 ID 清单(含自身,档位三的内部查询面)")
     @GetMapping("/{orgId}/subtree")
     public R<List<Long>> subtree(@PathVariable Long orgId) {
         return R.ok(orgService.subtreeIds(orgId));
     }
 
+    @PreAuthorize("hasAuthority('system:org:create')")
     @Operation(summary = "新增子节点")
     @OperLog(module = "组织管理", businessType = BusinessType.INSERT)
     @PostMapping
@@ -56,6 +60,7 @@ public class OrgController {
         return R.ok(orgService.create(request));
     }
 
+    @PreAuthorize("hasAuthority('system:org:update')")
     @Operation(summary = "修改组织(改名/排序/停用启用)")
     @OperLog(module = "组织管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{orgId}")
@@ -64,6 +69,7 @@ public class OrgController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:org:update')")
     @Operation(summary = "移动节点(子树 ancestors 整体重写)")
     @OperLog(module = "组织管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{orgId}/move")
@@ -72,6 +78,7 @@ public class OrgController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:org:delete')")
     @Operation(summary = "删除组织(有下级或挂用户即拒)")
     @OperLog(module = "组织管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{orgId}")

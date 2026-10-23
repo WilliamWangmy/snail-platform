@@ -20,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -28,6 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * 上游:snail-platform-start 真实上下文(需本机 MySQL/Valkey,SNAIL_DB_* 注入口令,未设则整类跳过);
  * 下游:无断言外设。每步用纳秒后缀新建互不冲突的组织/角色/用户,组织每轮全新所以"新组织内"的总数断言可重复执行;
  * 根组织(1 号)会随轮次累积测试用户,对它的断言只用成员存在性不用总数。
+ * 权限:自定义角色经 sys_role_menu 直插"用户列表+新增用户"两码(授菜单端点属 ⑦-2),否则权限闸先于数据权限闸;
+ * 无角色用户现在停在 403,数据权限的"无角色退回本人"不再有 HTTP 观测面。
  * 残留:测试角色与根组织用户有意保留——销户不是本回归职责,与阶段③流程测试同一口径。
  */
 @SpringBootTest
@@ -42,6 +45,10 @@ class DataScopeFlowTest {
     /** 与业务同一套 Redis 客户端,用于预置验证码答案 */
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    /** 授权关系直插:⑦-2 前尚无授菜单端点,测试自备 sys_role_menu 行 */
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final Pattern DATA_ID = Pattern.compile("\"data\":(\\d+)");
     private static final Pattern DATA_LIST = Pattern.compile("\"data\":\\[([^\\]]*)]");
@@ -83,7 +90,7 @@ class DataScopeFlowTest {
         proveOwnOrgScope(suffix, token2, u2, u3, u6, u4, u5);
         proveSubtreeScope(suffix, token3, u2, u3, u5, u6, u4);
         proveSelfScope(suffix, token4, u6, u2, u4);
-        proveNoRoleFallbackEmpty(suffix, token5, u2);
+        proveNoRoleDenied(token5);
         proveAdminSeesAll(suffix, adminToken, u2, u3, u4, u5, u6);
         proveCountMatchesScope(suffix, token2, u6);
 
@@ -123,11 +130,13 @@ class DataScopeFlowTest {
         assertEquals(1, total(page), "档位四总数应只有 u6: " + page);
     }
 
-    /** 无角色退回本人且无任何自建行:可见集为空,列表 0 行 */
-    private void proveNoRoleFallbackEmpty(String suffix, String token5, String u2) throws Exception {
-        String page = userPage(token5, 100);
-        assertEquals(0, total(page), "无角色且无自建行应为 0 行: " + page);
-        assertFalse(page.contains(q(u2)), "无角色用户泄漏他人行: " + page);
+    /** 无角色即无权限码:权限闸先于数据权限闸,用户列表直接 403 */
+    private void proveNoRoleDenied(String token5) throws Exception {
+        String response = mockMvc.perform(get("/system/user/page").param("pageSize", "100")
+                        .header("Authorization", "Bearer " + token5))
+                .andExpect(status().isForbidden())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertEquals(403, jsonCode(response), "无角色用户应被权限闸拒绝: " + response);
     }
 
     /** 档位一(admin)不设限:窗口根本不开,全部测试用户可见 */
@@ -192,6 +201,7 @@ class DataScopeFlowTest {
         mockMvc.perform(delete("/system/org/" + orgX).header("Authorization", "Bearer " + adminToken));
         for (long roleId : new long[] {r2, r3, r4}) {
             mockMvc.perform(delete("/system/role/" + roleId).header("Authorization", "Bearer " + adminToken));
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE role_id = ?", roleId);
         }
     }
 
@@ -215,7 +225,16 @@ class DataScopeFlowTest {
         String body = "{\"roleName\":\"" + name + "\",\"roleCode\":\"" + code + "\",\"dataScope\":" + dataScope + ",\"sort\":9}";
         String response = postJson("/system/role", body, token);
         assertTrue(response.contains("\"code\":0"), "建角色失败: " + response);
-        return Long.parseLong(extract(DATA_ID, response));
+        long roleId = Long.parseLong(extract(DATA_ID, response));
+        grantMenus(roleId, 100L, 1001L);
+        return roleId;
+    }
+
+    /** 自定义角色补"用户列表+新增用户"两码,让四档数据权限仍能在 HTTP 面被观测 */
+    private void grantMenus(long roleId, long... menuIds) {
+        for (long menuId : menuIds) {
+            jdbcTemplate.update("INSERT INTO sys_role_menu (role_id, menu_id) VALUES (?, ?)", roleId, menuId);
+        }
     }
 
     private String createOrg(long parentId, String name, String token) throws Exception {

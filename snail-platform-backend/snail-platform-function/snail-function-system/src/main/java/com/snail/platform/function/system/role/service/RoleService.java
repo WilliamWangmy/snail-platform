@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
+import com.snail.platform.function.system.menu.entity.SysRoleMenu;
+import com.snail.platform.function.system.menu.mapper.SysRoleMenuMapper;
 import com.snail.platform.function.system.role.dto.RoleCreateRequest;
 import com.snail.platform.function.system.role.dto.RoleQuery;
 import com.snail.platform.function.system.role.dto.RoleUpdateRequest;
@@ -15,6 +17,7 @@ import com.snail.platform.function.system.role.entity.SysUserRole;
 import com.snail.platform.function.system.role.mapper.SysRoleMapper;
 import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
 import java.util.Objects;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 职责:角色管理——分页检索、新增、修改、停用/启用、删除。
  * 守护口径:role_code 建后不可改(接口契约里干脆没有它);is_system=1 内置角色不可删;
  * 被 sys_user_role 引用的角色不可删;逻辑删除后 role_code 终身占用不释放(键值不回收口径)。
- * 上游:RoleController;下游:sys_role 读写(拦截器圈定本租户)、sys_user_role 引用计数。
+ * 角色状态/资料变更后 userPerms 与 userSession 整体失效:按角色反查用户不如全清便宜,且不会漏。
+ * 上游:RoleController;下游:sys_role 读写(拦截器圈定本租户)、sys_user_role 引用计数、sys_role_menu 随删清理。
  */
 @Service
 public class RoleService {
@@ -33,9 +37,14 @@ public class RoleService {
     /** 授权关系读,删除前置检查用 */
     private final SysUserRoleMapper userRoleMapper;
 
-    public RoleService(SysRoleMapper roleMapper, SysUserRoleMapper userRoleMapper) {
+    /** 角色-菜单授权,删角色时同事务清行 */
+    private final SysRoleMenuMapper roleMenuMapper;
+
+    public RoleService(SysRoleMapper roleMapper, SysUserRoleMapper userRoleMapper,
+                       SysRoleMenuMapper roleMenuMapper) {
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
+        this.roleMenuMapper = roleMenuMapper;
     }
 
     public PageResult<RoleVO> page(RoleQuery query) {
@@ -69,6 +78,7 @@ public class RoleService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void update(Long roleId, RoleUpdateRequest request) {
         SysRole role = requireRole(roleId);
         roleMapper.update(null, Wrappers.<SysRole>lambdaUpdate()
@@ -81,6 +91,7 @@ public class RoleService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void changeStatus(Long roleId, int status) {
         SysRole role = requireRole(roleId);
         if (Objects.equals(role.getStatus(), status)) {
@@ -92,6 +103,7 @@ public class RoleService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void delete(Long roleId) {
         SysRole role = requireRole(roleId);
         if (Objects.equals(role.getIsSystem(), 1)) {
@@ -101,6 +113,8 @@ public class RoleService {
                 .eq(SysUserRole::getRoleId, roleId)) > 0) {
             throw BizException.badRequest("角色下有授权用户,不能删除");
         }
+        roleMenuMapper.delete(Wrappers.<SysRoleMenu>lambdaQuery()
+                .eq(SysRoleMenu::getRoleId, roleId));
         roleMapper.deleteById(roleId);
     }
 

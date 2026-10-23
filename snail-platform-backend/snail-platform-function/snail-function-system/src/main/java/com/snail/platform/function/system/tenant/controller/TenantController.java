@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 职责:平台侧租户管理入口——列表、开通、资料修改、停用/启用;不提供删除(销户是运维动作,页面不给入口)。
- * 上游:平台管理端;下游:TenantService。权限码收口在后续阶段,本期任何已认证用户可达,口径见 SnailSecurityConfig。
+ * 上游:平台管理端;下游:TenantService。四个端点全挂 platform:tenant:* 权限码,仅有平台角色显式授权者可达。
  */
 @Tag(name = "租户管理")
 @Validated
@@ -41,12 +42,14 @@ public class TenantController {
         this.tenantService = tenantService;
     }
 
+    @PreAuthorize("hasAuthority('platform:tenant:list')")
     @Operation(summary = "租户分页列表")
     @GetMapping("/page")
     public R<PageResult<TenantVO>> page(@Valid TenantQuery query) {
         return R.ok(tenantService.page(query));
     }
 
+    @PreAuthorize("hasAuthority('platform:tenant:create')")
     @Operation(summary = "开通租户(同事务复制根组织/内置角色/管理员模板)")
     @OperLog(module = "租户管理", businessType = BusinessType.INSERT)
     @PostMapping
@@ -54,6 +57,7 @@ public class TenantController {
         return R.ok(tenantService.provision(request));
     }
 
+    @PreAuthorize("hasAuthority('platform:tenant:update')")
     @Operation(summary = "修改租户资料")
     @OperLog(module = "租户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{tenantId}")
@@ -62,6 +66,7 @@ public class TenantController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('platform:tenant:update')")
     @Operation(summary = "停用/启用租户")
     @OperLog(module = "租户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{tenantId}/status")

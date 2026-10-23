@@ -9,7 +9,14 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,10 +42,11 @@ class ArchitectureRulesTest {
 
     /** system 内登记在案的跨子域读边:引用方子域 -> 被引子域。
      * user->role 数据权限判定与授权读写;user->org/user->tenant 归属与上限校验;role->user 删角色引用计数;
-     * role->org 档位三取子树(只准经 OrgService 的缓存方法);tenant->* 开通复制种子;org->user 删组织挂人前置检查 */
+     * role->org 档位三取子树(只准经 OrgService 的缓存方法);role->menu 解析权限码与授权维护;
+     * tenant->* 开通复制种子;org->user 删组织挂人前置检查 */
     private static final Set<String> ALLOWED_SYSTEM_EDGES = Set.of(
             "user->role", "user->org", "user->tenant",
-            "role->user", "role->org",
+            "role->user", "role->org", "role->menu",
             "org->user",
             "tenant->org", "tenant->role", "tenant->user");
 
@@ -69,6 +77,9 @@ class ArchitectureRulesTest {
                 for (JavaMethod method : owner.getMethods()) {
                     if (!method.getModifiers().contains(JavaModifier.PUBLIC)) {
                         continue;
+                    }
+                    if (isMapped(method) && !method.isAnnotatedWith(PreAuthorize.class)) {
+                        violations.add(method.getFullName() + ":公开端点缺 @PreAuthorize(权限全量收口)");
                     }
                     long count = method.getParameterAnnotations().stream()
                             .filter(params -> params.stream().map(JavaAnnotation::getRawType)
@@ -131,6 +142,16 @@ class ArchitectureRulesTest {
             return dot < 0 ? rest : rest.substring(0, dot);
         }
         return packageName.equals(AUTH) || packageName.startsWith(AUTH + ".") ? "auth" : null;
+    }
+
+    /** 是否为 MVC 映射方法:每个映射端点都必须有 @PreAuthorize,公开端点写 permitAll */
+    private static boolean isMapped(JavaMethod method) {
+        return method.isAnnotatedWith(GetMapping.class)
+                || method.isAnnotatedWith(PostMapping.class)
+                || method.isAnnotatedWith(PutMapping.class)
+                || method.isAnnotatedWith(DeleteMapping.class)
+                || method.isAnnotatedWith(PatchMapping.class)
+                || method.isAnnotatedWith(RequestMapping.class);
     }
 
     private static boolean isImplementationLayer(String targetPackage) {

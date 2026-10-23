@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,12 +35,14 @@ public class LoginLogController {
         this.loginLogService = loginLogService;
     }
 
+    @PreAuthorize("hasAuthority('system:loginlog:list')")
     @Operation(summary = "登录日志分页")
     @GetMapping("/page")
     public R<PageResult<LoginLogVO>> page(@Valid LoginLogQuery query) {
         return R.ok(loginLogService.page(query));
     }
 
+    @PreAuthorize("hasAuthority('system:loginlog:export')")
     @Operation(summary = "导出登录日志 xlsx(超 5 万行拒)")
     @OperLog(module = "登录日志", businessType = BusinessType.EXPORT)
     @GetMapping("/export")

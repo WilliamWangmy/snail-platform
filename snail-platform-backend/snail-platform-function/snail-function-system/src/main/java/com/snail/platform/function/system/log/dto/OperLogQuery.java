@@ -10,7 +10,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 /**
  * 职责:操作日志分页/导出共用查询契约。参数超过三个即收敛成对象,两端口径天然一致。
  * 上游:OperLogController 的 GET 查询参数绑定;下游:OperLogService.page/export。
- * 口径:tenantId 仅平台侧(默认租户 1)生效,其余租户由 Service 钉死本租户;时间参数 ISO 局部日期时间格式;
+ * 口径:tenantId 仅持 platform:operlog:all 者生效,其余租户由 Service 钉死本租户;时间参数 ISO 局部日期时间格式;
  * 实现 framework-core PageQuery,分页对象由 PageAssembler 单点装配。
  */
 @Schema(description = "操作日志查询参数")

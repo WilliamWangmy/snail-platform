@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,18 +45,21 @@ public class UserController {
         this.userService = userService;
     }
 
+    @PreAuthorize("hasAuthority('system:user:list')")
     @Operation(summary = "用户分页列表")
     @GetMapping("/page")
     public R<PageResult<UserVO>> page(@Valid UserQuery query) {
         return R.ok(userService.page(query));
     }
 
+    @PreAuthorize("hasAuthority('system:user:list')")
     @Operation(summary = "用户详情(含授权角色集)")
     @GetMapping("/{userId}")
     public R<UserVO> detail(@PathVariable Long userId) {
         return R.ok(userService.detail(userId));
     }
 
+    @PreAuthorize("hasAuthority('system:user:create')")
     @Operation(summary = "新增用户")
     @OperLog(module = "用户管理", businessType = BusinessType.INSERT)
     @PostMapping
@@ -63,6 +67,7 @@ public class UserController {
         return R.ok(userService.create(request));
     }
 
+    @PreAuthorize("hasAuthority('system:user:update')")
     @Operation(summary = "修改用户")
     @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{userId}")
@@ -71,6 +76,7 @@ public class UserController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:user:reset-password')")
     @Operation(summary = "重置密码")
     @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{userId}/password")
@@ -80,6 +86,7 @@ public class UserController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:user:update')")
     @Operation(summary = "停用/启用用户")
     @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{userId}/status")
@@ -90,6 +97,7 @@ public class UserController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:user:delete')")
     @Operation(summary = "删除用户(逻辑删,同事务清授权)")
     @OperLog(module = "用户管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{userId}")
@@ -98,6 +106,7 @@ public class UserController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:user:assign-role')")
     @Operation(summary = "分配角色(全量覆盖)")
     @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{userId}/roles")

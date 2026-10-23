@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,12 +43,14 @@ public class RoleController {
         this.roleService = roleService;
     }
 
+    @PreAuthorize("hasAuthority('system:role:list')")
     @Operation(summary = "角色分页列表")
     @GetMapping("/page")
     public R<PageResult<RoleVO>> page(@Valid RoleQuery query) {
         return R.ok(roleService.page(query));
     }
 
+    @PreAuthorize("hasAuthority('system:role:create')")
     @Operation(summary = "新增角色")
     @OperLog(module = "角色管理", businessType = BusinessType.INSERT)
     @PostMapping
@@ -55,6 +58,7 @@ public class RoleController {
         return R.ok(roleService.create(request));
     }
 
+    @PreAuthorize("hasAuthority('system:role:update')")
     @Operation(summary = "修改角色")
     @OperLog(module = "角色管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{roleId}")
@@ -63,6 +67,7 @@ public class RoleController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:role:update')")
     @Operation(summary = "停用/启用角色")
     @OperLog(module = "角色管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{roleId}/status")
@@ -73,6 +78,7 @@ public class RoleController {
         return R.ok(null);
     }
 
+    @PreAuthorize("hasAuthority('system:role:delete')")
     @Operation(summary = "删除角色(内置或被授权引用即拒)")
     @OperLog(module = "角色管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{roleId}")

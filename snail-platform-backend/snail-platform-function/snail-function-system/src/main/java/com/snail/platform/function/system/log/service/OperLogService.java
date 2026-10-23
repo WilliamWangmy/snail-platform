@@ -9,6 +9,7 @@ import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
 import com.snail.platform.framework.excel.ExcelExporter;
+import com.snail.platform.framework.security.authority.AuthorityChecker;
 import com.snail.platform.function.system.log.dto.OperLogDetailVO;
 import com.snail.platform.function.system.log.dto.OperLogExportRow;
 import com.snail.platform.function.system.log.dto.OperLogListVO;
@@ -23,16 +24,16 @@ import org.springframework.stereotype.Service;
 
 /**
  * 职责:操作日志查询面——分页筛选、详情取证、xlsx 导出。sys_oper_log 在租户拦截器 ignore 清单,
- * 租户边界由本服务显式钉死:非平台租户一律锁本租户(请求里的 tenantId 参数一概不认),
- * 平台侧(默认租户 1,即 sys_tenant 的运营方)可按租户筛,不筛即跨租户全量。
+ * 租户边界由本服务显式钉死:无 platform:operlog:all 者一律锁本租户(请求里的 tenantId 参数一概不认),
+ * 持有该码者可按租户筛,不筛即跨租户全量。
  * 上游:OperLogController;下游:SysOperLogMapper、ExcelExporter。
  * 口径:日志只增不删,这里没有任何写路径;导出行数超上限即拒,引导缩小时间范围而不是悄悄截断。
  */
 @Service
 public class OperLogService {
 
-    /** 平台侧判定:默认租户 ID=1 即运营方,唯一一处硬编码口径 */
-    private static final Long PLATFORM_TENANT_ID = 1L;
+    /** 跨租户判定权限码,平台面唯一口径 */
+    private static final String PLATFORM_ALL = "platform:operlog:all";
 
     /** 导出行数上限,超出拒绝 */
     private static final long EXPORT_ROW_LIMIT = 50_000L;
@@ -93,7 +94,7 @@ public class OperLogService {
     }
 
     private boolean isPlatform() {
-        return PLATFORM_TENANT_ID.equals(TenantContextHolder.get());
+        return AuthorityChecker.has(PLATFORM_ALL);
     }
 
     private static boolean notBlank(String s) {
