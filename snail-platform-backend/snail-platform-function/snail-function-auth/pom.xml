@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-function-auth:认证业务模块——验证码、登录校验链、暴力计数、令牌签发接线、/system/auth 端点。
+  只持有认证流程;用户/租户/登录日志的表与 Mapper 归 snail-function-system,本模块跨模块取用。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-function</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-function-auth</artifactId>
+    <name>snail-function-auth</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-security</artifactId>
+        </dependency>
+        <!-- 登录要按用户名定位用户、带出租户、写登录日志——三张表的 PO/Mapper 在 system;
+             这是当前唯一的跨模块边,业务互调变密时收敛为 system 的 api 包契约 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-system</artifactId>
+        </dependency>
+    </dependencies>
+</project>
