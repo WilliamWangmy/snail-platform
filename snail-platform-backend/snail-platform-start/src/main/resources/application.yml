@@ -14,7 +14,7 @@ spring:
   cache:
     type: caffeine
     # 缓存名单点声明，业务侧不各自建缓存
-    cache-names: dictItem, menuTree, tenantConfig, orgSubtree
+    cache-names: dictItem, menuTree, tenantConfig, orgSubtree, userPerms, userSession
     caffeine:
       spec: maximumSize=2000,expireAfterWrite=10m
 
@@ -38,5 +38,7 @@ snail:
         - sys_user_role
         - sys_login_log
         - sys_oper_log
+        - sys_menu
+        - sys_role_menu
     pagination:
       max-limit: 500

@@ -1,13 +1,17 @@
 package com.snail.platform.framework.security.config;
 
 import com.snail.platform.framework.security.SnailSecurityProperties;
+import com.snail.platform.framework.security.authority.UserAuthorityProvider;
+import com.snail.platform.framework.security.login.LoginUserProvider;
 import com.snail.platform.framework.security.token.JwtTokenService;
 import com.snail.platform.framework.security.web.SnailAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -17,11 +21,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 /**
  * 职责:HTTP 安全链的唯一装配——无状态 JWT、白名单放行、其余一律认证;401/403 输出 R 同构 JSON。
  * 白名单只收认证入口与接口文档路径,业务端点不允许加进来。
- * 上游:framework-security 的令牌服务与认证过滤器;下游:全部 HTTP 请求。
- * 权限码判定(按钮/接口级 RBAC)在 sys_menu 设计后接入,本期 anyRequest().authenticated() 封顶。
+ * 权限码两层:METHOD 级 @PreAuthorize 判接口准入,过滤器经 UserAuthorityProvider 注入当前用户权限码。
+ * 上游:framework-security 的令牌服务、认证过滤器与权限端口;下游:全部 HTTP 请求。
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
+@EnableMethodSecurity
 @EnableConfigurationProperties(SnailSecurityProperties.class)
 public class SnailSecurityConfig {
 
@@ -40,7 +45,9 @@ public class SnailSecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain snailSecurityFilterChain(HttpSecurity http, JwtTokenService jwtTokenService)
+    public SecurityFilterChain snailSecurityFilterChain(HttpSecurity http, JwtTokenService jwtTokenService,
+                                                        ObjectProvider<UserAuthorityProvider> authorityProviders,
+                                                        ObjectProvider<LoginUserProvider> loginUserProviders)
             throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> {
@@ -50,7 +57,8 @@ public class SnailSecurityConfig {
                         .requestMatchers(HttpMethod.GET, WHITELIST).permitAll()
                         .requestMatchers(WHITELIST).permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new SnailAuthFilter(jwtTokenService), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new SnailAuthFilter(jwtTokenService, authorityProviders, loginUserProviders),
+                        UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, ex) ->
                                 writeJson(response, 401, "未认证或登录已过期"))
