@@ -16,8 +16,8 @@ public final class SensitiveDataMasker {
 
     /** 敏感字段名单:整键精确匹配、不区分大小写,不做子串(防把 passwordPolicy 这类配置键误伤) */
     private static final List<String> SENSITIVE_KEYS = List.of(
-            "password", "newPassword", "oldPassword", "rawPassword",
-            "phone", "mobile", "idCard", "idNumber", "bankCard",
+            "password", "newPassword", "oldPassword", "rawPassword", "adminPassword",
+            "phone", "mobile", "contactPhone", "idCard", "idNumber", "bankCard",
             "captchaCode");
 
     /** 由名单一次性拼出的替换正则:捕获 "键" 与冒号,吃掉紧随其后的字符串值 */
