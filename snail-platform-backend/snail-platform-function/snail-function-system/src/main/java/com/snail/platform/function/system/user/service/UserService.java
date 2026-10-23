@@ -4,7 +4,7 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.snail.platform.framework.core.context.AuditActorHolder;
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
@@ -28,6 +28,7 @@ import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.util.List;
 import java.util.Objects;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 新增受租户 accountLimit 约束(只拦新增不追认存量);删除同事务物理清 sys_user_role——人不在了授权就该空;
  * 自我保护:不允许停用或删除当前登录者自己,防管理员把自己锁在门外;列表查询按当前登录者 data_scope 开窗过滤,
  * 详情与前置校验按 ID 走窗口外——权限只约束"检索面",不拦"已知 ID 的定点读写"。
+ * 授权集变化与删号会让该用户的 userPerms 缓存失效,避免旧权限继续生效;
+ * 昵称/组织/授权变化与删号同时让 userSession 失效,登录人快照不落后于档案。
  * 上游:UserController;下游:sys_user/sys_user_role 写读、sys_org/sys_role 前置校验、sys_tenant 上限读取。
  */
 @Service
@@ -118,6 +121,7 @@ public class UserService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void update(Long userId, UserUpdateRequest request) {
         SysUser user = requireUser(userId);
         requireUsableOrg(request.orgId());
@@ -141,7 +145,7 @@ public class UserService {
     @Transactional
     public void changeStatus(Long userId, int status) {
         SysUser user = requireUser(userId);
-        if (status == 1 && Objects.equals(AuditActorHolder.get(), userId)) {
+        if (status == 1 && Objects.equals(LoginUserContextHolder.userId(), userId)) {
             throw BizException.badRequest("不能停用自己的账号");
         }
         if (Objects.equals(user.getStatus(), status)) {
@@ -154,9 +158,10 @@ public class UserService {
 
     /** 逻辑删用户 + 物理清授权同事务:授权关系不是历史 */
     @Transactional
+    @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void delete(Long userId) {
         requireUser(userId);
-        if (Objects.equals(AuditActorHolder.get(), userId)) {
+        if (Objects.equals(LoginUserContextHolder.userId(), userId)) {
             throw BizException.badRequest("不能删除自己的账号");
         }
         userMapper.deleteById(userId);
@@ -165,6 +170,7 @@ public class UserService {
 
     /** 全量覆盖:先删该用户全部授权再按新集插入,提交集即最终态 */
     @Transactional
+    @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void assignRoles(Long userId, List<Long> roleIds) {
         requireUser(userId);
         replaceRoles(userId, roleIds);

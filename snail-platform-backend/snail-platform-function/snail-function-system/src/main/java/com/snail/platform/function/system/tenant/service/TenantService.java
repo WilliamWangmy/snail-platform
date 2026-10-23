@@ -23,6 +23,7 @@ import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.util.Objects;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -130,6 +131,7 @@ public class TenantService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void update(Long tenantId, TenantUpdateRequest request) {
         requireTenant(tenantId);
         // updateById 会跳过 null,而"清空到期时间/账号上限"恰是合法意图,故逐字段显式 set

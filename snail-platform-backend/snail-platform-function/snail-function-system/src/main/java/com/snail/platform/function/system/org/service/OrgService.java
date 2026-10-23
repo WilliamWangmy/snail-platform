@@ -87,6 +87,7 @@ public class OrgService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void update(Long orgId, OrgUpdateRequest request) {
         SysOrg org = requireOrg(orgId);
         orgMapper.update(null, Wrappers.<SysOrg>lambdaUpdate()
