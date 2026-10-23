@@ -5,6 +5,7 @@ target/
 node_modules/
 dist/
 *.local
+*.tsbuildinfo
 
 # Python 线（立项后生效）
 __pycache__/
