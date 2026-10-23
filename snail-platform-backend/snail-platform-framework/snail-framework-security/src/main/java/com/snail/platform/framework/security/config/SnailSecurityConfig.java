@@ -1,0 +1,68 @@
+package com.snail.platform.framework.security.config;
+
+import com.snail.platform.framework.security.SnailSecurityProperties;
+import com.snail.platform.framework.security.token.JwtTokenService;
+import com.snail.platform.framework.security.web.SnailAuthFilter;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+/**
+ * 职责:HTTP 安全链的唯一装配——无状态 JWT、白名单放行、其余一律认证;401/403 输出 R 同构 JSON。
+ * 白名单只收认证入口与接口文档路径,业务端点不允许加进来。
+ * 上游:framework-security 的令牌服务与认证过滤器;下游:全部 HTTP 请求。
+ * 权限码判定(按钮/接口级 RBAC)在 sys_menu 设计后接入,本期 anyRequest().authenticated() 封顶。
+ */
+@Configuration(proxyBeanMethods = false)
+@EnableWebSecurity
+@EnableConfigurationProperties(SnailSecurityProperties.class)
+public class SnailSecurityConfig {
+
+    /** 认证与文档白名单;登录相关窄开口,别扩 */
+    private static final String[] WHITELIST = {
+            "/system/auth/captcha",
+            "/system/auth/login",
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
+    };
+
+    @Bean
+    public JwtTokenService jwtTokenService(SnailSecurityProperties properties) {
+        return new JwtTokenService(properties);
+    }
+
+    @Bean
+    public SecurityFilterChain snailSecurityFilterChain(HttpSecurity http, JwtTokenService jwtTokenService)
+            throws Exception {
+        http.csrf(csrf -> csrf.disable())
+                .cors(cors -> {
+                })
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(requests -> requests
+                        .requestMatchers(HttpMethod.GET, WHITELIST).permitAll()
+                        .requestMatchers(WHITELIST).permitAll()
+                        .anyRequest().authenticated())
+                .addFilterBefore(new SnailAuthFilter(jwtTokenService), UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint((request, response, ex) ->
+                                writeJson(response, 401, "未认证或登录已过期"))
+                        .accessDeniedHandler((request, response, ex) ->
+                                writeJson(response, 403, "无权限访问")));
+        return http.build();
+    }
+
+    /** 入口点直接吐与 R 同构的最小 JSON,避免为一行响应引序列化器 */
+    private void writeJson(HttpServletResponse response, int code, String message) throws java.io.IOException {
+        response.setStatus(code);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"code\":" + code + ",\"message\":\"" + message + "\",\"data\":null}");
+    }
+}
