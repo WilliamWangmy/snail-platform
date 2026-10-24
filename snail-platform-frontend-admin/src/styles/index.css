@@ -1,7 +1,38 @@
+/* 视觉令牌:值由 stores/theme.ts 在运行时写入 :root,这里只放浅色默认值与全局补充样式。 */
 :root {
-  --snail-page-bg: #f5f7fa;
-  --snail-content-radius: 4px;
-  --snail-content-padding: 16px;
+  --app-primary: #0f9f82;
+  --app-accent: #e0a14d;
+  --app-bg: #f3f7f7;
+  --app-card: #ffffff;
+  --app-soft: #f7fbfa;
+  --app-soft-2: #eef5f4;
+  --app-ink: #17302f;
+  --app-muted: #728583;
+  --app-line: #e5eeed;
+  --app-sidebar: #0a302c;
+  --app-sidebar-2: #072421;
+  --app-sidebar-text: rgba(224, 255, 248, 0.62);
+  --app-sidebar-muted: rgba(197, 255, 243, 0.38);
+  --app-on-primary: #ffffff;
+  --app-success: #0d977d;
+  --app-warning: #b77a29;
+  --app-danger: #dc655f;
+  --app-info: #4b7fa9;
+  --app-chart-1: #0fa78b;
+  --app-chart-2: #59cbb6;
+  --app-chart-3: #eab15c;
+  --app-chart-4: #8aa7c4;
+  --app-shadow: 0 14px 38px rgba(16, 61, 57, 0.07);
+  --app-radius: 16px;
+  --app-primary-rgb: 15, 159, 130;
+  --app-accent-rgb: 224, 161, 77;
+  --app-card-rgb: 255, 255, 255;
+  --app-success-rgb: 13, 151, 125;
+  --app-warning-rgb: 183, 122, 41;
+  --app-danger-rgb: 220, 101, 95;
+  --app-info-rgb: 75, 127, 169;
+  --app-primary-tint: #7bcaba;
+  --app-sidebar-glow: #0b423a;
 }
 
 html,
@@ -12,6 +43,481 @@ body,
 }
 
 body {
-  background-color: var(--snail-page-bg);
+  background: var(--app-bg);
+  color: var(--app-ink);
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+}
+
+.app-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+
+.el-button > .app-icon + span,
+.el-button > .app-icon {
+  margin-right: 5px;
+}
+
+.el-button > .app-icon:last-child {
+  margin-right: 0;
+}
+
+/* 品牌标识:登录页与侧栏共用同一套标记,文字色随容器覆盖。 */
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 11px;
+  color: var(--app-on-primary);
+  background: var(--app-primary);
+}
+
+.brand-name {
+  color: #fff;
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.brand-name span {
+  color: var(--app-accent);
+}
+
+.brand-sub {
+  margin-top: 2px;
+  color: var(--app-sidebar-muted);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+
+/* 页面骨架:布局层统一包一层 .page-wrap,各页只写业务内容。 */
+.page-wrap {
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 16px;
+  height: 1px;
+  background: var(--app-primary);
+}
+
+.page-head h1 {
+  margin: 6px 0 0;
+  color: var(--app-ink);
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.page-head p {
+  margin: 6px 0 0;
+  color: var(--app-muted);
+  font-size: 12.5px;
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+}
+
+/* 卡片:表头/表体留白与表格式列表的统一口径。 */
+.el-card {
+  border-radius: var(--app-radius);
+  border-color: var(--app-line);
+  background: var(--app-card);
+  box-shadow: var(--app-shadow);
+}
+
+.el-card__header {
+  padding: 16px 20px;
+  border-bottom-color: var(--app-line);
+}
+
+.el-card__body {
+  padding: 18px 20px;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.card-head h3 {
+  margin: 0;
+  color: var(--app-ink);
+  font-size: 14px;
+}
+
+.card-head p {
+  margin: 5px 0 0;
+  color: var(--app-muted);
+  font-size: 10.5px;
+}
+
+.table-card > .el-card__body {
+  padding: 0;
+}
+
+.table-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.table-card-head h3 {
+  margin: 0;
+  color: var(--app-ink);
+  font-size: 14px;
+}
+
+.table-card-head h3 span {
+  margin-left: 6px;
+  color: var(--app-muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 19px;
+  border-top: 1px solid var(--app-line);
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.table-footer .el-pagination {
+  margin-left: auto;
+}
+
+.filter-card {
+  margin-bottom: 15px;
+}
+
+.filter-card .el-card__body {
+  padding: 14px 17px 2px;
+}
+
+.filter-form .el-form-item {
+  margin-right: 14px;
+  margin-bottom: 12px;
+}
+
+.filter-form .el-form-item__label {
+  color: var(--app-muted);
+  font-size: 10.5px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 15px;
+}
+
+.mini-stat .el-card__body {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 15px 17px;
+}
+
+.mini-stat b {
+  display: block;
+  color: var(--app-ink);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.mini-stat span {
+  display: block;
+  margin-top: 3px;
+  color: var(--app-muted);
+  font-size: 9.5px;
+}
+
+.mini-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 10px;
+  color: var(--app-primary);
+  background: var(--app-soft);
+}
+
+/* 状态标记:列表页统一用它替代裸 ElTag,色值全部走主题令牌。 */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  color: var(--app-muted);
+  background: var(--app-soft);
+  font-size: 9.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-pill::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill.success {
+  color: var(--app-success);
+  background: rgba(var(--app-success-rgb), 0.12);
+}
+
+.status-pill.info {
+  color: var(--app-info);
+  background: rgba(var(--app-info-rgb), 0.12);
+}
+
+.status-pill.warning {
+  color: var(--app-warning);
+  background: rgba(var(--app-warning-rgb), 0.12);
+}
+
+.status-pill.danger {
+  color: var(--app-danger);
+  background: rgba(var(--app-danger-rgb), 0.12);
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.status-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-dot.on {
+  color: var(--app-success);
+}
+
+.status-dot.on::before {
+  box-shadow: 0 0 0 3px rgba(var(--app-success-rgb), 0.12);
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-cell b {
+  display: block;
+  color: var(--app-ink);
+  font-size: 11.5px;
+}
+
+.user-cell span {
+  display: block;
+  margin-top: 2px;
+  color: var(--app-muted);
+  font-size: 9px;
+}
+
+.inline-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.el-avatar {
+  font-weight: 650;
+}
+
+/* 表格:紧凑字号与透明底,边框交给主题线色。 */
+.el-table {
+  --el-table-header-bg-color: var(--app-soft);
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-soft);
+  --el-table-border-color: var(--app-line);
+  --el-table-text-color: var(--app-muted);
+  --el-table-header-text-color: var(--app-muted);
+  background: transparent;
+}
+
+.el-table th.el-table__cell {
+  background: var(--app-soft);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.el-table td.el-table__cell {
+  font-size: 11.5px;
+  border-bottom-color: var(--app-line);
+}
+
+/* 固定列粘性单元格的底色继承自 tr:tr 必须实底,否则横向滚动时下面的列会透出来。 */
+.el-table tr {
+  background: var(--app-card);
+}
+
+.el-table::before,
+.el-table__inner-wrapper::before {
+  background: var(--app-line);
+}
+
+/* 内缩用外边距而非内边距:el-table 按自身 clientWidth 计算列宽,内边距会让表体横向溢出;width:auto 让外边距真正参与宽度计算。 */
+.table-card .el-table {
+  width: auto;
+  margin: 0 6px;
+}
+
+.el-button--primary:not(.is-plain):not(.is-link):not(.is-text) {
+  --el-button-text-color: var(--app-on-primary);
+  --el-button-hover-text-color: var(--app-on-primary);
+  --el-button-active-text-color: var(--app-on-primary);
+}
+
+.el-radio-button.is-active .el-radio-button__inner {
+  color: var(--app-on-primary);
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+  box-shadow: -1px 0 0 0 var(--app-primary);
+}
+
+.el-dialog {
+  border-radius: var(--app-radius);
+}
+
+/* 主题面板弹层同样 teleport 到 body,宽度上限放全局。 */
+.theme-popper {
+  max-width: calc(100vw - 24px);
+}
+
+/* 折叠侧栏的二级菜单弹层被 teleport 到 body,只能在全局样式里染深色底。 */
+.el-menu--popup {
+  min-width: 168px;
+  padding: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: var(--app-sidebar) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+}
+
+.el-menu--popup .el-menu-item {
+  height: 38px;
+  margin: 2px 0;
+  border-radius: 7px;
+  color: var(--app-sidebar-text) !important;
+  font-size: 12px;
+}
+
+.el-menu--popup .el-menu-item:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+.el-menu--popup .el-menu-item.is-active {
+  color: #fff !important;
+  background: linear-gradient(90deg, rgba(var(--app-primary-rgb), 0.22), rgba(var(--app-primary-rgb), 0.03)) !important;
+}
+
+@media (max-width: 760px) {
+  .page-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .page-head h1 {
+    font-size: 23px;
+  }
+
+  .head-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-form .el-form-item {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .filter-form .el-form-item .el-input,
+  .filter-form .el-form-item .el-select,
+  .filter-form .el-form-item .el-tree-select {
+    width: 100% !important;
+  }
+
+  .table-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .table-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .el-dialog {
+    width: calc(100vw - 24px) !important;
+  }
+
+  .el-message-box {
+    max-width: calc(100vw - 32px);
+  }
 }
