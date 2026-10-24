@@ -21,7 +21,8 @@ import org.apache.ibatis.session.ResultHandler;
  * 职责:数据权限谓词的 SQL 注入点——线程窗口里有 DataScopeFilter 时,把 "(org IN (...) OR create_by = 本人)"
  * AND 进 SELECT 的 WHERE;四档并集算法在业务判定服务,这里只负责机械拼接,不认任何表名与业务语义。
  * 装配顺序固定在租户之后、分页之前:分页 count 会先于 beforeQuery 逐序消费改写后的 SQL,顺序换了 count 就漏权限。
- * 只改写单表 PlainSelect;UNION/JOIN 形态原样放过——权限口径下放到消费层,业务库单据接进来时再扩。
+ * 只改写单表 PlainSelect;UNION/JOIN 等非单表形态一律 fail-fast——静默放过就是数据面越权且不可观测,
+ * 确需豁免的 Mapper 用 @InterceptorIgnore(dataPermission) 显式声明。
  * 上游:MybatisPlusConfig;下游:开窗的业务列表查询产生的 SELECT。
  */
 public class SnailDataScopeInnerInterceptor implements InnerInterceptor {
@@ -43,7 +44,14 @@ public class SnailDataScopeInnerInterceptor implements InnerInterceptor {
             throw new IllegalStateException("数据权限无法解析查询 SQL: " + ms.getId(), e);
         }
         if (!(statement instanceof PlainSelect select)) {
-            return;
+            throw new IllegalStateException(
+                    "数据权限窗口内只允许单表 SELECT,UNION 等形态注入不了谓词;确需豁免请在 Mapper 用 "
+                            + "@InterceptorIgnore(dataPermission) 显式声明: " + ms.getId());
+        }
+        if (select.getJoins() != null && !select.getJoins().isEmpty()) {
+            throw new IllegalStateException(
+                    "数据权限窗口内不允许 JOIN 查询,谓词落到多表 WHERE 语义未定义;确需豁免请在 Mapper 用 "
+                            + "@InterceptorIgnore(dataPermission) 显式声明: " + ms.getId());
         }
         try {
             Expression scope = CCJSqlParserUtil.parseCondExpression(buildPredicate(filter));
