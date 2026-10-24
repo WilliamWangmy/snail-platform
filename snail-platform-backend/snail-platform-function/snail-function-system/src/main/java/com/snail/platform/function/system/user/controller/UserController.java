@@ -1,5 +1,7 @@
 package com.snail.platform.function.system.user.controller;
 
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
+import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
@@ -94,6 +96,18 @@ public class UserController {
                                        @RequestParam @Min(value = 0, message = "状态取值 0/1")
                                        @Max(value = 1, message = "状态取值 0/1") int status) {
         userService.changeStatus(userId, status);
+        return R.ok(null);
+    }
+
+    @PreAuthorize("hasAuthority('system:user:kick')")
+    @Operation(summary = "强制下线(令牌版本自增,全设备生效)")
+    @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/{userId}/force-logout")
+    public R<Void> forceLogout(@PathVariable Long userId) {
+        if (java.util.Objects.equals(LoginUserContextHolder.userId(), userId)) {
+            throw BizException.badRequest("不能强制下线自己");
+        }
+        userService.forceLogout(userId);
         return R.ok(null);
     }
 

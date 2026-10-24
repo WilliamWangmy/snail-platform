@@ -1,0 +1,138 @@
+package com.snail.platform.function.system.user.service;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
+import com.snail.platform.framework.core.context.TenantContextHolder;
+import com.snail.platform.framework.core.exception.BizException;
+import com.snail.platform.framework.core.response.PageResult;
+import com.snail.platform.framework.redis.SnailRedisKeys;
+import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
+import com.snail.platform.framework.security.token.SnailPrincipal;
+import com.snail.platform.function.system.user.dto.OnlineQuery;
+import com.snail.platform.function.system.user.dto.OnlineSessionVO;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * 职责:在线会话的 Redis 实现——心跳写入"谁在线/从哪来/最近活跃",列表按租户索引聚合,强制下线双保险。
+ * 心跳每认证请求一次:SETEX 会话键(30 分钟滑动) + SADD/EXPIRE 索引(Lua 原子);异常全吞、告警限频,
+ * redis 抖动不阻断业务请求。强制下线 = 令牌版本自增(真正的吊销) + 会话键清理(列表即时消失)。
+ * 上游:SnailAuthFilter 经 SessionHeartbeatPort 端口、OnlineController;下游:Valkey、UserService.forceLogout。
+ */
+@Service
+public class OnlineSessionService implements SessionHeartbeatPort {
+
+    private static final Logger log = LoggerFactory.getLogger(OnlineSessionService.class);
+
+    /** 会话与索引的滑动窗口 */
+    private static final Duration ONLINE_TTL = Duration.ofMinutes(30);
+
+    /** SADD 与 EXPIRE 原子化:索引键永不过期竞态(修正逐条写的非原子竞态) */
+    private static final DefaultRedisScript<Long> INDEX_SCRIPT = new DefaultRedisScript<>(
+            "redis.call('SADD', KEYS[1], ARGV[1]) "
+                    + "redis.call('EXPIRE', KEYS[1], ARGV[2]) "
+                    + "return 1", Long.class);
+
+    /** 心跳失败告警限频:每 100 次告警一条,redis 长时间宕机不刷屏 */
+    private static final int WARN_EVERY = 100;
+
+    /** Valkey 存取 */
+    private final StringRedisTemplate redisTemplate;
+
+    /** 会话详情的 JSON 编解码 */
+    private final ObjectMapper objectMapper;
+
+    /** 强制下线的令牌吊销单点 */
+    private final UserService userService;
+
+    /** 心跳失败计数,限频告警 */
+    private final AtomicLong failures = new AtomicLong();
+
+    public OnlineSessionService(StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
+                                UserService userService) {
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.userService = userService;
+    }
+
+    /** 会话快照,首见时间定格,其余随心跳刷新;username 取自令牌身份,免回查档案 */
+    private record OnlineSession(String username, String ip, String userAgent,
+                                 LocalDateTime firstSeen, LocalDateTime lastActive) {
+    }
+
+    @Override
+    public void beat(SnailPrincipal principal, String ip, String userAgent) {
+        try {
+            String key = SnailRedisKeys.online(principal.tenantId(), principal.userId());
+            OnlineSession session = new OnlineSession(principal.username(), ip, userAgent,
+                    LocalDateTime.now(), LocalDateTime.now());
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(session), ONLINE_TTL);
+            redisTemplate.execute(INDEX_SCRIPT,
+                    List.of(SnailRedisKeys.onlineIndex(principal.tenantId())),
+                    String.valueOf(principal.userId()), String.valueOf(ONLINE_TTL.toSeconds()));
+        } catch (Exception e) {
+            if (failures.incrementAndGet() % WARN_EVERY == 1) {
+                log.warn("在线心跳写入失败(限频告警): {}", e.getMessage());
+            }
+        }
+    }
+
+    /** 在线列表:索引取人、读会话、内存分页;在线规模 = 活跃用户数,上限可控 */
+    public PageResult<OnlineSessionVO> page(OnlineQuery query) {
+        Long tenantId = TenantContextHolder.get();
+        Set<String> members = redisTemplate.opsForSet().members(SnailRedisKeys.onlineIndex(tenantId));
+        String keyword = query.keyword() == null ? "" : query.keyword().trim();
+        List<OnlineSessionVO> all = members == null ? List.of() : members.stream()
+                .map(Long::valueOf)
+                .map(userId -> read(tenantId, userId))
+                .filter(Objects::nonNull)
+                .filter(vo -> keyword.isEmpty() || (vo.username() != null && vo.username().contains(keyword)))
+                .sorted(Comparator.comparing(OnlineSessionVO::lastActive).reversed())
+                .toList();
+        int from = (query.pageNum() - 1) * query.pageSize();
+        List<OnlineSessionVO> rows = from >= all.size() ? List.of()
+                : all.subList(from, Math.min(from + query.pageSize(), all.size()));
+        return PageResult.of(rows, all.size());
+    }
+
+    /** 强制下线:不能踢自己;令牌版本自增是真吊销,redis 清理是尽力而为 */
+    public void kick(Long userId) {
+        Long operator = LoginUserContextHolder.userId();
+        if (Objects.equals(operator, userId)) {
+            throw BizException.badRequest("不能强制下线自己");
+        }
+        userService.forceLogout(userId);
+        try {
+            Long tenantId = TenantContextHolder.get();
+            redisTemplate.delete(SnailRedisKeys.online(tenantId, userId));
+            redisTemplate.opsForSet().remove(SnailRedisKeys.onlineIndex(tenantId), String.valueOf(userId));
+        } catch (Exception e) {
+            log.warn("在线会话键清理失败(版本吊销已生效): {}", e.getMessage());
+        }
+    }
+
+    private OnlineSessionVO read(Long tenantId, Long userId) {
+        try {
+            String raw = redisTemplate.opsForValue().get(SnailRedisKeys.online(tenantId, userId));
+            if (raw == null) {
+                return null;
+            }
+            OnlineSession session = objectMapper.readValue(raw, OnlineSession.class);
+            return new OnlineSessionVO(userId, session.username(), session.ip(), session.userAgent(),
+                    session.firstSeen(), session.lastActive());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+}
