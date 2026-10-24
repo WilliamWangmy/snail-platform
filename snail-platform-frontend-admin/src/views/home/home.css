@@ -1,0 +1,172 @@
+/* 工作台:欢迎区、KPI 与双栏面板,版式口径与本页数据来源同域维护。 */
+.welcome-card {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+  border: 0;
+  color: #eafffa;
+  background:
+    radial-gradient(480px 230px at 86% 25%, rgba(var(--app-accent-rgb), 0.16), transparent 62%),
+    radial-gradient(500px 260px at 45% -40%, rgba(var(--app-primary-rgb), 0.2), transparent 65%),
+    linear-gradient(120deg, var(--app-sidebar), var(--app-sidebar-2) 68%, var(--app-sidebar-glow));
+}
+
+.welcome-card :deep(.el-card__body) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 30px;
+}
+
+.welcome-date {
+  color: rgba(214, 255, 247, 0.52);
+  font-size: 10.5px;
+}
+
+.welcome-copy h2 {
+  margin: 9px 0 7px;
+  color: #f4fffc;
+  font-size: 25px;
+  letter-spacing: -0.035em;
+}
+
+.welcome-copy p {
+  margin: 0;
+  color: rgba(219, 255, 248, 0.5);
+  font-size: 11.5px;
+}
+
+.welcome-side {
+  display: flex;
+  flex: none;
+  gap: 28px;
+}
+
+.welcome-fact {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.welcome-fact span {
+  color: rgba(214, 255, 247, 0.46);
+  font-size: 9.5px;
+}
+
+.welcome-fact b {
+  overflow: hidden;
+  max-width: 180px;
+  color: #eafffa;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpi-card {
+  height: 100%;
+  min-height: 128px;
+}
+
+.kpi-card :deep(.el-card__body) {
+  padding: 16px 18px;
+}
+
+.kpi-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.kpi-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(var(--app-primary-rgb), 0.1);
+}
+
+.kpi-value {
+  overflow: hidden;
+  margin-top: 12px;
+  color: var(--app-ink);
+  font-family: 'Bahnschrift', 'DIN Alternate', sans-serif;
+  font-size: 25px;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpi-foot {
+  margin-top: 4px;
+  color: var(--app-muted);
+  font-size: 9.5px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.68fr) minmax(300px, 0.82fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-line);
+  border-radius: 11px;
+  background: var(--app-soft);
+  color: var(--app-ink);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entry:hover {
+  border-color: var(--app-primary);
+  color: var(--app-primary);
+}
+
+.entry .app-icon {
+  color: var(--app-primary);
+}
+
+@media (max-width: 1280px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .welcome-card :deep(.el-card__body) {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 22px;
+  }
+
+  .welcome-side {
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  .welcome-copy h2 {
+    font-size: 21px;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+}
