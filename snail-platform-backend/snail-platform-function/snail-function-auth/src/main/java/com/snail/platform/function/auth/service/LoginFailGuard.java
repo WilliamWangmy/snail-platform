@@ -1,12 +1,13 @@
 package com.snail.platform.function.auth.service;
 
+import com.snail.platform.framework.redis.SnailRateGuard;
 import java.time.Duration;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 /**
  * 职责:登录失败的暴力计数与锁定判定,计数只存 Valkey——锁定是运行态,不是审计,不落表。
- * 上游:AuthService 校验链;下游:Valkey。
+ * 原子计数逻辑在 framework-redis 的 SnailRateGuard 单点,本类只持有登录场景的键名与阈值。
+ * 上游:AuthService 校验链;下游:SnailRateGuard。
  * 口径:按登录名全局计数(用户名本就全局唯一),验证码失败与口令失败合并计。
  */
 @Service
@@ -21,30 +22,25 @@ public class LoginFailGuard {
     /** 计数窗口与锁定时长 */
     private static final Duration WINDOW = Duration.ofMinutes(10);
 
-    /** Redis 计数存取 */
-    private final StringRedisTemplate redisTemplate;
+    /** 通用计数锁定器 */
+    private final SnailRateGuard rateGuard;
 
-    public LoginFailGuard(StringRedisTemplate redisTemplate) {
-        this.redisTemplate = redisTemplate;
+    public LoginFailGuard(SnailRateGuard rateGuard) {
+        this.rateGuard = rateGuard;
     }
 
     /** 是否已达锁定阈值 */
     public boolean isLocked(String username) {
-        String value = redisTemplate.opsForValue().get(KEY_PREFIX + username);
-        return value != null && Long.parseLong(value) >= MAX_FAILS;
+        return rateGuard.isLocked(KEY_PREFIX + username, MAX_FAILS);
     }
 
     /** 记一次失败;首次失败挂窗口,到点自动解锁 */
     public void increase(String username) {
-        String key = KEY_PREFIX + username;
-        Long count = redisTemplate.opsForValue().increment(key);
-        if (count != null && count == 1L) {
-            redisTemplate.expire(key, WINDOW);
-        }
+        rateGuard.record(KEY_PREFIX + username, WINDOW);
     }
 
     /** 登录成功即清零 */
     public void clear(String username) {
-        redisTemplate.delete(KEY_PREFIX + username);
+        rateGuard.clear(KEY_PREFIX + username);
     }
 }
