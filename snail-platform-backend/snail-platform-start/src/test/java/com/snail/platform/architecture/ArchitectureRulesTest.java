@@ -35,7 +35,9 @@ import java.util.Set;
 class ArchitectureRulesTest {
 
     private static final String SYSTEM = "com.snail.platform.function.system.";
+    private static final String SYSTEM_API = SYSTEM + "api";
     private static final String AUTH = "com.snail.platform.function.auth";
+    private static final String NOTIFY = "com.snail.platform.function.notify";
 
     /** MP 分页对象全限定名:业务层禁止直接 new，分页只能经 framework-db 的 PageAssembler 单点装配 */
     private static final String MP_PAGE = "com.baomidou.mybatisplus.extension.plugins.pagination.Page";
@@ -94,6 +96,19 @@ class ArchitectureRulesTest {
 
             owner.getDirectDependenciesFromSelf().forEach(dependency ->
                     checkCrossSubdomain(owner, dependency, violations));
+
+            // notify 是第一个按"跨模块只经 api 包"目标态写的模块:对 system 的依赖只准落在 system.api 包,
+            // 后续模块按同款规则逐个登记;auth 的整体豁免收窄是另一笔登记在案的债务
+            if (ownerPackage.startsWith(NOTIFY)) {
+                owner.getDirectDependenciesFromSelf().forEach(dependency -> {
+                    String targetPackage = dependency.getTargetClass().getPackageName();
+                    if (targetPackage.startsWith(SYSTEM) && !targetPackage.startsWith(SYSTEM_API)) {
+                        violations.add(owner.getFullName() + " -> "
+                                + dependency.getTargetClass().getFullName()
+                                + ":notify 对 system 的依赖只准经 api 包(目标态 §3)");
+                    }
+                });
+            }
 
             if (ownerPackage.startsWith("com.snail.platform.function")) {
                 owner.getConstructorCallsFromSelf().forEach(call -> {

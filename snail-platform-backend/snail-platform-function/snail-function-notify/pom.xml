@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-function-notify:站内通知业务模块——消息主体/收件行/出站投递、平台公告、业务侧 NotifyApi。
+  对 system 的依赖只准经 com.snail.platform.function.system.api 包(ArchUnit 机械执法),
+  收件人显示名发送时快照落库,运行期不回查用户档案。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-function</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-function-notify</artifactId>
+    <name>snail-function-notify</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-db</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-log</artifactId>
+        </dependency>
+        <!-- 收件人简要信息经 system 的 api 包端口取用,不得触达其内部子域 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-system</artifactId>
+        </dependency>
+        <!-- 邮件出站通道;未配置 spring.mail 时 JavaMailSender 不装配,通道缺席自动降级日志 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+    </dependencies>
+</project>

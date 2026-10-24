@@ -28,6 +28,10 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-auth</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-notify</artifactId>
+        </dependency>
 
         <!-- 接口文档：springdoc 3.x 对应 Boot 4；api-docs 与 swagger-ui 路径的放行已在 framework-security 白名单 -->
         <dependency>

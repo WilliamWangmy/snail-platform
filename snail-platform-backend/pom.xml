@@ -96,6 +96,11 @@
                 <artifactId>snail-function-auth</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.snail.platform</groupId>
+                <artifactId>snail-function-notify</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- ORM：boot4 starter 线，方言在 snail-framework-db 固定为 MYSQL -->
             <dependency>

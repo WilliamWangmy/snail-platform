@@ -40,5 +40,6 @@ snail:
         - sys_oper_log
         - sys_menu
         - sys_role_menu
+        - sys_notify_outbound
     pagination:
       max-limit: 500
