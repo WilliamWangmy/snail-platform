@@ -22,7 +22,8 @@ import org.springframework.stereotype.Service;
 /**
  * 职责:登录人富快照的唯一解析实现——人员在 sys_user,组织名在 sys_org,租户名在 sys_tenant,
  * 角色取启用角色并按 sort/roleId 升序;整体按用户 ID 缓存,常用字段不必每请求回查数据库。
- * 口径:停用角色不进快照;用户已不存在(逻辑删后令牌未过期)返回令牌身份最小快照,不让请求 500。
+ * 口径:停用角色不进快照;用户已不存在(逻辑删后令牌未过期)或已停用,返回令牌身份最小快照,
+ * 让旧令牌只剩 authenticated——停用账号的权限收回不等令牌过期,变更侧负责失效本缓存。
  * 失效:userSession 由 user/role/org/tenant 的写路径按需失效,口径见各服务注解与 docs §11。
  * 上游:SnailAuthFilter 经 LoginUserProvider 端口调用;下游:sys_user/sys_org/sys_tenant/sys_user_role/sys_role 读。
  */
@@ -60,7 +61,8 @@ public class UserSessionService implements LoginUserProvider {
     @Cacheable(cacheNames = "userSession", key = "#p0.userId()")
     public LoginUser load(SnailPrincipal principal) {
         SysUser user = userMapper.selectById(principal.userId());
-        if (user == null) {
+        if (user == null || !Integer.valueOf(STATUS_ACTIVE).equals(user.getStatus())) {
+            // 已删或已停用:一律降级令牌身份最小快照,旧令牌在剩余有效期内不再携带任何档案与角色
             return LoginUserProvider.minimal(principal);
         }
         SysOrg org = user.getOrgId() == null ? null : orgMapper.selectById(user.getOrgId());

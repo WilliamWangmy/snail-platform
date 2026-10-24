@@ -29,6 +29,7 @@ import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,10 +37,11 @@ import org.springframework.transaction.annotation.Transactional;
  * 职责:用户管理——分页检索、新增(含建号即授权)、修改、重置口令、停用/启用、逻辑删除、角色全量覆盖分配。
  * 关键口径:username 全表唯一且建后不可改,查重走无租户窄窗口(全表口径),撞库提示"登录名已存在";
  * 新增受租户 accountLimit 约束(只拦新增不追认存量);删除同事务物理清 sys_user_role——人不在了授权就该空;
- * 自我保护:不允许停用或删除当前登录者自己,防管理员把自己锁在门外;列表查询按当前登录者 data_scope 开窗过滤,
- * 详情与前置校验按 ID 走窗口外——权限只约束"检索面",不拦"已知 ID 的定点读写"。
- * 授权集变化与删号会让该用户的 userPerms 缓存失效,避免旧权限继续生效;
- * 昵称/组织/授权变化与删号同时让 userSession 失效,登录人快照不落后于档案。
+ * 自我保护:不允许停用或删除当前登录者自己,防管理员把自己锁在门外。
+ * 数据权限:列表查询按当前登录者 data_scope 开窗过滤;停用/删除/重置口令/分配角色四类定点写必须过
+ * requireUserInScope 闸(目标用户在可见集内),分配的角色档位不得宽于操作者自身最宽档(resolveGrantable)——
+ * 只拦"已知 ID 的定点读写",详情与档案修改仍走窗口外。
+ * 授权集变化/删号/停用启用会让该用户的 userPerms 与 userSession 缓存失效,停用与收权即时生效,不等令牌过期。
  * 上游:UserController;下游:sys_user/sys_user_role 写读、sys_org/sys_role 前置校验、sys_tenant 上限读取。
  */
 @Service
@@ -112,10 +114,15 @@ public class UserService {
         user.setOrgId(request.orgId());
         user.setStatus(0);
         user.setRemark(request.remark());
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            // 唯一键含已删记录,预查会漏;错误口径仍走业务拒绝
+            throw BizException.badRequest("登录名已存在");
+        }
 
         if (request.roleIds() != null && !request.roleIds().isEmpty()) {
-            replaceRoles(user.getUserId(), request.roleIds());
+            replaceRoles(user.getUserId(), resolveGrantable(request.roleIds()));
         }
         return user.getUserId();
     }
@@ -137,12 +144,14 @@ public class UserService {
     @Transactional
     public void resetPassword(Long userId, String rawPassword) {
         SysUser user = requireUser(userId);
+        requireUserInScope(userId);
         userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(rawPassword))
                 .eq(SysUser::getUserId, user.getUserId()));
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void changeStatus(Long userId, int status) {
         SysUser user = requireUser(userId);
         if (status == 1 && Objects.equals(LoginUserContextHolder.userId(), userId)) {
@@ -151,6 +160,7 @@ public class UserService {
         if (Objects.equals(user.getStatus(), status)) {
             return;
         }
+        requireUserInScope(userId);
         userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getStatus, status)
                 .eq(SysUser::getUserId, userId));
@@ -164,6 +174,7 @@ public class UserService {
         if (Objects.equals(LoginUserContextHolder.userId(), userId)) {
             throw BizException.badRequest("不能删除自己的账号");
         }
+        requireUserInScope(userId);
         userMapper.deleteById(userId);
         userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, userId));
     }
@@ -173,23 +184,79 @@ public class UserService {
     @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void assignRoles(Long userId, List<Long> roleIds) {
         requireUser(userId);
-        replaceRoles(userId, roleIds);
+        requireUserInScope(userId);
+        replaceRoles(userId, resolveGrantable(roleIds));
     }
 
-    private void replaceRoles(Long userId, List<Long> roleIds) {
+    /**
+     * 解析并校验授权集:角色必须全部落在本租户,且档位不得宽于操作者自身最宽档——
+     * 防"仅本人档"的操作者借分配角色授出全部档角色,给自己或他人开纵向提权口子。
+     */
+    private List<SysRole> resolveGrantable(List<Long> roleIds) {
         List<Long> distinct = roleIds == null ? List.of() : roleIds.stream()
                 .filter(Objects::nonNull).distinct().toList();
-        if (!distinct.isEmpty()) {
-            List<SysRole> roles = roleMapper.selectBatchIds(distinct);
-            if (roles.size() != distinct.size()) {
-                throw BizException.badRequest("包含不存在或跨租户的角色");
+        if (distinct.isEmpty()) {
+            return List.of();
+        }
+        List<SysRole> roles = roleMapper.selectBatchIds(distinct);
+        if (roles.size() != distinct.size()) {
+            throw BizException.badRequest("包含不存在或跨租户的角色");
+        }
+        Integer broadest = operatorBroadestDataScope();
+        if (broadest == null) {
+            throw BizException.forbidden("当前登录人没有可用角色,不能分配角色");
+        }
+        for (SysRole role : roles) {
+            if (role.getDataScope() == null || role.getDataScope() < broadest) {
+                throw BizException.forbidden("不能分配数据档位宽于自身权限的角色: " + role.getRoleName());
             }
         }
+        return roles;
+    }
+
+    /** 操作者自身最宽数据档位:启用角色的最小 data_scope(1 全部最宽);无可用角色返回 null 即不可分配 */
+    private Integer operatorBroadestDataScope() {
+        Long operatorId = LoginUserContextHolder.userId();
+        if (operatorId == null) {
+            return null;
+        }
+        List<Long> roleIds = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
+                        .eq(SysUserRole::getUserId, operatorId))
+                .stream().map(SysUserRole::getRoleId).distinct().toList();
+        if (roleIds.isEmpty()) {
+            return null;
+        }
+        // 0 为启用状态;停用角色不构成操作者的权限凭据,不参与档位折算
+        return roleMapper.selectBatchIds(roleIds).stream()
+                .filter(role -> Integer.valueOf(0).equals(role.getStatus()))
+                .map(SysRole::getDataScope)
+                .filter(Objects::nonNull)
+                .min(Integer::compareTo)
+                .orElse(null);
+    }
+
+    /**
+     * 定点写的数据权限闸:目标用户必须在当前登录者 data_scope 的可见集内。
+     * 复用列表检索的同一口径(开窗计数),只拦"已知 ID 的定点写";全部档返回 null 不设限,窗口不开。
+     */
+    private void requireUserInScope(Long userId) {
+        DataScopeFilter scope = dataScopeService.currentFilterOrNull();
+        if (scope == null) {
+            return;
+        }
+        Long visible = DataScopeContextHolder.filter(scope, () -> userMapper.selectCount(
+                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUserId, userId)));
+        if (visible == null || visible == 0) {
+            throw BizException.forbidden("目标用户不在当前数据权限范围内");
+        }
+    }
+
+    private void replaceRoles(Long userId, List<SysRole> roles) {
         userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, userId));
-        for (Long roleId : distinct) {
+        for (SysRole role : roles) {
             SysUserRole grant = new SysUserRole();
             grant.setUserId(userId);
-            grant.setRoleId(roleId);
+            grant.setRoleId(role.getRoleId());
             userRoleMapper.insert(grant);
         }
     }

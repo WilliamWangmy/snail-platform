@@ -10,6 +10,8 @@ import com.snail.platform.function.system.role.entity.SysRole;
 import com.snail.platform.function.system.role.entity.SysUserRole;
 import com.snail.platform.function.system.role.mapper.SysRoleMapper;
 import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
+import com.snail.platform.function.system.user.entity.SysUser;
+import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +24,10 @@ import org.springframework.stereotype.Service;
 /**
  * 职责:把"用户 -> 启用角色 -> 角色菜单授权 + admin 隐式规则"折成一组权限码,交给认证过滤器放进 SecurityContext。
  * 语义 A:role_code=admin 且 is_system=1 的启用角色隐式持有全部 scope=2 权限码;平台面(scope=1)永远只认 sys_role_menu。
- * 解析口径:停用角色整体剔除;菜单自身或任一祖先停用即退出解析;目录/外链无码不产权限。
- * 缓存:userPerms 按用户 ID 缓存;角色状态变更、用户角色分配/删除、菜单与授权变更都是失效点。
- * 上游:SnailAuthFilter 经 UserAuthorityProvider 端口调用;下游:sys_user_role/sys_role/sys_menu/sys_role_menu 读。
+ * 解析口径:用户本人已删或停用,权限码整体清空——停用立即生效,不等令牌过期;停用角色整体剔除;
+ * 菜单自身或任一祖先停用即退出解析;目录/外链无码不产权限。
+ * 缓存:userPerms 按用户 ID 缓存;用户状态/角色状态变更、用户角色分配/删除、菜单与授权变更都是失效点。
+ * 上游:SnailAuthFilter 经 UserAuthorityProvider 端口调用;下游:sys_user/sys_user_role/sys_role/sys_menu/sys_role_menu 读。
  */
 @Service
 public class UserPermissionService implements UserAuthorityProvider {
@@ -41,6 +44,9 @@ public class UserPermissionService implements UserAuthorityProvider {
     /** 用户-角色授权读 */
     private final SysUserRoleMapper userRoleMapper;
 
+    /** 用户表读:权限码发放前先核对用户本人状态 */
+    private final SysUserMapper userMapper;
+
     /** 角色表读 */
     private final SysRoleMapper roleMapper;
 
@@ -50,9 +56,11 @@ public class UserPermissionService implements UserAuthorityProvider {
     /** 角色-菜单授权读 */
     private final SysRoleMenuMapper roleMenuMapper;
 
-    public UserPermissionService(SysUserRoleMapper userRoleMapper, SysRoleMapper roleMapper,
-                                 SysMenuMapper menuMapper, SysRoleMenuMapper roleMenuMapper) {
+    public UserPermissionService(SysUserRoleMapper userRoleMapper, SysUserMapper userMapper,
+                                 SysRoleMapper roleMapper, SysMenuMapper menuMapper,
+                                 SysRoleMenuMapper roleMenuMapper) {
         this.userRoleMapper = userRoleMapper;
+        this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.menuMapper = menuMapper;
         this.roleMenuMapper = roleMenuMapper;
@@ -61,6 +69,11 @@ public class UserPermissionService implements UserAuthorityProvider {
     @Override
     @Cacheable(cacheNames = "userPerms", key = "#userId")
     public Set<String> authoritiesOf(Long userId) {
+        SysUser user = userMapper.selectById(userId);
+        if (user == null || !Integer.valueOf(STATUS_ACTIVE).equals(user.getStatus())) {
+            // 用户已删或已停用:权限码整体清空,停用动作即时生效,不等令牌过期
+            return Set.of();
+        }
         List<Long> roleIds = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
                         .eq(SysUserRole::getUserId, userId))
                 .stream().map(SysUserRole::getRoleId).distinct().toList();
