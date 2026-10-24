@@ -11,6 +11,8 @@ const ICON_MAP: Record<string, string> = {
   Platform: 'grid',
   School: 'shield',
   Menu: 'menu',
+  Bell: 'bell',
+  Message: 'mail',
 };
 
 export function menuIcon(name?: string | null): string {

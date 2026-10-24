@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import AppIcon from '@/components/AppIcon.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import ThemePicker from '@/components/ThemePicker.vue';
+import { fetchUnreadCount } from '@/api/notify';
 import { useAuthStore } from '@/stores/auth';
 import { resetMenuRoutes } from '@/router/menuRoutes';
 
@@ -50,8 +51,31 @@ function handleUserCommand(command: string | number | object): void {
   if (command === 'logout') signOut();
 }
 
-onMounted(() => window.addEventListener('resize', handleResize));
-onBeforeUnmount(() => window.removeEventListener('resize', handleResize));
+/* ------------------------- 通知未读数:30s 轮询 ------------------------- */
+
+const unread = ref(0);
+let unreadTimer: number | undefined;
+
+async function pollUnread(): Promise<void> {
+  try {
+    unread.value = await fetchUnreadCount();
+  } catch {
+    // 轮询失败静默:通知角标是辅助信息,不因网络抖动打断主流程
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize);
+  if (auth.has('system:notify:list')) {
+    void pollUnread();
+    unreadTimer = window.setInterval(() => void pollUnread(), 30_000);
+  }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+  if (unreadTimer !== undefined) window.clearInterval(unreadTimer);
+});
 </script>
 
 <template>
@@ -160,6 +184,30 @@ onBeforeUnmount(() => window.removeEventListener('resize', handleResize));
           </ElBreadcrumbItem>
         </ElBreadcrumb>
         <div class="topbar-actions">
+          <ElTooltip
+            v-if="auth.has('system:notify:list')"
+            content="通知中心"
+            placement="bottom"
+          >
+            <ElBadge
+              :value="unread"
+              :hidden="unread === 0"
+              :max="99"
+            >
+              <ElButton
+                text
+                circle
+                class="topbar-icon"
+                aria-label="通知中心"
+                @click="router.push('/system/notify')"
+              >
+                <AppIcon
+                  name="bell"
+                  :size="18"
+                />
+              </ElButton>
+            </ElBadge>
+          </ElTooltip>
           <ThemePicker />
           <div class="topbar-divider"></div>
           <ElDropdown
