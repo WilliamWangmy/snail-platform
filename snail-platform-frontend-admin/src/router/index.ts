@@ -29,6 +29,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '工作台', icon: 'grid', breadcrumb: ['工作台'] },
       },
       {
+        path: '/profile',
+        name: 'profile',
+        component: () => import('@/views/profile/index.vue'),
+        meta: { title: '个人中心', icon: 'user', breadcrumb: ['个人中心'] },
+      },
+      {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/views/error/NotFound.vue'),

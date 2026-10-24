@@ -49,6 +49,7 @@ function signOut(): void {
 
 function handleUserCommand(command: string | number | object): void {
   if (command === 'logout') signOut();
+  else if (command === 'profile') void router.push('/profile');
 }
 
 /* ------------------------- 通知未读数:30s 轮询 ------------------------- */
@@ -232,7 +233,13 @@ onBeforeUnmount(() => {
             </span>
             <template #dropdown>
               <ElDropdownMenu>
-                <ElDropdownItem command="logout">
+                <ElDropdownItem command="profile">
+                  个人中心
+                </ElDropdownItem>
+                <ElDropdownItem
+                  divided
+                  command="logout"
+                >
                   退出登录
                 </ElDropdownItem>
               </ElDropdownMenu>

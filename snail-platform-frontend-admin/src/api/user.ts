@@ -72,3 +72,8 @@ export function deleteUser(userId: number): Promise<void> {
 export function assignUserRoles(userId: number, roleIds: number[]): Promise<void> {
   return put<void>(`/system/user/${userId}/roles`, { roleIds });
 }
+
+/** 强制下线:令牌版本自增,该用户全部设备下一次请求即 401。 */
+export function forceLogoutUser(userId: number): Promise<void> {
+  return post<void>(`/system/user/${userId}/force-logout`);
+}

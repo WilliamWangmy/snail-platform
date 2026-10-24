@@ -9,6 +9,7 @@ import {
   changeUserStatus,
   createUser,
   deleteUser,
+  forceLogoutUser,
   getUser,
   pageUsers,
   resetUserPassword,
@@ -276,7 +277,16 @@ function actionsOf(row: UserVO): RowAction[] {
     { key: 'roles', label: '分配角色', show: auth.has('system:user:assign-role'), handler: () => { void openAssignRoles(row); } },
     { key: 'toggle', label: row.status === 0 ? '停用' : '启用', show: auth.has('system:user:update'), handler: () => { void toggleStatus(row); } },
     { key: 'delete', label: '删除', tone: 'danger', show: auth.has('system:user:delete'), handler: () => { void remove(row); } },
+    { key: 'kick', label: '强制下线', tone: 'danger', show: auth.has('system:user:kick') && row.userId !== auth.user?.userId, handler: () => { void kickUser(row); } },
   ];
+}
+
+/** 强制下线:令牌版本自增,该用户全部设备下一次请求即 401。 */
+async function kickUser(row: UserVO): Promise<void> {
+  await ElMessageBox.confirm(`将强制下线 ${row.username} 的全部会话,确定执行?`, '强制下线', { type: 'warning' });
+  await forceLogoutUser(row.userId);
+  ElMessage.success('已强制下线');
+  await refresh();
 }
 </script>
 
