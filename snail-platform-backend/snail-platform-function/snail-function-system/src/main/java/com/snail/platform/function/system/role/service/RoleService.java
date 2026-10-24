@@ -18,6 +18,7 @@ import com.snail.platform.function.system.role.mapper.SysRoleMapper;
 import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
 import java.util.Objects;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,7 +74,12 @@ public class RoleService {
         role.setSort(request.sort() == null ? 0 : request.sort());
         role.setStatus(0);
         role.setRemark(request.remark());
-        roleMapper.insert(role);
+        try {
+            roleMapper.insert(role);
+        } catch (DuplicateKeyException e) {
+            // 唯一键含已删记录,预查会漏(与已删角色同 code 重开是合法操作);错误口径仍走业务拒绝
+            throw BizException.badRequest("角色标识已存在");
+        }
         return role.getRoleId();
     }
 

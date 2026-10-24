@@ -24,6 +24,7 @@ import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.util.Objects;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,7 +99,12 @@ public class TenantService {
         tenant.setAccountLimit(request.accountLimit());
         tenant.setStatus(0);
         tenant.setRemark(request.remark());
-        tenantMapper.insert(tenant);
+        try {
+            tenantMapper.insert(tenant);
+        } catch (DuplicateKeyException e) {
+            // 唯一键含已删记录,预查会漏(与已销户租户同 code 重开是合法操作);错误口径仍走业务拒绝
+            throw BizException.badRequest("租户标识已存在");
+        }
 
         Long newTenantId = tenant.getTenantId();
         TenantContextHolder.asTenant(newTenantId, () -> {
