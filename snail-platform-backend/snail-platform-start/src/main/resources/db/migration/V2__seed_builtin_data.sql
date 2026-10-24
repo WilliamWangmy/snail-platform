@@ -1,6 +1,8 @@
 -- =========================================================
 -- Snail Platform 内置种子数据:默认租户 + admin 账号 + 全局菜单目录 + 平台面授权
--- admin 口令为 admin123 的 BCrypt 密文(Hutool 实算),上线前必须改
+-- admin 口令由部署方以 BCrypt 密文(非明文)经 SNAIL_SEED_ADMIN_PASSWORD 注入下方占位符:
+-- dev profile 给了开发默认值(即 admin123 的密文,本机行为不变);prod 未提供该变量则迁移失败、启动被拦
+-- 密文生成:用与业务侧一致的 Hutool BCrypt.hashpw(明文) 离线生成后填入环境变量
 -- 新租户开通不靠迁移脚本:由平台管理功能在运行时按本模板复制,且不写 sys_menu、不复制目录
 -- 目录内节点全部 is_system=1;现有页面均为站内菜单,target 走默认 1
 -- dashboard/外链菜单待对应页面落地后再追加种子
@@ -21,7 +23,7 @@ INSERT INTO sys_role (role_id, tenant_id, role_name, role_code, data_scope, is_s
 (2, 1, '普通角色',   'common', 4, 1, 2, NOW());
 
 INSERT INTO sys_user (user_id, tenant_id, username, nickname, password, org_id, status, create_time)
-VALUES (1, 1, 'admin', '超级管理员', '$2a$10$NPfvBiM7OT1Ibw.574fQ.ukPvo4jlW31/JLF3R3T/IRv8yMjEn8xy', 1, 0, NOW());
+VALUES (1, 1, 'admin', '超级管理员', '${seedAdminPassword}', 1, 0, NOW());
 
 INSERT INTO sys_user_role (user_id, role_id) VALUES (1, 1);
 

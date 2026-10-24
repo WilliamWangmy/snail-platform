@@ -7,6 +7,10 @@ spring:
   data:
     redis:
       url: ${SNAIL_REDIS_URL}
+  flyway:
+    placeholders:
+      # V2 种子写入 admin 口令所需,值为 BCrypt 密文(非明文);缺失则迁移失败、启动被拦
+      "[seedAdminPassword]": ${SNAIL_SEED_ADMIN_PASSWORD}
 
 # 文档端点在生产整体关闭
 springdoc:
@@ -14,3 +18,9 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+snail:
+  security:
+    jwt:
+      # 生产签名密钥必填(共享配置无默认值),缺失启动即失败;短于 32 字符拒绝启动
+      secret: ${SNAIL_JWT_SECRET}

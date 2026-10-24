@@ -27,8 +27,8 @@ springdoc:
 snail:
   security:
     jwt:
-      # 生产用 SNAIL_JWT_SECRET 覆盖,仓库只留开发占位;短于 32 字符拒绝启动
-      secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}
+      # secret 不在共享配置给默认值:开发占位只住 dev profile,prod 缺 SNAIL_JWT_SECRET 启动即失败;短于 32 字符拒绝启动
+      secret: ${SNAIL_JWT_SECRET}
       expire-minutes: 120
   db:
     tenant:

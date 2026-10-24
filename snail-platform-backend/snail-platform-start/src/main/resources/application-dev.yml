@@ -7,7 +7,17 @@ spring:
   data:
     redis:
       url: ${SNAIL_REDIS_URL:redis://127.0.0.1:6379}
+  flyway:
+    placeholders:
+      # V2 种子写入 admin 口令所需;开发默认就是 admin123 的密文,本机行为不变
+      "[seedAdminPassword]": ${SNAIL_SEED_ADMIN_PASSWORD:$2a$10$NPfvBiM7OT1Ibw.574fQ.ukPvo4jlW31/JLF3R3T/IRv8yMjEn8xy}
 
 logging:
   level:
     com.snail.platform: DEBUG
+
+snail:
+  security:
+    jwt:
+      # 开发占位密钥只住 dev profile;生产密钥必须由 SNAIL_JWT_SECRET 提供,共享配置无默认可漏
+      secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}
