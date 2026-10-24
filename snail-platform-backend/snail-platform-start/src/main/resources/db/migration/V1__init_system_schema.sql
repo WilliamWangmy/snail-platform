@@ -2,7 +2,8 @@
 -- Snail Platform 系统基础表(多租户版)
 -- 租户模式:共享库共享表 + tenant_id 判别列,MP TenantLineInnerInterceptor 默认全员注入
 -- ignore 清单:sys_tenant / sys_user_role / sys_menu / sys_role_menu / 两张日志表
---              (日志带 tenant_id,由查询侧或切面显式写)
+--              / sys_notify_outbound(通知出站队列表,异步线程写入,租户归属靠行内快照)
+--              (日志与队列表带 tenant_id,由查询侧或切面显式写)
 -- 登录口径:不选租户,账号+密码+验证码;username 全表唯一,按用户名自动定位租户
 -- 业务表:审计四件套 + 逻辑删除;日志表只增,不配逻辑删除,时间毫秒
 -- 唯一键口径:被逻辑删除记录的键值不释放、不可复用
@@ -38,6 +39,7 @@ CREATE TABLE sys_user (
     username    VARCHAR(30)  NOT NULL COMMENT '登录名,全表唯一;登录自动定位所属租户',
     nickname    VARCHAR(30)  NOT NULL COMMENT '显示名',
     password    VARCHAR(100) NOT NULL COMMENT 'BCrypt 密文',
+    token_version BIGINT     NOT NULL DEFAULT 0 COMMENT '令牌版本,改密/重置/停用/强制下线自增,进 JWT ver 声明实现吊销',
     email       VARCHAR(50)  DEFAULT NULL COMMENT '邮箱',
     phone       VARCHAR(20)  DEFAULT NULL COMMENT '手机号',
     org_id      BIGINT       DEFAULT NULL COMMENT '所属组织,关联 sys_org.org_id;一用户一主组织',
@@ -209,3 +211,61 @@ CREATE TABLE sys_oper_log (
     KEY idx_ol_trace (trace_id),
     KEY idx_ol_operator (tenant_id, operator)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '操作日志:framework-log 切面异步落库,只增;租户拦截器 ignore 表';
+
+-- ---------- 通知:消息主体与收件行租户托管,出站投递为队列状态表(全量结构,自 V3/V5 整合) ----------
+
+CREATE TABLE sys_notify_message (
+    message_id  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '消息ID',
+    tenant_id   BIGINT       NOT NULL COMMENT '租户ID,拦截器自动填充',
+    title       VARCHAR(100) NOT NULL COMMENT '标题',
+    content     TEXT         NOT NULL COMMENT '正文,纯文本',
+    biz_type    VARCHAR(50)  DEFAULT NULL COMMENT '业务域标签:announcement/account/…',
+    biz_id      BIGINT       DEFAULT NULL COMMENT '关联业务ID',
+    sender_id   BIGINT       DEFAULT NULL COMMENT '发送人用户ID,系统代发为 NULL',
+    sender_name VARCHAR(30)  DEFAULT NULL COMMENT '发送人显示名快照,发送时刻定格',
+    send_time   DATETIME     DEFAULT NULL COMMENT '发送时间',
+    create_by   BIGINT       DEFAULT NULL COMMENT '创建人用户ID',
+    create_time DATETIME     DEFAULT NULL COMMENT '创建时间',
+    update_by   BIGINT       DEFAULT NULL COMMENT '修改人用户ID',
+    update_time DATETIME     DEFAULT NULL COMMENT '修改时间',
+    deleted     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除:0 正常 1 已删',
+    PRIMARY KEY (message_id),
+    KEY idx_nm_biz (tenant_id, biz_type, biz_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '通知消息主体,租户托管';
+
+CREATE TABLE sys_notify_recipient (
+    recipient_id BIGINT      NOT NULL AUTO_INCREMENT COMMENT '收件行ID',
+    message_id   BIGINT      NOT NULL COMMENT '消息ID,sys_notify_message.message_id',
+    tenant_id    BIGINT      NOT NULL COMMENT '租户ID,拦截器自动填充',
+    user_id      BIGINT      NOT NULL COMMENT '收件人用户ID,收件箱谓词',
+    nickname     VARCHAR(30) DEFAULT NULL COMMENT '收件人显示名快照,发送时刻定格',
+    read_status  TINYINT     NOT NULL DEFAULT 0 COMMENT '已读:0 未读 1 已读',
+    read_time    DATETIME    DEFAULT NULL COMMENT '已读时间',
+    create_by    BIGINT      DEFAULT NULL COMMENT '创建人用户ID',
+    create_time  DATETIME    DEFAULT NULL COMMENT '创建时间',
+    update_by    BIGINT      DEFAULT NULL COMMENT '修改人用户ID',
+    update_time  DATETIME    DEFAULT NULL COMMENT '修改时间',
+    deleted      TINYINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除:0 正常 1 已删;收件箱移除即置 1',
+    PRIMARY KEY (recipient_id),
+    KEY idx_nr_inbox (tenant_id, user_id, read_status, recipient_id),
+    KEY idx_nr_message (message_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '通知收件行,一人一行';
+
+CREATE TABLE sys_notify_outbound (
+    outbound_id BIGINT       NOT NULL AUTO_INCREMENT COMMENT '投递记录ID',
+    message_id  BIGINT       NOT NULL COMMENT '消息ID,sys_notify_message.message_id',
+    tenant_id   BIGINT       DEFAULT NULL COMMENT '消息归属租户快照,溯源用',
+    channel     VARCHAR(20)  NOT NULL COMMENT '通道:mail | log',
+    target      VARCHAR(100) DEFAULT NULL COMMENT '寻址摘要:mail 记 bcc×N,log 记无通道说明',
+    status      TINYINT      NOT NULL DEFAULT 0 COMMENT '投递状态:1 成功 2 失败',
+    error       VARCHAR(500) DEFAULT NULL COMMENT '失败原因,截断落库',
+    retry_count INT          NOT NULL DEFAULT 0 COMMENT '重试次数,0 即一次投递成功',
+    send_time   DATETIME     DEFAULT NULL COMMENT '投递完成时间',
+    create_by   BIGINT       DEFAULT NULL COMMENT '创建人用户ID,投递线程写入留空',
+    create_time DATETIME     DEFAULT NULL COMMENT '创建时间',
+    update_by   BIGINT       DEFAULT NULL COMMENT '修改人用户ID',
+    update_time DATETIME     DEFAULT NULL COMMENT '修改时间',
+    deleted     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除:0 正常 1 已删,本表不提供删除入口',
+    PRIMARY KEY (outbound_id),
+    KEY idx_no_message (message_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '通知出站投递记录,异步线程写入;租户拦截器 ignore 表';
