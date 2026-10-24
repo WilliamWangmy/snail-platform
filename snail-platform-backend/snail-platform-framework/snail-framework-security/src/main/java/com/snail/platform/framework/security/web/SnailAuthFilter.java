@@ -12,8 +12,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import java.io.IOException;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.List;
 import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
@@ -46,12 +48,17 @@ public class SnailAuthFilter extends OncePerRequestFilter {
     /** 登录人富快照端口;缺省时降级为令牌身份最小快照 */
     private final ObjectProvider<LoginUserProvider> loginUserProviders;
 
+    /** 在线心跳端口;缺省时跳过,在线观测不影响认证主链 */
+    private final ObjectProvider<SessionHeartbeatPort> heartbeats;
+
     public SnailAuthFilter(JwtTokenService jwtTokenService,
                            ObjectProvider<UserAuthorityProvider> authorityProviders,
-                           ObjectProvider<LoginUserProvider> loginUserProviders) {
+                           ObjectProvider<LoginUserProvider> loginUserProviders,
+                           ObjectProvider<SessionHeartbeatPort> heartbeats) {
         this.jwtTokenService = jwtTokenService;
         this.authorityProviders = authorityProviders;
         this.loginUserProviders = loginUserProviders;
+        this.heartbeats = heartbeats;
     }
 
     @Override
@@ -69,10 +76,21 @@ public class SnailAuthFilter extends OncePerRequestFilter {
                 if (principal != null) {
                     // 权限解析要读租户托管表,必须先于 Provider 调用注入租户
                     TenantContextHolder.set(principal.tenantId());
-                    LoginUserContextHolder.set(loginUserOf(principal));
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            principal, null, authoritiesOf(principal.userId()));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    LoginUserProvider provider = loginUserProviders.getIfAvailable();
+                    LoginUser snapshot = provider != null ? provider.load(principal)
+                            : LoginUserProvider.minimal(principal);
+                    if (sessionValid(provider != null, principal, snapshot)) {
+                        LoginUserContextHolder.set(snapshot);
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                principal, null, authoritiesOf(principal.userId()));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        SessionHeartbeatPort heartbeat = heartbeats.getIfAvailable();
+                        if (heartbeat != null) {
+                            // 在线心跳是辅助观测:实现侧自行容错,失败不影响认证主链
+                            heartbeat.beat(principal, request.getRemoteAddr(), request.getHeader("User-Agent"));
+                        }
+                    }
+                    // 快照无版本(用户已删/停用)跳过比对;版本不一致视同令牌已被吊销,保持匿名交授权规则出 401
                 }
             }
             chain.doFilter(request, response);
@@ -81,6 +99,21 @@ public class SnailAuthFilter extends OncePerRequestFilter {
             TenantContextHolder.clear();
             LoginUserContextHolder.clear();
         }
+    }
+
+    /**
+     * 会话有效性:解析端口缺席时按降级口径放行(framework 单用不绑业务模型);
+     * 端口在场而快照无版本,即用户已删/停用——整体 401 而非降级为"仅认证";
+     * 版本与令牌 ver 声明不一致即已吊销(改密/重置/停用/踢人)。
+     */
+    private boolean sessionValid(boolean providerPresent, SnailPrincipal principal, LoginUser snapshot) {
+        if (!providerPresent) {
+            return true;
+        }
+        if (snapshot.tokenVersion() == null) {
+            return false;
+        }
+        return Objects.equals(principal.tokenVersion(), snapshot.tokenVersion());
     }
 
     /** 登录人快照由业务实现补全(带缓存);端口缺省时只保留令牌身份,不让 framework 单用被业务模型绑死 */

@@ -69,7 +69,7 @@ public class UserSessionService implements LoginUserProvider {
         SysTenant tenant = tenantMapper.selectById(user.getTenantId());
         return new LoginUser(user.getUserId(), user.getTenantId(), tenant == null ? null : tenant.getName(),
                 user.getUsername(), user.getNickname(), user.getOrgId(), org == null ? null : org.getName(),
-                rolesOf(user.getUserId()));
+                Long.valueOf(user.getTokenVersion()), rolesOf(user.getUserId()));
     }
 
     /** 只收启用角色;sort 升序、空值垫底,同序按 roleId 稳定排列 */

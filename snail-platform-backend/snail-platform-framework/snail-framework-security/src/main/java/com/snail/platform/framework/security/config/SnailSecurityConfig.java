@@ -3,6 +3,7 @@ package com.snail.platform.framework.security.config;
 import com.snail.platform.framework.security.SnailSecurityProperties;
 import com.snail.platform.framework.security.authority.UserAuthorityProvider;
 import com.snail.platform.framework.security.login.LoginUserProvider;
+import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import com.snail.platform.framework.security.token.JwtTokenService;
 import com.snail.platform.framework.security.web.SnailAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,7 +48,8 @@ public class SnailSecurityConfig {
     @Bean
     public SecurityFilterChain snailSecurityFilterChain(HttpSecurity http, JwtTokenService jwtTokenService,
                                                         ObjectProvider<UserAuthorityProvider> authorityProviders,
-                                                        ObjectProvider<LoginUserProvider> loginUserProviders)
+                                                        ObjectProvider<LoginUserProvider> loginUserProviders,
+                                                        ObjectProvider<SessionHeartbeatPort> heartbeats)
             throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> {
@@ -57,7 +59,7 @@ public class SnailSecurityConfig {
                         .requestMatchers(HttpMethod.GET, WHITELIST).permitAll()
                         .requestMatchers(WHITELIST).permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new SnailAuthFilter(jwtTokenService, authorityProviders, loginUserProviders),
+                .addFilterBefore(new SnailAuthFilter(jwtTokenService, authorityProviders, loginUserProviders, heartbeats),
                         UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, ex) ->

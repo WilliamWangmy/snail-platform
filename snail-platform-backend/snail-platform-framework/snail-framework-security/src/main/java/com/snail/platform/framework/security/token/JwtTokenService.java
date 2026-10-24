@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.util.Date;
 
 /**
- * 职责:平台 JWT 的唯一签发与校验处,HS256,载荷只放 uid/tid/uname/oid 四项身份事实。
+ * 职责:平台 JWT 的唯一签发与校验处,HS256,载荷只放 uid/tid/uname/oid/ver 五项身份事实。
  * 上游:SnailSecurityConfig 装配;下游:认证链签发、过滤器回验。
  * 不做:refresh token、token 黑名单——无状态到期即失效是本期口径。
  */
@@ -33,6 +33,9 @@ public class JwtTokenService {
 
     /** 组织 ID 载荷键,操作日志按部门留痕用;此键加入前签发的令牌无该claim,回验得 null */
     private static final String CLAIM_OID = "oid";
+
+    /** 令牌版本载荷键:改密/重置/停用/强制下线自增,回验与登录人快照比对实现吊销;缺失按 0 计 */
+    private static final String CLAIM_VER = "ver";
 
     /** HS256 签名密钥 */
     private final byte[] secret;
@@ -58,6 +61,7 @@ public class JwtTokenService {
                 .claim(CLAIM_TID, principal.tenantId())
                 .claim(CLAIM_UNAME, principal.username())
                 .claim(CLAIM_OID, principal.orgId())
+                .claim(CLAIM_VER, principal.tokenVersion())
                 .issueTime(Date.from(now))
                 .expirationTime(Date.from(now.plus(ttl)))
                 .build();
@@ -88,11 +92,13 @@ public class JwtTokenService {
             if (claims.getExpirationTime() == null || claims.getExpirationTime().before(new Date())) {
                 throw BizException.unauthorized("登录已过期,请重新登录");
             }
+            Long ver = claims.getLongClaim(CLAIM_VER);
             return new SnailPrincipal(
                     claims.getLongClaim(CLAIM_UID),
                     claims.getLongClaim(CLAIM_TID),
                     claims.getStringClaim(CLAIM_UNAME),
-                    claims.getLongClaim(CLAIM_OID));
+                    claims.getLongClaim(CLAIM_OID),
+                    ver == null ? 0L : ver);
         } catch (ParseException | JOSEException e) {
             throw BizException.unauthorized("登录状态无效,请重新登录");
         }

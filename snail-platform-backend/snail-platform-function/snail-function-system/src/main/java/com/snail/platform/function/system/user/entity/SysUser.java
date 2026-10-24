@@ -29,6 +29,9 @@ public class SysUser extends TenantAuditedEntity {
     /** BCrypt 密文,任何出参对象禁止携带 */
     private String password;
 
+    /** 令牌版本:改密/重置/停用/强制下线自增,进 JWT ver 声明实现吊销 */
+    private Long tokenVersion;
+
     /** 邮箱 */
     private String email;
 

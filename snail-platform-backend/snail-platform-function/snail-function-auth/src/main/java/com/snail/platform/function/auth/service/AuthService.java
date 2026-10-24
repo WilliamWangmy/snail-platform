@@ -90,7 +90,7 @@ public class AuthService {
             failGuard.clear(username);
             String token = jwtTokenService.issue(
                     new SnailPrincipal(user.getUserId(), user.getTenantId(), user.getUsername(),
-                            user.getOrgId()));
+                            user.getOrgId(), user.getTokenVersion()));
             writeLoginLog(http, user.getTenantId(), username, user.getUserId(), 1, "登录成功");
             return new LoginSuccessVO(token, "Bearer", jwtTokenService.expiresInSeconds(),
                     user.getUserId(), user.getUsername(), user.getNickname(),

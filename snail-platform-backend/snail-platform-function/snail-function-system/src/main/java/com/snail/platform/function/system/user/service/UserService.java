@@ -102,6 +102,7 @@ public class UserService {
         if (taken > 0) {
             throw BizException.badRequest("登录名已存在");
         }
+        PasswordPolicy.validate(request.password());
         requireUsableOrg(request.orgId());
         checkAccountLimit();
 
@@ -142,12 +143,25 @@ public class UserService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void resetPassword(Long userId, String rawPassword) {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
+        PasswordPolicy.validate(rawPassword);
         userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(rawPassword))
+                .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, user.getUserId()));
+    }
+
+    /** 强制下线:令牌版本自增 + 快照失效,该用户存量令牌下一次请求即 401;不判自我,由调用方决定 */
+    @Transactional
+    @CacheEvict(cacheNames = "userSession", key = "#userId")
+    public void forceLogout(Long userId) {
+        requireUser(userId);
+        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+                .setSql("token_version = token_version + 1")
+                .eq(SysUser::getUserId, userId));
     }
 
     @Transactional
@@ -163,6 +177,7 @@ public class UserService {
         requireUserInScope(userId);
         userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getStatus, status)
+                .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
     }
 
