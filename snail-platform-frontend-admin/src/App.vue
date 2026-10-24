@@ -1,7 +1,3 @@
-<script setup lang="ts"></script>
-
 <template>
-  <div class="app-shell"></div>
+  <RouterView />
 </template>
-
-<style scoped></style>
