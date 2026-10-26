@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-function-storage:文件存储业务模块——sys_file 元数据、租户配额、REST 上传/下载/删除、平台检索。
+  存储端口经 framework-storage 条件装配,type 为空时按端口缺席降级;上传人显示名快照落库不反查用户档案。
+  对 system 的依赖只有一处:直读 SysTenantMapper 取存储配额,与 auth 同款的登记例外(单一只读边,
+  ArchUnit 已在规则注释登记),变密时收敛 system.api 包。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-function</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-function-storage</artifactId>
+    <name>snail-function-storage</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-db</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-log</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-storage</artifactId>
+        </dependency>
+        <!-- 登记例外:storage 直读 sys_tenant 的 SysTenantMapper 取配额(与 auth 同款,只读边) -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-system</artifactId>
+        </dependency>
+    </dependencies>
+</project>

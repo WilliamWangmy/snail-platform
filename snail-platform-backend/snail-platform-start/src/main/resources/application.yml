@@ -7,6 +7,11 @@ spring:
     virtual:
       # 运行时 JDK≥21 才生效，JDK 17 静默关闭；产物仍按 17 编译
       enabled: true
+  servlet:
+    multipart:
+      # 与 snail.storage.upload.max-size-mb 对齐,单点口径别漂移
+      max-file-size: 50MB
+      max-request-size: 50MB
   flyway:
     enabled: true
     # 单库单目录，脚本就放在本模块 resources/db/migration 下
@@ -43,3 +48,24 @@ snail:
         - sys_notify_outbound
     pagination:
       max-limit: 500
+  storage:
+    # type 缺省(空)= 不装配 StoragePort,文件功能端点按"文件存储未配置"降级;sftp/s3 必填且配置缺失即启动失败
+    type: ${SNAIL_STORAGE_TYPE:}
+    sftp:
+      host: ${SNAIL_SFTP_HOST:127.0.0.1}
+      port: 22
+      username: ${SNAIL_SFTP_USERNAME:snail}
+      password: ${SNAIL_SFTP_PASSWORD:snail}
+      base-dir: /data/snail/files
+    s3:
+      # 协议兼容端点与凭证不给开发默认值;type=s3 而这些值缺失,装配校验启动即失败
+      endpoint: ${SNAIL_S3_ENDPOINT:}
+      region: ${SNAIL_S3_REGION:us-east-1}
+      bucket: ${SNAIL_S3_BUCKET:}
+      access-key: ${SNAIL_S3_AK:}
+      secret-key: ${SNAIL_S3_SK:}
+      # true 路径式 endpoint/bucket/key(MinIO 等自建必需);false 虚拟主机 bucket.endpoint/key(阿里 OSS/腾讯 COS 兼容端点用这个)
+      path-style: true
+    upload:
+      max-size-mb: 50
+      ext-whitelist: jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,md,zip,7z

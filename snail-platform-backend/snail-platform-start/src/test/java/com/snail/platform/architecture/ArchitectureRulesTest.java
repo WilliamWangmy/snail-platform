@@ -38,6 +38,15 @@ class ArchitectureRulesTest {
     private static final String SYSTEM_API = SYSTEM + "api";
     private static final String AUTH = "com.snail.platform.function.auth";
     private static final String NOTIFY = "com.snail.platform.function.notify";
+    private static final String STORAGE = "com.snail.platform.function.storage";
+
+    /**
+     * 对 system 依赖强制只经 api 包的模块:notify 是第一个按"跨模块只经 api 包"目标态写的模块,
+     * 后续模块按同款规则逐个登记;auth 的整体豁免与 storage 的豁免是另一笔登记在案的债务。
+     * storage 暂不列入:它直读 sys_tenant 的 SysTenantMapper 取存储配额,与 auth 同款登记例外
+     * (storage→tenant 的单一只读边),变密时收敛 system.api 包,再补进本清单。
+     */
+    private static final Set<String> API_PACKAGE_ENFORCED = Set.of(NOTIFY);
 
     /** MP 分页对象全限定名:业务层禁止直接 new，分页只能经 framework-db 的 PageAssembler 单点装配 */
     private static final String MP_PAGE = "com.baomidou.mybatisplus.extension.plugins.pagination.Page";
@@ -97,15 +106,14 @@ class ArchitectureRulesTest {
             owner.getDirectDependenciesFromSelf().forEach(dependency ->
                     checkCrossSubdomain(owner, dependency, violations));
 
-            // notify 是第一个按"跨模块只经 api 包"目标态写的模块:对 system 的依赖只准落在 system.api 包,
-            // 后续模块按同款规则逐个登记;auth 的整体豁免收窄是另一笔登记在案的债务
-            if (ownerPackage.startsWith(NOTIFY)) {
+            // 按"跨模块只经 api 包"目标态写的模块(见 API_PACKAGE_ENFORCED 注释)机械执法
+            if (API_PACKAGE_ENFORCED.stream().anyMatch(ownerPackage::startsWith)) {
                 owner.getDirectDependenciesFromSelf().forEach(dependency -> {
                     String targetPackage = dependency.getTargetClass().getPackageName();
                     if (targetPackage.startsWith(SYSTEM) && !targetPackage.startsWith(SYSTEM_API)) {
                         violations.add(owner.getFullName() + " -> "
                                 + dependency.getTargetClass().getFullName()
-                                + ":notify 对 system 的依赖只准经 api 包(目标态 §3)");
+                                + ":跨模块对 system 的依赖只准经 api 包(目标态 §3)");
                     }
                 });
             }

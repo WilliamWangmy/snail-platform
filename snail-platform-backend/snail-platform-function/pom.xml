@@ -24,6 +24,7 @@
         <module>snail-function-system</module>
         <module>snail-function-auth</module>
         <module>snail-function-notify</module>
+        <module>snail-function-storage</module>
     </modules>
 
     <dependencies>

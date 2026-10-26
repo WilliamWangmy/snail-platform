@@ -32,6 +32,10 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-notify</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-storage</artifactId>
+        </dependency>
 
         <!-- 接口文档：springdoc 3.x 对应 Boot 4；api-docs 与 swagger-ui 路径的放行已在 framework-security 白名单 -->
         <dependency>
@@ -48,6 +52,17 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 内嵌 SFTP 服务器:文件存储流程测试用,替代外部 SFTP 依赖 -->
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-sftp</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
