@@ -3,8 +3,11 @@ package com.snail.platform.framework.storage;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.KeyPair;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Base64;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -115,6 +119,30 @@ class SftpStoragePortTest {
         assertTrue(port.exists(key), "冷目录下的写入应自建成功");
         Path landed = server.home().resolve("cold-start-dir").resolve(key);
         assertTrue(Files.isRegularFile(landed), "冷目录应真实创建: " + landed);
+    }
+
+    /**
+     * 严格指纹校验的失败侧:known_hosts 里是另一把公钥,连接必须在握手阶段被拒绝,
+     * 而不是带着错误的主机身份继续传输文件。
+     */
+    @Test
+    void strictHostKeyCheckingRejectsUnknownFingerprint() throws Exception {
+        SnailStorageProperties.Sftp config = server.properties();
+        config.setStrictHostKeyChecking(true);
+        Path knownHosts = server.home().resolve("known_hosts-unrelated");
+        KeyPair other = KeyPair.genKeyPair(new JSch(), KeyPair.RSA);
+        String entry = "[" + config.getHost() + "]:" + config.getPort() + " "
+                + other.getKeyType() + " "
+                + Base64.getEncoder().encodeToString(other.getPublicKeyBlob());
+        Files.writeString(knownHosts, entry + System.lineSeparator(), StandardCharsets.UTF_8);
+        config.setKnownHosts(knownHosts.toString());
+        SftpStoragePort port = new SftpStoragePort(config);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> port.put("7/202610/strict.txt", new ByteArrayInputStream(PAYLOAD),
+                        PAYLOAD.length, "text/plain"));
+        assertTrue(error.getMessage().contains("SFTP 连接失败"),
+                "指纹不匹配应在建连阶段失败: " + error.getMessage());
     }
 
     /**

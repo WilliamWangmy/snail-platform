@@ -56,6 +56,18 @@ public class SnailStorageProperties {
 
         /** 根目录,允许不存在,put 时逐级自建;SFTP 下对象路径 = baseDir + "/" + key */
         private String baseDir;
+
+        /** known_hosts 文件路径;strict-host-key-checking=true 时必填 */
+        private String knownHosts;
+
+        /** 主机指纹校验:生产默认开启;自签指纹的开发/测试环境显式关闭 */
+        private boolean strictHostKeyChecking = true;
+
+        /** 建连与开通道超时(毫秒),避免网络故障时挂死请求线程 */
+        private int connectTimeoutMs = 10_000;
+
+        /** 会话读写超时(毫秒),覆盖通道操作等不到响应的情况 */
+        private int sessionTimeoutMs = 30_000;
     }
 
     /** S3 协议兼容连接参数;type=s3 时全部必填 */

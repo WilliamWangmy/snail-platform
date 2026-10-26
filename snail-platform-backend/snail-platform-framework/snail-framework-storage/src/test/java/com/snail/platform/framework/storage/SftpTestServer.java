@@ -13,8 +13,8 @@ import org.apache.sshd.sftp.server.SftpSubsystemFactory;
 /**
  * 职责:内嵌 SFTP 测试夹具——随机端口、口令认证、虚拟根指向传入目录,替代外部 SFTP 依赖。
  * 上游:framework-storage 的端口层单测;下游:Apache SSHD 的 SftpSubsystemFactory(仅 test 作用域)。
- * 口径:口令是测试专用值,与 application.yml 的开发默认值同级别,不构成生产凭据;
- * 主机密钥随机自签并落在同一个 home 目录,StrictHostKeyChecking=no 的消费方无需 known_hosts。
+ * 口径:口令是测试专用值,不构成生产凭据;主机密钥随机自签,夹具显式关闭严格指纹校验,
+ * 消费方无需 known_hosts;生产配置仍默认严格校验。
  */
 public final class SftpTestServer implements AutoCloseable {
 
@@ -66,6 +66,7 @@ public final class SftpTestServer implements AutoCloseable {
         sftp.setUsername(USERNAME);
         sftp.setPassword(PASSWORD);
         sftp.setBaseDir("/");
+        sftp.setStrictHostKeyChecking(false);
         return sftp;
     }
 

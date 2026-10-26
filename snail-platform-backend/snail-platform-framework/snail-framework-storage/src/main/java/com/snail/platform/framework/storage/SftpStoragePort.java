@@ -14,7 +14,8 @@ import org.slf4j.LoggerFactory;
  * 职责:StoragePort 的 SFTP 实现——每次操作独立建连(open session→channel→操作→断开),
  * 不持共享连接,线程安全按最保守形态成立;吞吐不足时再上连接池(路线图项,不进首版)。
  * 上游:StoragePort;下游:JSch 会话与 SFTP 通道。
- * 口径:strictHostKeyChecking=no——自署主机免 known_hosts 带外分发,主机伪装风险由部署侧网络边界兜底;
+ * 口径:主机指纹默认严格校验,knownHosts 路径由配置提供;仅开发/测试环境可显式关闭;
+ * 建连、开通道与会话读写都有超时,网络故障不会无限挂住请求线程;
  * put 前递归 mkdirs(stat 异常即视为目录缺失,逐级创建),baseDir 允许不存在;
  * 对象路径 = baseDir + "/" + key;get 返回的流挂在本次的会话上,随流关闭一并断开连接。
  */
@@ -31,7 +32,10 @@ public class SftpStoragePort implements StoragePort {
     /** 主机指纹校验开关名 */
     private static final String STRICT_HOST_KEY_CHECKING = "StrictHostKeyChecking";
 
-    /** 关闭指纹校验:自署主机免带外分发 known_hosts */
+    /** 严格校验主机指纹 */
+    private static final String HOST_KEY_CHECKING_ON = "yes";
+
+    /** 关闭指纹校验:只给自签指纹的开发/测试环境使用 */
     private static final String HOST_KEY_CHECKING_OFF = "no";
 
     /** SFTP 错误码:文件或目录不存在 */
@@ -109,6 +113,9 @@ public class SftpStoragePort implements StoragePort {
     private SessionHolder open() {
         try {
             JSch jsch = new JSch();
+            if (hasText(config.getKnownHosts())) {
+                jsch.setKnownHosts(config.getKnownHosts());
+            }
             if (hasText(config.getPrivateKey())) {
                 jsch.addIdentity(config.getPrivateKey());
             }
@@ -116,12 +123,14 @@ public class SftpStoragePort implements StoragePort {
             if (hasText(config.getPassword())) {
                 session.setPassword(config.getPassword());
             }
-            session.setConfig(STRICT_HOST_KEY_CHECKING, HOST_KEY_CHECKING_OFF);
-            session.connect();
+            session.setConfig(STRICT_HOST_KEY_CHECKING,
+                    config.isStrictHostKeyChecking() ? HOST_KEY_CHECKING_ON : HOST_KEY_CHECKING_OFF);
+            session.setTimeout(config.getSessionTimeoutMs());
+            session.connect(config.getConnectTimeoutMs());
             ChannelSftp channel;
             try {
                 channel = (ChannelSftp) session.openChannel(CHANNEL_SFTP);
-                channel.connect();
+                channel.connect(config.getConnectTimeoutMs());
             } catch (JSchException e) {
                 session.disconnect();
                 throw e;
