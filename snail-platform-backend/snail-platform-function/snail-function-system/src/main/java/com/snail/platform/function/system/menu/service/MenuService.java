@@ -56,6 +56,13 @@ public class MenuService {
     private static final Pattern PERM_CODE = Pattern.compile(
             "^(platform|system):[a-z0-9]+(?:-[a-z0-9]+)*:[a-z0-9]+(?:-[a-z0-9]+)*$");
 
+    /** 外链地址:只允许 http/https,挡掉 javascript: 一类可执行 scheme 被当成链接渲染 */
+    private static final Pattern EXTERNAL_URL = Pattern.compile("^https?://[^\\s/?#]+[^\\s]*$",
+            Pattern.CASE_INSENSITIVE);
+
+    /** 站内路由:绝对路径,允许前端路由参数的冒号段 */
+    private static final Pattern INTERNAL_PATH = Pattern.compile("^/[^\\s]*$");
+
     /** 菜单目录读写 */
     private final SysMenuMapper menuMapper;
 
@@ -120,7 +127,7 @@ public class MenuService {
         try {
             menuMapper.insert(menu);
         } catch (DuplicateKeyException e) {
-            // 唯一键含已删记录,预查会漏;错误口径仍走业务拒绝
+            // deleted 行仍占唯一键,权限码终身占用;数据库拦下时统一转业务拒绝
             throw BizException.badRequest("权限码已存在");
         }
         return menu.getMenuId();
@@ -143,7 +150,7 @@ public class MenuService {
         validateShape(menu.getMenuType(), menu.getTarget(), menu.getScope(), path, component,
                 menu.getPermCode(), visible);
 
-        menuMapper.update(null, Wrappers.<SysMenu>lambdaUpdate()
+        menuMapper.update(new SysMenu(), Wrappers.<SysMenu>lambdaUpdate()
                 .set(SysMenu::getMenuName, request.menuName().trim())
                 .set(SysMenu::getPath, path)
                 .set(SysMenu::getComponent, component)
@@ -179,7 +186,9 @@ public class MenuService {
         return menu;
     }
 
-    /** 父节点约束:根只能是目录;按钮与外链不能挂下级;子承父面;大屏与站内两棵树不互相嵌套 */
+    /** 父节点约束:根只能是目录;按钮与外链不能挂下级;导航节点子承父面;大屏与站内两棵树不互相嵌套。
+     *  按钮例外——它不入导航树,只决定"哪个动作要哪个码",所以允许挂在其服务的页面下:
+     *  站内页面上的跨面动作(如平台授权、跨租户查看)本就该长在同一个位置,授权树按节点自身的面判权。 */
     private void validateParent(SysMenu parent, int menuType, int target, int scope) {
         if (parent == null) {
             if (menuType != TYPE_DIR) {
@@ -193,7 +202,7 @@ public class MenuService {
         if (Objects.equals(parent.getTarget(), TARGET_EXTERNAL)) {
             throw BizException.badRequest("外链不能挂下级");
         }
-        if (!Objects.equals(parent.getScope(), scope)) {
+        if (menuType != TYPE_BUTTON && !Objects.equals(parent.getScope(), scope)) {
             throw BizException.badRequest("子菜单归属面必须与父菜单一致");
         }
         if (isDashboard(parent.getTarget()) != isDashboard(target)) {
@@ -204,6 +213,15 @@ public class MenuService {
     /** 三元组决定 path/component/perm_code 的必填口径;权限码前缀必须与归属面一致 */
     private void validateShape(int menuType, int target, int scope, String path, String component,
                                String permCode, int visible) {
+        if (hasText(path)) {
+            if (target == TARGET_EXTERNAL) {
+                if (!EXTERNAL_URL.matcher(path).matches()) {
+                    throw BizException.badRequest("外链地址须以 http:// 或 https:// 开头");
+                }
+            } else if (!INTERNAL_PATH.matcher(path).matches()) {
+                throw BizException.badRequest("站内路由须以 / 开头");
+            }
+        }
         if (menuType == TYPE_DIR) {
             if (hasText(permCode)) {
                 throw BizException.badRequest("目录不能配置权限码");
