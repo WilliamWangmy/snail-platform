@@ -33,8 +33,8 @@ http.interceptors.response.use(
     }
     return response;
   },
-  (error: AxiosError<Envelope<unknown>>) => {
-    const body = error.response?.data;
+  async (error: AxiosError<Envelope<unknown>>) => {
+    const body = await envelopeOf(error);
     if (body && typeof body.code === 'number') {
       report(body.code, body.message);
       return Promise.reject(new ApiError(body.code, body.message));
@@ -43,6 +43,23 @@ http.interceptors.response.use(
     return Promise.reject(new ApiError(-1, '网络异常，请稍后重试'));
   },
 );
+
+/**
+ * 取错误响应里的信封。非 2xx 也会带 R 信封(401/403/404/405 与 500),
+ * 但流式请求(responseType=blob)的响应体是 Blob,不先读出来就只能报"网络异常",
+ * 把服务端说清的拒绝理由(如无下载权限)吞掉。
+ */
+async function envelopeOf(error: AxiosError<Envelope<unknown>>): Promise<Envelope<unknown> | undefined> {
+  const data = error.response?.data;
+  if (data instanceof Blob) {
+    try {
+      return JSON.parse(await data.text()) as Envelope<unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+  return data;
+}
 
 function report(code: number, message: string): void {
   const onLoginPage = window.location.pathname.startsWith('/login');
