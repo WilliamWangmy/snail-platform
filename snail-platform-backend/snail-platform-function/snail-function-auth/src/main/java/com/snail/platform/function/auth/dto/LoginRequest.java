@@ -18,6 +18,7 @@ public record LoginRequest(
 
         @Schema(description = "口令明文,服务端只做比对不落日志", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入密码")
+        @Size(max = 64, message = "密码过长")
         String password,
 
         @Schema(description = "验证码键,来自验证码接口", requiredMode = Schema.RequiredMode.REQUIRED)

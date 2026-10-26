@@ -1,6 +1,7 @@
 package com.snail.platform.function.auth.service;
 
 import cn.hutool.crypto.digest.BCrypt;
+import cn.hutool.extra.servlet.JakartaServletUtil;
 import cn.hutool.http.useragent.UserAgent;
 import cn.hutool.http.useragent.UserAgentUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -28,9 +29,16 @@ import org.springframework.transaction.annotation.Transactional;
  * 每步拒绝的文案即口径;凡进入本服务必落一条登录日志,成败皆记,用户不存在的失败归属记 tenant_id=0。
  * 上游:AuthController;下游:sys_user/sys_tenant 读、sys_login_log 写、JWT 签发。
  * 防账号枚举:用户不存在与口令错误回同一文案。
+ * 计数口径:失败按类型分流(LoginRejects)——只有凭证失败累加 IP+登录名锁定,
+ * 验证码失败由 CaptchaService 按 IP 自计,租户/账号停用属运营状态不计数;
+ * 锁定分支自身不再累加,否则锁定期间每次重试都在延长计数窗口。
+ * 来源 IP 取 Hutool getClientIP(信任转发头),代理层必须负责归一化,否则计数可被伪造头绕开。
  */
 @Service
 public class AuthService {
+
+    /** 锁定命中时的统一文案 */
+    private static final String LOCKED_MESSAGE = "失败次数过多,请稍后再试";
 
     /** 用户表读,登录定位走旁路窗口 */
     private final SysUserMapper userMapper;
@@ -62,34 +70,36 @@ public class AuthService {
 
     public LoginSuccessVO login(LoginRequest request, HttpServletRequest http) {
         String username = request.username().trim();
+        String ip = JakartaServletUtil.getClientIP(http);
+        if (failGuard.isCredentialLocked(ip, username)) {
+            writeLoginLog(http, 0L, username, null, 0, LOCKED_MESSAGE);
+            throw BizException.badRequest(LOCKED_MESSAGE);
+        }
         SysUser user = null;
         try {
-            if (failGuard.isLocked(username)) {
-                throw BizException.badRequest("失败次数过多,请稍后再试");
-            }
-            captchaService.verify(request.captchaKey(), request.captchaCode());
+            captchaService.verify(ip, request.captchaKey(), request.captchaCode());
 
             user = TenantContextHolder.withoutTenant(() -> userMapper.selectOne(
                     Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username)));
             if (user == null) {
-                throw BizException.badRequest("账号或密码错误");
+                throw new LoginRejects.Credential("账号或密码错误");
             }
 
             SysTenant tenant = tenantMapper.selectById(user.getTenantId());
             if (tenant == null || Objects.equals(tenant.getStatus(), 1)) {
-                throw BizException.badRequest("租户已停用");
+                throw new LoginRejects.Access("租户已停用");
             }
             if (tenant.getExpireTime() != null && tenant.getExpireTime().isBefore(LocalDateTime.now())) {
-                throw BizException.badRequest("租户已到期");
+                throw new LoginRejects.Access("租户已到期");
             }
             if (Objects.equals(user.getStatus(), 1)) {
-                throw BizException.badRequest("账号已停用");
+                throw new LoginRejects.Access("账号已停用");
             }
             if (!BCrypt.checkpw(request.password(), user.getPassword())) {
-                throw BizException.badRequest("账号或密码错误");
+                throw new LoginRejects.Credential("账号或密码错误");
             }
 
-            failGuard.clear(username);
+            failGuard.clearCredentialFails(ip, username);
             String token = jwtTokenService.issue(
                     new SnailPrincipal(user.getUserId(), user.getTenantId(), user.getUsername(),
                             user.getOrgId(), user.getTokenVersion()));
@@ -101,7 +111,9 @@ public class AuthService {
             Long tenantId = user != null ? user.getTenantId() : 0L;
             Long userId = user != null ? user.getUserId() : null;
             writeLoginLog(http, tenantId, username, userId, 0, e.getMessage());
-            failGuard.increase(username);
+            if (e instanceof LoginRejects.Credential) {
+                failGuard.increaseCredentialFail(ip, username);
+            }
             throw e;
         }
     }
@@ -113,7 +125,7 @@ public class AuthService {
     @Transactional
     @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void logout(Long userId) {
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
     }
@@ -126,7 +138,7 @@ public class AuthService {
         log.setTenantId(tenantId);
         log.setUsername(username);
         log.setUserId(userId);
-        log.setIp(cn.hutool.extra.servlet.JakartaServletUtil.getClientIP(http));
+        log.setIp(JakartaServletUtil.getClientIP(http));
         log.setBrowser(ua == null ? null : ua.getBrowser().getName());
         log.setOs(ua == null ? null : ua.getOs().getName());
         log.setStatus(status);

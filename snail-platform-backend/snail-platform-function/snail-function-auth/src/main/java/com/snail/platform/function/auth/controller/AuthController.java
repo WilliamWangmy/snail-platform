@@ -1,7 +1,7 @@
 package com.snail.platform.function.auth.controller;
 
-import com.snail.platform.framework.core.context.LoginUser;
-import com.snail.platform.framework.core.context.LoginUserContextHolder;
+import cn.hutool.extra.servlet.JakartaServletUtil;
+import com.snail.platform.framework.core.context.LoginUser;import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.security.authority.UserAuthorityProvider;
@@ -51,8 +51,8 @@ public class AuthController {
     @PreAuthorize("permitAll()")
     @Operation(summary = "获取图形验证码")
     @GetMapping("/captcha")
-    public R<CaptchaVO> captcha() {
-        return R.ok(captchaService.generate());
+    public R<CaptchaVO> captcha(HttpServletRequest http) {
+        return R.ok(captchaService.generate(JakartaServletUtil.getClientIP(http)));
     }
 
     @PreAuthorize("permitAll()")
