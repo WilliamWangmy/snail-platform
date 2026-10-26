@@ -31,12 +31,14 @@ import java.util.Objects;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 职责:用户管理——分页检索、新增(含建号即授权)、修改、重置口令、停用/启用、逻辑删除、角色全量覆盖分配。
  * 关键口径:username 全表唯一且建后不可改,查重走无租户窄窗口(全表口径),撞库提示"登录名已存在";
- * 新增受租户 accountLimit 约束(只拦新增不追认存量);删除同事务物理清 sys_user_role——人不在了授权就该空;
+ * 新增受租户 accountLimit 约束(锁 sys_tenant 行后计数,只拦新增不追认存量);
+ * 删除同事务物理清 sys_user_role——人不在了授权就该空;
  * 自我保护:不允许停用或删除当前登录者自己,防管理员把自己锁在门外。
  * 数据权限:列表查询按当前登录者 data_scope 开窗过滤;详情、档案修改、停用、删除、重置口令、强制下线、
  * 分配角色七类定点操作必须过 requireUserInScope 闸(目标用户在可见集内);建号与调岗还需目标组织可授权。
@@ -95,7 +97,7 @@ public class UserService {
         return UserVO.of(requireUser(userId), roleIdsOf(userId));
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Long create(UserCreateRequest request) {
         String username = request.username().trim();
         Long taken = TenantContextHolder.withoutTenant(() -> userMapper.selectCount(
@@ -120,7 +122,7 @@ public class UserService {
         try {
             userMapper.insert(user);
         } catch (DuplicateKeyException e) {
-            // 唯一键含已删记录,预查会漏;错误口径仍走业务拒绝
+            // deleted 行仍占唯一键,登录名终身占用;数据库拦下时统一转业务拒绝
             throw BizException.badRequest("登录名已存在");
         }
 
@@ -137,7 +139,7 @@ public class UserService {
         requireUserInScope(userId);
         requireUsableOrg(request.orgId());
         requireAssignableOrg(request.orgId());
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getNickname, request.nickname().trim())
                 .set(SysUser::getEmail, request.email())
                 .set(SysUser::getPhone, request.phone())
@@ -152,7 +154,7 @@ public class UserService {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
         PasswordPolicy.validate(rawPassword);
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(rawPassword))
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, user.getUserId()));
@@ -164,7 +166,7 @@ public class UserService {
     public void forceLogout(Long userId) {
         requireUser(userId);
         requireUserInScope(userId);
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
     }
@@ -180,7 +182,7 @@ public class UserService {
             return;
         }
         requireUserInScope(userId);
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getStatus, status)
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
@@ -196,7 +198,7 @@ public class UserService {
         }
         requireUserInScope(userId);
         // 逻辑删后旧令牌仍可能落在其他节点缓存里,版本前推让最小快照之外的残留也失去会话资格
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
         userMapper.deleteById(userId);
@@ -299,9 +301,19 @@ public class UserService {
         }
     }
 
-    /** accountLimit 为 null 即不限;只拦新增,不追认存量 */
+    /**
+     * accountLimit 为 null 即不限;只拦新增,不追认存量。
+     * 锁 sys_tenant 行再计数:selectCount 与 insert 之间不串行,并发建号能一起看到"还差一个"从而突破上限
+     * (与存储配额同一口径);READ_COMMITTED 让拿锁方必见前一笔已提交的用户行。
+     */
     private void checkAccountLimit() {
-        SysTenant tenant = tenantMapper.selectById(TenantContextHolder.get());
+        Long tenantId = TenantContextHolder.get();
+        if (tenantId == null) {
+            return;
+        }
+        SysTenant tenant = tenantMapper.selectOne(Wrappers.<SysTenant>lambdaQuery()
+                .eq(SysTenant::getTenantId, tenantId)
+                .last("FOR UPDATE"));
         if (tenant == null || tenant.getAccountLimit() == null) {
             return;
         }
