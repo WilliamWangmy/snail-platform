@@ -22,9 +22,9 @@ public record UserCreateRequest(
         @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
         String username,
 
-        @Schema(description = "初始口令,BCrypt 落库", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "初始口令,BCrypt 落库;强度口径见 PasswordPolicy", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入初始密码")
-        @Size(min = 8, max = 30, message = "密码长度 8-30")
+        @Size(min = 8, max = 64, message = "密码长度 8-64")
         String password,
 
         @Schema(description = "显示名", requiredMode = Schema.RequiredMode.REQUIRED)

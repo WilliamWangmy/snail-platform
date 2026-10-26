@@ -2,6 +2,7 @@ package com.snail.platform.function.system.tenant.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
@@ -17,6 +18,8 @@ public record TenantCreateRequest(
         @Schema(description = "租户标识,全局唯一,建后不可改", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入租户标识")
         @Size(min = 2, max = 64, message = "租户标识长度 2-64")
+        @Pattern(regexp = "[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?",
+                message = "租户标识只允许小写字母、数字、点、下划线与连字符,首尾须为字母或数字")
         String tenantCode,
 
         @Schema(description = "租户名称", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -46,10 +49,11 @@ public record TenantCreateRequest(
         @Schema(description = "首任管理员登录名,全局唯一", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入管理员登录名")
         @Size(min = 3, max = 30, message = "登录名长度 3-30")
+        @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
         String adminUsername,
 
         @Schema(description = "首任管理员初始口令,服务端 BCrypt 落库", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入管理员初始密码")
-        @Size(min = 8, max = 30, message = "密码长度 8-30")
+        @Size(min = 8, max = 64, message = "密码长度 8-64")
         String adminPassword) {
 }

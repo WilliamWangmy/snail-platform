@@ -11,8 +11,8 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "重置密码请求")
 public record ResetPasswordRequest(
 
-        @Schema(description = "新口令明文,服务端 BCrypt 落库,不落任何日志", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "新口令明文,服务端 BCrypt 落库,不落任何日志;强度口径见 PasswordPolicy", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入新密码")
-        @Size(min = 8, max = 30, message = "密码长度 8-30")
+        @Size(min = 8, max = 64, message = "密码长度 8-64")
         String password) {
 }
