@@ -80,7 +80,12 @@ async function handleRemove(row: FileVO): Promise<void> {
 
 function rowActions(row: FileVO): RowAction[] {
   return [
-    { key: 'download', label: '下载', handler: () => void handleDownload(row) },
+    {
+      key: 'download',
+      label: '下载',
+      show: auth.has('system:file:download'),
+      handler: () => void handleDownload(row),
+    },
     {
       key: 'delete',
       label: '删除',
