@@ -75,8 +75,11 @@ public class OnlineSessionService implements SessionHeartbeatPort {
     public void beat(SnailPrincipal principal, String ip, String userAgent) {
         try {
             String key = SnailRedisKeys.online(principal.tenantId(), principal.userId());
+            LocalDateTime now = LocalDateTime.now();
+            // 首见时间跨心跳保留:整键覆盖写会把"上线时刻"漂成"最近一次请求",在线列表就再也读不出会话时长
+            OnlineSession previous = parseQuietly(redisTemplate.opsForValue().get(key));
             OnlineSession session = new OnlineSession(principal.username(), ip, userAgent,
-                    LocalDateTime.now(), LocalDateTime.now());
+                    previous == null ? now : previous.firstSeen(), now);
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(session), ONLINE_TTL);
             redisTemplate.execute(INDEX_SCRIPT,
                     List.of(SnailRedisKeys.onlineIndex(principal.tenantId())),
@@ -123,14 +126,21 @@ public class OnlineSessionService implements SessionHeartbeatPort {
     }
 
     private OnlineSessionVO read(Long tenantId, Long userId) {
+        OnlineSession session = parseQuietly(redisTemplate.opsForValue().get(SnailRedisKeys.online(tenantId, userId)));
+        if (session == null) {
+            return null;
+        }
+        return new OnlineSessionVO(userId, session.username(), session.ip(), session.userAgent(),
+                session.firstSeen(), session.lastActive());
+    }
+
+    /** 会话 JSON 解码;空值与结构漂移(Jackson 不认 record)一律按"无会话"处理,不让列表整页报错 */
+    private OnlineSession parseQuietly(String raw) {
+        if (raw == null) {
+            return null;
+        }
         try {
-            String raw = redisTemplate.opsForValue().get(SnailRedisKeys.online(tenantId, userId));
-            if (raw == null) {
-                return null;
-            }
-            OnlineSession session = objectMapper.readValue(raw, OnlineSession.class);
-            return new OnlineSessionVO(userId, session.username(), session.ip(), session.userAgent(),
-                    session.firstSeen(), session.lastActive());
+            return objectMapper.readValue(raw, OnlineSession.class);
         } catch (Exception e) {
             return null;
         }
