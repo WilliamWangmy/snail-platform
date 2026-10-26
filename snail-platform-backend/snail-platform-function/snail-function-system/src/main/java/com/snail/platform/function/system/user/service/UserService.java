@@ -38,9 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
  * 关键口径:username 全表唯一且建后不可改,查重走无租户窄窗口(全表口径),撞库提示"登录名已存在";
  * 新增受租户 accountLimit 约束(只拦新增不追认存量);删除同事务物理清 sys_user_role——人不在了授权就该空;
  * 自我保护:不允许停用或删除当前登录者自己,防管理员把自己锁在门外。
- * 数据权限:列表查询按当前登录者 data_scope 开窗过滤;停用/删除/重置口令/分配角色四类定点写必须过
- * requireUserInScope 闸(目标用户在可见集内),分配的角色档位不得宽于操作者自身最宽档(resolveGrantable)——
- * 只拦"已知 ID 的定点读写",详情与档案修改仍走窗口外。
+ * 数据权限:列表查询按当前登录者 data_scope 开窗过滤;详情、档案修改、停用、删除、重置口令、强制下线、
+ * 分配角色七类定点操作必须过 requireUserInScope 闸(目标用户在可见集内);建号与调岗还需目标组织可授权。
+ * 分配的角色档位不得宽于操作者自身最宽档(resolveGrantable),防纵向提权。
  * 授权集变化/删号/停用启用会让该用户的 userPerms 与 userSession 缓存失效,停用与收权即时生效,不等令牌过期。
  * 上游:UserController;下游:sys_user/sys_user_role 写读、sys_org/sys_role 前置校验、sys_tenant 上限读取。
  */
@@ -91,6 +91,7 @@ public class UserService {
     }
 
     public UserVO detail(Long userId) {
+        requireUserInScope(userId);
         return UserVO.of(requireUser(userId), roleIdsOf(userId));
     }
 
@@ -104,6 +105,7 @@ public class UserService {
         }
         PasswordPolicy.validate(request.password());
         requireUsableOrg(request.orgId());
+        requireAssignableOrg(request.orgId());
         checkAccountLimit();
 
         SysUser user = new SysUser();
@@ -132,7 +134,9 @@ public class UserService {
     @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void update(Long userId, UserUpdateRequest request) {
         SysUser user = requireUser(userId);
+        requireUserInScope(userId);
         requireUsableOrg(request.orgId());
+        requireAssignableOrg(request.orgId());
         userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getNickname, request.nickname().trim())
                 .set(SysUser::getEmail, request.email())
@@ -159,6 +163,7 @@ public class UserService {
     @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void forceLogout(Long userId) {
         requireUser(userId);
+        requireUserInScope(userId);
         userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
@@ -221,7 +226,7 @@ public class UserService {
         if (roles.size() != distinct.size()) {
             throw BizException.badRequest("包含不存在或跨租户的角色");
         }
-        Integer broadest = operatorBroadestDataScope();
+        Integer broadest = dataScopeService.operatorBroadestDataScope();
         if (broadest == null) {
             throw BizException.forbidden("当前登录人没有可用角色,不能分配角色");
         }
@@ -233,32 +238,15 @@ public class UserService {
         return roles;
     }
 
-    /** 操作者自身最宽数据档位:启用角色的最小 data_scope(1 全部最宽);无可用角色返回 null 即不可分配 */
-    private Integer operatorBroadestDataScope() {
-        Long operatorId = LoginUserContextHolder.userId();
-        if (operatorId == null) {
-            return null;
-        }
-        List<Long> roleIds = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
-                        .eq(SysUserRole::getUserId, operatorId))
-                .stream().map(SysUserRole::getRoleId).distinct().toList();
-        if (roleIds.isEmpty()) {
-            return null;
-        }
-        // 0 为启用状态;停用角色不构成操作者的权限凭据,不参与档位折算
-        return roleMapper.selectBatchIds(roleIds).stream()
-                .filter(role -> Integer.valueOf(0).equals(role.getStatus()))
-                .map(SysRole::getDataScope)
-                .filter(Objects::nonNull)
-                .min(Integer::compareTo)
-                .orElse(null);
-    }
-
     /**
      * 定点写的数据权限闸:目标用户必须在当前登录者 data_scope 的可见集内。
-     * 复用列表检索的同一口径(开窗计数),只拦"已知 ID 的定点写";全部档返回 null 不设限,窗口不开。
+     * 自己天然在本人臂内,不受 create_by 口径限制(否则"仅本人档"会被自己不是自己创建而挡下);
+     * 其余目标复用列表检索的同一口径(开窗计数),全部档返回 null 不设限。
      */
     private void requireUserInScope(Long userId) {
+        if (Objects.equals(LoginUserContextHolder.userId(), userId)) {
+            return;
+        }
         DataScopeFilter scope = dataScopeService.currentFilterOrNull();
         if (scope == null) {
             return;
@@ -267,6 +255,13 @@ public class UserService {
                 Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUserId, userId)));
         if (visible == null || visible == 0) {
             throw BizException.forbidden("目标用户不在当前数据权限范围内");
+        }
+    }
+
+    /** 建号/调岗的组织闸:组织档操作者只能把人挂进自己可见的组织 */
+    private void requireAssignableOrg(Long orgId) {
+        if (!dataScopeService.canAssignOrg(orgId)) {
+            throw BizException.forbidden("目标组织不在当前数据权限范围内");
         }
     }
 

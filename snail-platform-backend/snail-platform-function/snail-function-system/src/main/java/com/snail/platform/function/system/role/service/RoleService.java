@@ -24,8 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 职责:角色管理——分页检索、新增、修改、停用/启用、删除。
- * 守护口径:role_code 建后不可改(接口契约里干脆没有它);is_system=1 内置角色不可删;
- * 被 sys_user_role 引用的角色不可删;逻辑删除后 role_code 终身占用不释放(键值不回收口径)。
+ * 守护口径:role_code 建后不可改(接口契约里干脆没有它);is_system=1 内置角色对管理端只读,
+ * 修改/停用/删除一律拒绝;被 sys_user_role 引用的角色不可删;逻辑删除后 role_code 终身占用不释放。
+ * 数据档位:新增或维护后的档位不得宽于操作者自身最宽档,防"窄档管理员"造出宽档角色。
  * 角色状态/资料变更后 userPerms 与 userSession 整体失效:按角色反查用户不如全清便宜,且不会漏。
  * 上游:RoleController;下游:sys_role 读写(拦截器圈定本租户)、sys_user_role 引用计数、sys_role_menu 随删清理。
  */
@@ -41,11 +42,15 @@ public class RoleService {
     /** 角色-菜单授权,删角色时同事务清行 */
     private final SysRoleMenuMapper roleMenuMapper;
 
+    /** 操作者最宽数据档位判定 */
+    private final DataScopeService dataScopeService;
+
     public RoleService(SysRoleMapper roleMapper, SysUserRoleMapper userRoleMapper,
-                       SysRoleMenuMapper roleMenuMapper) {
+                       SysRoleMenuMapper roleMenuMapper, DataScopeService dataScopeService) {
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMenuMapper = roleMenuMapper;
+        this.dataScopeService = dataScopeService;
     }
 
     public PageResult<RoleVO> page(RoleQuery query) {
@@ -66,6 +71,7 @@ public class RoleService {
                 .eq(SysRole::getRoleCode, roleCode)) > 0) {
             throw BizException.badRequest("角色标识已存在");
         }
+        requireGrantableDataScope(request.dataScope());
         SysRole role = new SysRole();
         role.setRoleName(request.roleName().trim());
         role.setRoleCode(roleCode);
@@ -87,6 +93,8 @@ public class RoleService {
     @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void update(Long roleId, RoleUpdateRequest request) {
         SysRole role = requireRole(roleId);
+        requireBuiltinReadOnly(role);
+        requireGrantableDataScope(request.dataScope() != null ? request.dataScope() : role.getDataScope());
         roleMapper.update(null, Wrappers.<SysRole>lambdaUpdate()
                 .set(SysRole::getRoleName, request.roleName().trim())
                 .set(request.dataScope() != null, SysRole::getDataScope, request.dataScope())
@@ -100,6 +108,8 @@ public class RoleService {
     @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void changeStatus(Long roleId, int status) {
         SysRole role = requireRole(roleId);
+        requireBuiltinReadOnly(role);
+        requireGrantableDataScope(role.getDataScope());
         if (Objects.equals(role.getStatus(), status)) {
             return;
         }
@@ -115,6 +125,7 @@ public class RoleService {
         if (Objects.equals(role.getIsSystem(), 1)) {
             throw BizException.badRequest("内置角色不可删除");
         }
+        requireGrantableDataScope(role.getDataScope());
         if (userRoleMapper.selectCount(Wrappers.<SysUserRole>lambdaQuery()
                 .eq(SysUserRole::getRoleId, roleId)) > 0) {
             throw BizException.badRequest("角色下有授权用户,不能删除");
@@ -122,6 +133,27 @@ public class RoleService {
         roleMenuMapper.delete(Wrappers.<SysRoleMenu>lambdaQuery()
                 .eq(SysRoleMenu::getRoleId, roleId));
         roleMapper.deleteById(roleId);
+    }
+
+    /** 内置角色由开通模板维护,管理端只读;放开改档/停用会让租户把自己锁在门外 */
+    private void requireBuiltinReadOnly(SysRole role) {
+        if (Objects.equals(role.getIsSystem(), 1)) {
+            throw BizException.badRequest("内置角色不可修改");
+        }
+    }
+
+    /** 角色档位不得宽于操作者自身最宽档;无可用启用角色一律拒绝配置 */
+    private void requireGrantableDataScope(Integer dataScope) {
+        if (dataScope == null) {
+            return;
+        }
+        Integer broadest = dataScopeService.operatorBroadestDataScope();
+        if (broadest == null) {
+            throw BizException.forbidden("当前登录人没有可用角色,不能配置数据权限");
+        }
+        if (dataScope < broadest) {
+            throw BizException.forbidden("不能配置数据档位宽于自身权限的角色");
+        }
     }
 
     private SysRole requireRole(Long roleId) {

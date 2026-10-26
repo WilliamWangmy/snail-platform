@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * 职责:修改角色契约。刻意不含 role_code——建后不可改,接口收不到就不存在被改的路径;
- * 内置角色(is_system=1)允许改名称/数据权限/顺序/状态,禁改禁删在 Service 判定。
+ * 内置角色(is_system=1)对管理端只读,修改/停用/删除在 Service 一律拒绝。
  * 上游:角色管理页面;下游:RoleService.update。
  */
 @Schema(description = "修改角色请求")
