@@ -78,7 +78,7 @@ public class DictService {
         try {
             typeMapper.insert(type);
         } catch (DuplicateKeyException e) {
-            // 唯一键含已删记录,预查会漏;错误口径仍走业务拒绝
+            // deleted 行仍占唯一键,标识终身占用;数据库拦下时统一转业务拒绝
             throw BizException.badRequest("字典类型已存在");
         }
         return type.getDictId();
@@ -89,7 +89,7 @@ public class DictService {
     public void updateType(Long dictId, DictTypeUpdateRequest request) {
         SysDictType type = requireType(dictId);
         int status = request.status() == null ? type.getStatus() : request.status();
-        typeMapper.update(null, Wrappers.<SysDictType>lambdaUpdate()
+        typeMapper.update(new SysDictType(), Wrappers.<SysDictType>lambdaUpdate()
                 .set(SysDictType::getDictName, request.dictName().trim())
                 .set(SysDictType::getStatus, status)
                 .set(SysDictType::getRemark, trimToNull(request.remark()))
@@ -142,7 +142,7 @@ public class DictService {
     public void updateData(Long dictDataId, DictDataUpdateRequest request) {
         SysDictData data = requireData(dictDataId);
         int status = request.status() == null ? data.getStatus() : request.status();
-        dataMapper.update(null, Wrappers.<SysDictData>lambdaUpdate()
+        dataMapper.update(new SysDictData(), Wrappers.<SysDictData>lambdaUpdate()
                 .set(SysDictData::getDictLabel, request.dictLabel().trim())
                 .set(SysDictData::getSort, request.sort() == null ? data.getSort() : request.sort())
                 .set(SysDictData::getStatus, status)

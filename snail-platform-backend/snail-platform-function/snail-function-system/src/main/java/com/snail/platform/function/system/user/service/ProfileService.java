@@ -75,7 +75,7 @@ public class ProfileService {
     @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void update(Long userId, UpdateProfileRequest request) {
         requireSelf(userId);
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getNickname, request.nickname().trim())
                 .set(SysUser::getEmail, request.email())
                 .set(SysUser::getPhone, request.phone())
@@ -97,7 +97,7 @@ public class ProfileService {
         }
         PasswordPolicy.validate(request.newPassword());
         rateGuard.clear(guardKey);
-        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(request.newPassword()))
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));

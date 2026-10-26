@@ -83,7 +83,7 @@ public class RoleService {
         try {
             roleMapper.insert(role);
         } catch (DuplicateKeyException e) {
-            // 唯一键含已删记录,预查会漏(与已删角色同 code 重开是合法操作);错误口径仍走业务拒绝
+            // 唯一键不含 deleted:已删角色仍终身占用 role_code,同码重开会被数据库拦下;口径统一走业务拒绝
             throw BizException.badRequest("角色标识已存在");
         }
         return role.getRoleId();
@@ -95,7 +95,7 @@ public class RoleService {
         SysRole role = requireRole(roleId);
         requireBuiltinReadOnly(role);
         requireGrantableDataScope(request.dataScope() != null ? request.dataScope() : role.getDataScope());
-        roleMapper.update(null, Wrappers.<SysRole>lambdaUpdate()
+        roleMapper.update(new SysRole(), Wrappers.<SysRole>lambdaUpdate()
                 .set(SysRole::getRoleName, request.roleName().trim())
                 .set(request.dataScope() != null, SysRole::getDataScope, request.dataScope())
                 .set(request.sort() != null, SysRole::getSort, request.sort())
@@ -113,7 +113,7 @@ public class RoleService {
         if (Objects.equals(role.getStatus(), status)) {
             return;
         }
-        roleMapper.update(null, Wrappers.<SysRole>lambdaUpdate()
+        roleMapper.update(new SysRole(), Wrappers.<SysRole>lambdaUpdate()
                 .set(SysRole::getStatus, status)
                 .eq(SysRole::getRoleId, roleId));
     }
