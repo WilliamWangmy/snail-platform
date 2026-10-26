@@ -54,3 +54,8 @@ export function login(payload: LoginPayload): Promise<LoginResult> {
 export function fetchLoginUser(): Promise<LoginUser> {
   return get<LoginUser>('/system/auth/me');
 }
+
+/** 服务端登出:令牌版本自增,当前用户全部设备立即失效。 */
+export function logout(): Promise<void> {
+  return post<void>('/system/auth/logout');
+}

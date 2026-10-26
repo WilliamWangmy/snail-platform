@@ -41,14 +41,14 @@ function handleSelect(index: string): void {
   mobileOpen.value = false;
 }
 
-function signOut(): void {
-  auth.signOut();
+async function signOut(): Promise<void> {
+  await auth.signOutEverywhere();
   resetMenuRoutes(router);
   void router.push('/login');
 }
 
 function handleUserCommand(command: string | number | object): void {
-  if (command === 'logout') signOut();
+  if (command === 'logout') void signOut();
   else if (command === 'profile') void router.push('/profile');
 }
 

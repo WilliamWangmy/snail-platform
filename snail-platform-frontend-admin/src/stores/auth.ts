@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { fetchLoginUser, login as loginRequest, type LoginPayload, type LoginUser } from '@/api/auth';
+import { fetchLoginUser, login as loginRequest, logout as logoutRequest, type LoginPayload, type LoginUser } from '@/api/auth';
 import { fetchCurrentMenus, type MenuRoute } from '@/api/menu';
 import { clearToken, getToken, setToken } from '@/utils/token';
 
@@ -44,5 +44,28 @@ export const useAuthStore = defineStore('auth', () => {
     clearToken();
   }
 
-  return { token, user, menus, loaded, roleNames, has, signIn, loadSession, loadMenus, signOut };
+  /** 先吊销服务端令牌,再清本地;网络失败不阻断本地登出。 */
+  async function signOutEverywhere(): Promise<void> {
+    try {
+      if (token.value) await logoutRequest();
+    } catch {
+      /* 令牌可能已失效,本地清理继续 */
+    } finally {
+      signOut();
+    }
+  }
+
+  return {
+    token,
+    user,
+    menus,
+    loaded,
+    roleNames,
+    has,
+    signIn,
+    loadSession,
+    loadMenus,
+    signOut,
+    signOutEverywhere,
+  };
 });
