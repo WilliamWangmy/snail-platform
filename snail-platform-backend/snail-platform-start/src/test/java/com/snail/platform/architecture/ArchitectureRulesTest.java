@@ -53,13 +53,21 @@ class ArchitectureRulesTest {
 
     /** system 内登记在案的跨子域读边:引用方子域 -> 被引子域。
      * user->role 数据权限判定与授权读写;user->org/user->tenant 归属与上限校验;role->user 删角色引用计数;
-     * role->org 档位三取子树(只准经 OrgService 的缓存方法);role->menu 解析权限码与授权维护;
-     * tenant->* 开通复制种子;org->user 删组织挂人前置检查 */
+     * role->org 档位三取子树(只准经 OrgQueryService 的缓存只读方法);role->menu 解析权限码与授权维护;
+     * org->role 组织写侧的可见性闸门(消费 DataScopeService 的判定,不反向产谓词);
+     * org->user 删组织挂人前置检查;tenant->* 开通复制种子 */
     private static final Set<String> ALLOWED_SYSTEM_EDGES = Set.of(
             "user->role", "user->org", "user->tenant",
             "role->user", "role->org", "role->menu",
-            "org->user",
+            "org->user", "org->role",
             "tenant->org", "tenant->role", "tenant->user");
+
+    /** MP BaseMapper 全限定名:审计填充只认实体,方法级写库纪律按它的方法名判 */
+    private static final String BASE_MAPPER = "com.baomidou.mybatisplus.core.mapper.BaseMapper";
+
+    /** MP BaseMapper 的写方法名 */
+    private static final Set<String> MAPPER_WRITE_METHODS =
+            Set.of("insert", "update", "updateById", "delete", "deleteById", "deleteByMap", "insertOrUpdate", "upsert");
 
     /** 全部纪律一次执行:装配纪律(事务/启动类/框架回望/分页单点)、跨子域白名单、契约不互借、散参阈值 */
     @ArchTest
@@ -68,19 +76,17 @@ class ArchitectureRulesTest {
 
         for (JavaClass owner : classes) {
             String ownerPackage = owner.getPackageName();
+            boolean inServiceLayer = ownerPackage.startsWith("com.snail.platform.function")
+                    && ownerPackage.contains(".service");
 
-            if (ownerPackage.startsWith("com.snail.platform.framework")
-                    && (owner.isAnnotatedWith(Transactional.class)
-                    || owner.isMetaAnnotatedWith(Transactional.class))) {
+            if (ownerPackage.startsWith("com.snail.platform.framework") && declaresTransaction(owner)) {
                 violations.add(owner.getFullName() + ":framework 层出现 @Transactional(约定 §5:横切只能单点装配)");
             }
             if (!ownerPackage.equals("com.snail.platform")
                     && owner.isAnnotatedWith(SpringBootApplication.class)) {
                 violations.add(owner.getFullName() + ":启动类只准住在 start 根包(约定 §1)");
             }
-            if ((owner.isAnnotatedWith(Transactional.class) || owner.isMetaAnnotatedWith(Transactional.class))
-                    && !(ownerPackage.startsWith("com.snail.platform.function")
-                    && ownerPackage.contains(".service"))) {
+            if (declaresTransaction(owner) && !inServiceLayer) {
                 violations.add(owner.getFullName() + ":@Transactional 只允许出现在 service 包(约定 §3)");
             }
 
@@ -126,6 +132,11 @@ class ArchitectureRulesTest {
                     }
                 });
             }
+
+            if (inServiceLayer) {
+                owner.getMethods().forEach(method ->
+                        checkMapperWritesInsideTransaction(owner, method, violations));
+            }
         }
 
         if (!violations.isEmpty()) {
@@ -133,7 +144,54 @@ class ArchitectureRulesTest {
         }
     }
 
-    /** 跨子域三条禁令:dto 契约任何方向都不互借；实现面只准走白名单边；框架类不得引用业务类 */
+    /**
+     * 方法级事务纪律:service 方法里出现两处以上 BaseMapper 写调用(insert/update/delete 系列)时,
+     * 该方法自身或所在类必须标 @Transactional。单条写语句自提交即原子,不必挂事务;
+     * 两处以上才有"前半提交、后半失败"的半态——这正是类级注解挡不住的口子(某个公开写方法被直调时,
+     * 类上的注解并不会给它开事务)。
+     */
+    private static void checkMapperWritesInsideTransaction(JavaClass owner, JavaMethod method,
+                                                           Set<String> violations) {
+        if (isTransactional(method)) {
+            return;
+        }
+        long writes = method.getCallsFromSelf().stream().filter(ArchitectureRulesTest::isMapperWrite).count();
+        if (writes >= 2) {
+            violations.add(method.getFullName() + ":方法内 " + writes
+                    + " 处写库调用却无 @Transactional(约定 §3:多写必须成事务)");
+        }
+    }
+
+    /** 是否是对 MP BaseMapper(或其业务子接口)的写调用 */
+    private static boolean isMapperWrite(com.tngtech.archunit.core.domain.JavaCall<?> call) {
+        if (!MAPPER_WRITE_METHODS.contains(call.getTarget().getName())) {
+            return false;
+        }
+        String targetOwner = call.getTarget().getOwner().getFullName();
+        return targetOwner.equals(BASE_MAPPER) || call.getTarget().getOwner().isAssignableTo(BASE_MAPPER);
+    }
+
+    /** 方法级或所在类级的 @Transactional 都算数:类级注解对整个类的方法生效,是 Spring 的语义 */
+    private static boolean isTransactional(JavaMethod method) {
+        return method.isAnnotatedWith(Transactional.class)
+                || method.getOwner().isAnnotatedWith(Transactional.class);
+    }
+
+    /**
+     * 类级或任一方法级 @Transactional 都算"这个类声明了事务"。Spring 里方法级注解同样生效,
+     * 只认类级会让两条包位纪律永不命中(整改线 Phase 5 修正 P1-2:原规则一半是空转)。
+     */
+    private static boolean declaresTransaction(JavaClass owner) {
+        if (owner.isAnnotatedWith(Transactional.class) || owner.isMetaAnnotatedWith(Transactional.class)) {
+            return true;
+        }
+        return owner.getMethods().stream().anyMatch(method -> method.isAnnotatedWith(Transactional.class)
+                || method.isMetaAnnotatedWith(Transactional.class));
+    }
+
+    /**
+     * 跨子域三条禁令:dto 契约任何方向都不互借；实现面只准走白名单边；框架类不得引用业务类
+     */
     private static void checkCrossSubdomain(JavaClass owner,
                                             com.tngtech.archunit.core.domain.Dependency dependency,
                                             Set<String> violations) {

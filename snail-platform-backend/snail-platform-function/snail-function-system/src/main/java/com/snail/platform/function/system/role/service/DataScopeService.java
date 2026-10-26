@@ -3,7 +3,7 @@ package com.snail.platform.function.system.role.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.db.datascope.DataScopeFilter;
-import com.snail.platform.function.system.org.service.OrgService;
+import com.snail.platform.function.system.org.service.OrgQueryService;
 import com.snail.platform.function.system.role.entity.SysRole;
 import com.snail.platform.function.system.role.entity.SysUserRole;
 import com.snail.platform.function.system.role.mapper.SysRoleMapper;
@@ -22,8 +22,9 @@ import org.springframework.stereotype.Service;
  * 本人臂在角色 4 或"无任何可用角色"时置为当前用户(无授权的人退回只看自己,不给他开组织口子)。
  * 停用角色(status=1)一律不参与并集——权限包被收走就是收走。
  * 同时对外提供两个判定口:操作者最宽档(角色配置不得宽于它)与目标组织可授权性(建号/调岗用)。
- * 上游:各业务 Service 的列表查询(经 DataScopeContextHolder.filter 开窗);下游:sys_user_role/sys_role 读、
- * sys_user 读、orgSubtree 缓存(OrgService.subtreeIds)。本服务只产谓词对象,不改 SQL——注入在 framework-db 拦截器。
+ * 上游:各业务 Service 的列表查询(经 DataScopeContextHolder.filter 开窗)、OrgService 的写侧定点闸;
+ * 下游:sys_user_role/sys_role 读、sys_user 读、orgSubtree 缓存(OrgQueryService.subtreeIds)。
+ * 本服务只产谓词对象,不改 SQL——注入在 framework-db 拦截器。
  */
 @Service
 public class DataScopeService {
@@ -49,15 +50,15 @@ public class DataScopeService {
     /** 角色表读:取各授权角色的 data_scope 与状态 */
     private final SysRoleMapper roleMapper;
 
-    /** 子树 ID 清单,档位三消费 orgSubtree 缓存 */
-    private final OrgService orgService;
+    /** 子树 ID 清单,档位三消费 orgSubtree 缓存;走只读端口,避免与 OrgService 的写侧闸门互相依赖 */
+    private final OrgQueryService orgQueryService;
 
     public DataScopeService(SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
-                            SysRoleMapper roleMapper, OrgService orgService) {
+                            SysRoleMapper roleMapper, OrgQueryService orgQueryService) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMapper = roleMapper;
-        this.orgService = orgService;
+        this.orgQueryService = orgQueryService;
     }
 
     /**
@@ -101,7 +102,7 @@ public class DataScopeService {
                 }
                 case SCOPE_ORG_SUBTREE -> {
                     if (user.getOrgId() != null) {
-                        orgIds.addAll(orgService.subtreeIds(user.getOrgId()));
+                        orgIds.addAll(orgQueryService.subtreeIds(user.getOrgId()));
                     }
                 }
                 case SCOPE_SELF -> selfOnly = true;

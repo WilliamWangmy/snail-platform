@@ -24,7 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 职责:组织树管理入口——整棵查询、子树 ID 清单、新增子节点、改属性、移动、删除;作用域永远是当前登录者所属租户。
- * 上游:组织管理页面;下游:OrgService。租户圈定由拦截器完成,本层不出现 tenant_id 参数。
+ * 上游:组织管理页面;下游:OrgService。租户圈定由拦截器完成,本层不出现 tenant_id 参数;
+ * 数据权限可见集同样由服务层收口,本层不判 scope。
  */
 @Tag(name = "组织管理")
 @RestController
@@ -46,10 +47,10 @@ public class OrgController {
     }
 
     @PreAuthorize("hasAuthority('system:org:list')")
-    @Operation(summary = "组织子树 ID 清单(含自身,档位三的内部查询面)")
+    @Operation(summary = "组织子树 ID 清单(含自身,限当前数据权限可见的组织)")
     @GetMapping("/{orgId}/subtree")
     public R<List<Long>> subtree(@PathVariable Long orgId) {
-        return R.ok(orgService.subtreeIds(orgId));
+        return R.ok(orgService.subtreeWithinScope(orgId));
     }
 
     @PreAuthorize("hasAuthority('system:org:create')")

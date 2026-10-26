@@ -1,6 +1,7 @@
 package com.snail.platform.system;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * 职责:数据权限闸的端到端回归——有限档操作者不能按 ID 读写可见集外的用户、不能把用户挂到可见集外的组织、
+ * 不能读写可见集外的组织节点(树/子树清单/改名/移动/删除/在闸外父节点下新增)、
  * 不能创建/维护宽于自身档位的角色;内置角色对管理端只读;本人仍可查看自己并自助强制下线。
  * 上游:snail-platform-start 真实上下文(需本机 MySQL/Valkey,SNAIL_DB_* 注入口令,未设则整类跳过);
  * 下游:无断言外设。每轮用纳秒后缀新建组织/角色/用户,断言用本轮用户名与 ID,可重复执行。
@@ -61,7 +63,7 @@ class DataScopeGuardFlowTest {
         long orgB = Long.parseLong(createOrg(1L, "闸外B" + suffix, adminToken));
         long r2 = createRole("档二守卫" + suffix, "g2" + suffix, 2, adminToken);
         long r4 = createRole("档四守卫" + suffix, "g4" + suffix, 4, adminToken);
-        grantMenus(r2, 100L, 1001L, 1002L, 1006L, 1101L, 1102L);
+        grantMenus(r2, 100L, 1001L, 1002L, 1006L, 1101L, 1102L, 120L, 1201L, 1202L, 1203L);
         grantMenus(r4, 100L);
 
         String u2 = "guard2" + suffix;
@@ -75,11 +77,12 @@ class DataScopeGuardFlowTest {
         String token4 = login(u4, PASSWORD);
 
         long uidInside = proveFixedPointWritesAreScoped(token2, orgA, orgB, suffix);
+        long orgChild = proveOrgScopeGuard(token2, orgA, orgB, suffix);
         long narrowerRole = proveRoleCeiling(token2, r2, suffix);
         proveSelfStaysReachable(token4, uid4);
         proveBuiltinRolesReadOnly(adminToken);
 
-        cleanup(adminToken, uid2, uid4, uidOutside, uidInside, orgA, orgB, r2, r4, narrowerRole);
+        cleanup(adminToken, uid2, uid4, uidOutside, uidInside, orgA, orgB, orgChild, r2, r4, narrowerRole);
     }
 
     /** 档二操作者:可见集外的用户读写/踢人全 403;建号与调岗只能落在本组织。返回闸内新建用户 ID */
@@ -117,6 +120,30 @@ class DataScopeGuardFlowTest {
                 token);
         assertEquals(0, jsonCode(stayIn), "闸内组织调岗应放行: " + stayIn);
         return insideId;
+    }
+
+    /** 档二操作者的组织闸:树里不出现闸外节点,闸外节点的清单/改名/移入/删除一律 403,闸外父节点下新增也拒;闸内新增放行 */
+    private long proveOrgScopeGuard(String token, long orgA, long orgB, String suffix) throws Exception {
+        String tree = getJson("/system/org/tree", token);
+        assertEquals(0, jsonCode(tree), "组织树应放行: " + tree);
+        assertTrue(tree.contains("\"orgId\":" + orgA), "树应含本组织: " + tree);
+        assertFalse(tree.contains("\"orgId\":" + orgB), "树不应含闸外组织: " + tree);
+
+        assertBizCode(getJson("/system/org/" + orgB + "/subtree", token), 403, "目标组织不在当前数据权限范围内");
+        assertBizCode(putJson("/system/org/" + orgB, "{\"name\":\"越权改名" + suffix + "\"}", token),
+                403, "目标组织不在当前数据权限范围内");
+        assertBizCode(putJson("/system/org/" + orgB + "/move", "{\"newParentId\":" + orgA + "}", token),
+                403, "目标组织不在当前数据权限范围内");
+        assertBizCode(deleteJson("/system/org/" + orgB, token), 403, "目标组织不在当前数据权限范围内");
+
+        String underOutside = postJson("/system/org",
+                "{\"parentId\":" + orgB + ",\"name\":\"闸外子女" + suffix + "\",\"sort\":0}", token);
+        assertBizCode(underOutside, 403, "目标组织不在当前数据权限范围内");
+
+        String inside = postJson("/system/org",
+                "{\"parentId\":" + orgA + ",\"name\":\"闸内子女" + suffix + "\",\"sort\":0}", token);
+        assertEquals(0, jsonCode(inside), "闸内父节点下新增应放行: " + inside);
+        return Long.parseLong(extract(DATA_ID, inside));
     }
 
     /** 档二操作者:不能新建更宽档角色,也不能把已有角色改宽;收窄方向放行。返回收窄后角色 ID 供清理 */
@@ -166,7 +193,9 @@ class DataScopeGuardFlowTest {
     }
 
     private void cleanup(String adminToken, long uid2, long uid4, long uidOutside, long uidInside,
-                         long orgA, long orgB, long r2, long r4, long narrowerRole) throws Exception {
+                         long orgA, long orgB, long orgChild, long r2, long r4,
+                         long narrowerRole) throws Exception {
+        // u5/u3 留在原地:注销入口不在本回归职责内;被断言依赖与挡删除的先行清掉
         deleteUser(uid2, adminToken);
         deleteUser(uid4, adminToken);
         deleteUser(uidOutside, adminToken);
@@ -174,6 +203,7 @@ class DataScopeGuardFlowTest {
         deleteRole(r2, adminToken);
         deleteRole(r4, adminToken);
         deleteRole(narrowerRole, adminToken);
+        deleteJson("/system/org/" + orgChild, adminToken);
         deleteJson("/system/org/" + orgA, adminToken);
         deleteJson("/system/org/" + orgB, adminToken);
     }
