@@ -32,7 +32,7 @@ const pwdRules = {
   oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, max: 30, message: '密码长度 8-30', trigger: 'blur' },
+    { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请再次输入新密码', trigger: 'blur' },

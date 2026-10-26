@@ -64,6 +64,11 @@ const rules: FormRules<TenantForm> = {
   tenantCode: [
     { required: true, message: '请输入租户标识', trigger: 'blur' },
     { min: 2, max: 64, message: '租户标识长度 2-64', trigger: 'blur' },
+    {
+      pattern: /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/,
+      message: '租户标识只允许小写字母、数字、点、下划线与连字符,首尾须为字母或数字',
+      trigger: 'blur',
+    },
   ],
   name: [
     { required: true, message: '请输入租户名称', trigger: 'blur' },
@@ -74,10 +79,11 @@ const rules: FormRules<TenantForm> = {
   adminUsername: [
     { required: true, message: '请输入管理员登录名', trigger: 'blur' },
     { min: 3, max: 30, message: '登录名长度 3-30', trigger: 'blur' },
+    { pattern: /^[A-Za-z0-9_.@-]+$/, message: '登录名只允许字母、数字、下划线、点、@、连字符', trigger: 'blur' },
   ],
   adminPassword: [
     { required: true, message: '请输入管理员初始密码', trigger: 'blur' },
-    { min: 8, max: 30, message: '密码长度 8-30', trigger: 'blur' },
+    { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
   ],
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 };
@@ -387,7 +393,7 @@ async function toggleStatus(row: TenantVO): Promise<void> {
             v-model="form.adminPassword"
             type="password"
             show-password
-            placeholder="8-30 位"
+            placeholder="8-64 位"
           />
         </ElFormItem>
         <ElFormItem

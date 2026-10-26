@@ -115,7 +115,7 @@ const rules = computed<FormRules<UserForm>>(() => ({
     editingId.value === null
       ? [
           { required: true, message: '请输入初始密码', trigger: 'blur' },
-          { min: 8, max: 30, message: '密码长度 8-30', trigger: 'blur' },
+          { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
         ]
       : [],
   nickname: [
@@ -203,7 +203,7 @@ const pwdForm = reactive({ password: '', confirm: '' });
 const pwdRules: FormRules<typeof pwdForm> = {
   password: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, max: 30, message: '密码长度 8-30', trigger: 'blur' },
+    { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
   ],
   confirm: [
     { required: true, message: '请再次输入新密码', trigger: 'blur' },
@@ -516,7 +516,7 @@ async function kickUser(row: UserVO): Promise<void> {
             v-model="form.password"
             type="password"
             show-password
-            placeholder="8-30 位"
+            placeholder="8-64 位"
           />
         </ElFormItem>
         <ElFormItem
@@ -615,7 +615,7 @@ async function kickUser(row: UserVO): Promise<void> {
             v-model="pwdForm.password"
             type="password"
             show-password
-            placeholder="8-30 位"
+            placeholder="8-64 位"
           />
         </ElFormItem>
         <ElFormItem
