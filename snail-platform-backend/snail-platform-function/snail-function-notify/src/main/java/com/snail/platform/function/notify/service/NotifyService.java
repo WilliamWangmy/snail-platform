@@ -123,6 +123,10 @@ public class NotifyService implements NotifyApi {
         Long userId = requireLoginUser();
         Page<SysNotifyRecipient> page = PageAssembler.from(query);
         List<Long> bizMessageIds = bizMessageIdsOf(query.bizType());
+        if (bizMessageIds != null && bizMessageIds.isEmpty()) {
+            // 该业务面下一条消息都没有:空集合拼进 IN 是 SQL 语法错误,而不是"查无结果"
+            return PageResult.of(List.of(), 0);
+        }
         IPage<SysNotifyRecipient> result = recipientMapper.selectPage(page, Wrappers.<SysNotifyRecipient>lambdaQuery()
                 .eq(SysNotifyRecipient::getUserId, userId)
                 .eq(query.readStatus() != null, SysNotifyRecipient::getReadStatus, query.readStatus())
@@ -159,7 +163,7 @@ public class NotifyService implements NotifyApi {
         if (!Integer.valueOf(UNREAD).equals(recipient.getReadStatus())) {
             return;
         }
-        recipientMapper.update(null, Wrappers.<SysNotifyRecipient>lambdaUpdate()
+        recipientMapper.update(new SysNotifyRecipient(), Wrappers.<SysNotifyRecipient>lambdaUpdate()
                 .set(SysNotifyRecipient::getReadStatus, READ)
                 .set(SysNotifyRecipient::getReadTime, LocalDateTime.now())
                 .eq(SysNotifyRecipient::getRecipientId, recipientId));
@@ -168,7 +172,7 @@ public class NotifyService implements NotifyApi {
     /** 全部已读:只动本人未读行 */
     public void markAllRead() {
         Long userId = requireLoginUser();
-        recipientMapper.update(null, Wrappers.<SysNotifyRecipient>lambdaUpdate()
+        recipientMapper.update(new SysNotifyRecipient(), Wrappers.<SysNotifyRecipient>lambdaUpdate()
                 .set(SysNotifyRecipient::getReadStatus, READ)
                 .set(SysNotifyRecipient::getReadTime, LocalDateTime.now())
                 .eq(SysNotifyRecipient::getUserId, userId)
