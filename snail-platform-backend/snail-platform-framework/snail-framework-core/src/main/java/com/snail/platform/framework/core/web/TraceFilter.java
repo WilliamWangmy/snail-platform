@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.regex.Pattern;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -27,11 +28,19 @@ public class TraceFilter extends OncePerRequestFilter {
     /** 跨组件传递用的请求/响应头名 */
     public static final String TRACE_HEADER = "X-Trace-Id";
 
+    /**
+     * 可沿用的传入 traceId 形状:字母数字与连字符,8-64 位。
+     * 口径:头部是不可信输入,原样进 MDC 就等于把换行/控制字符写进日志行(伪造日志条目),
+     * 也原样回写响应头;不合格的一律丢弃改用新生成的 id,不报错——追踪标识不值得为一个坏头拒绝请求。
+     */
+    private static final Pattern INCOMING_TRACE_ID = Pattern.compile("[A-Za-z0-9-]{8,64}");
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String incoming = request.getHeader(TRACE_HEADER);
-        String traceId = incoming != null && !incoming.isBlank() ? incoming : IdUtil.fastSimpleUUID();
+        String traceId = incoming != null && INCOMING_TRACE_ID.matcher(incoming).matches()
+                ? incoming : IdUtil.fastSimpleUUID();
         MDC.put(TRACE_ID, traceId);
         response.setHeader(TRACE_HEADER, traceId);
         try {
