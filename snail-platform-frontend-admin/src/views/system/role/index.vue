@@ -200,13 +200,14 @@ async function remove(row: RoleVO): Promise<void> {
   await refresh();
 }
 
-/** 行操作:权限不足的不占位,超过三个由 RowActions 折叠。 */
+/** 行操作:权限不足的不占位,超过三个由 RowActions 折叠;内置角色只留菜单授权。 */
 function actionsOf(row: RoleVO): RowAction[] {
+  const mutable = row.isSystem !== 1;
   return [
-    { key: 'edit', label: '修改', show: auth.has('system:role:update'), handler: () => openEdit(row) },
+    { key: 'edit', label: '修改', show: mutable && auth.has('system:role:update'), handler: () => openEdit(row) },
     { key: 'menus', label: '菜单授权', show: auth.has('system:role:assign-menu'), handler: () => { void openAssignMenus(row); } },
-    { key: 'toggle', label: row.status === 0 ? '停用' : '启用', show: auth.has('system:role:update'), handler: () => { void toggleStatus(row); } },
-    { key: 'delete', label: '删除', tone: 'danger', show: auth.has('system:role:delete'), handler: () => { void remove(row); } },
+    { key: 'toggle', label: row.status === 0 ? '停用' : '启用', show: mutable && auth.has('system:role:update'), handler: () => { void toggleStatus(row); } },
+    { key: 'delete', label: '删除', tone: 'danger', show: mutable && auth.has('system:role:delete'), handler: () => { void remove(row); } },
   ];
 }
 </script>
