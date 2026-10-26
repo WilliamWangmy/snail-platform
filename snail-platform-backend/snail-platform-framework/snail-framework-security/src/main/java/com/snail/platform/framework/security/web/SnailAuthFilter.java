@@ -62,6 +62,13 @@ public class SnailAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        // 上下文全部派生自请求本身(无会话态),异步派发(如 StreamingResponseBody 下载)重建同一份
+        // 认证上下文交授权规则重判;默认跳过会让异步派发变匿名,响应已提交时安全异常无法落笔
+        return false;
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         try {
