@@ -22,6 +22,7 @@ import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
+import com.snail.platform.function.system.user.service.PasswordPolicy;
 import java.util.Objects;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DuplicateKeyException;
@@ -32,6 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
  * 职责:租户全生命周期——分页检索、开通(模板复制)、资料修改、停用/启用。
  * sys_tenant 在拦截器 ignore 清单,本服务天然跨租户;开通是新租户数据的写入点,
  * 模板复制段用 TenantContextHolder.asTenant 把身份切到新租户,让拦截器把新租户写对。
+ * actor 口径(整改线 Phase 5 定版):asTenant 只切租户不切操作者,新租户根组织与首任管理员的 create_by
+ * 是执行开通的平台管理员——留痕指向开通人比指向"虚构的自创建"更有价值;首任管理员复制的是内置超管模板
+ * (data_scope=1 全部档),可见集按整租户算,不因该归属而看不到自己的组织与账号。
  * 销户(deleted)是平台侧运维动作,本服务不提供入口。
  * 上游:TenantController;下游:sys_tenant 写读 + 开通事务内的 sys_org/sys_role/sys_user/sys_user_role。
  */
@@ -79,6 +83,7 @@ public class TenantService {
     public Long provision(TenantCreateRequest request) {
         String tenantCode = request.tenantCode().trim();
         String adminUsername = request.adminUsername().trim();
+        PasswordPolicy.validate(request.adminPassword());
 
         if (tenantMapper.selectCount(Wrappers.<SysTenant>lambdaQuery()
                 .eq(SysTenant::getTenantCode, tenantCode)) > 0) {
@@ -102,7 +107,7 @@ public class TenantService {
         try {
             tenantMapper.insert(tenant);
         } catch (DuplicateKeyException e) {
-            // 唯一键含已删记录,预查会漏(与已销户租户同 code 重开是合法操作);错误口径仍走业务拒绝
+            // 唯一键不含 deleted:已销户租户仍终身占用 tenant_code,同码重开会被数据库拦下;口径统一走业务拒绝
             throw BizException.badRequest("租户标识已存在");
         }
 
@@ -144,7 +149,7 @@ public class TenantService {
                 && !Integer.valueOf(1).equals(existing.getStatus());
         boolean expireChanged = !Objects.equals(existing.getExpireTime(), request.expireTime());
         // updateById 会跳过 null,而"清空到期时间/账号上限"恰是合法意图,故逐字段显式 set
-        tenantMapper.update(null, Wrappers.<SysTenant>lambdaUpdate()
+        tenantMapper.update(new SysTenant(), Wrappers.<SysTenant>lambdaUpdate()
                 .set(SysTenant::getName, request.name().trim())
                 .set(SysTenant::getContactUser, request.contactUser())
                 .set(SysTenant::getContactPhone, request.contactPhone())
@@ -165,7 +170,7 @@ public class TenantService {
         if (Objects.equals(tenant.getStatus(), status)) {
             return;
         }
-        tenantMapper.update(null, Wrappers.<SysTenant>lambdaUpdate()
+        tenantMapper.update(new SysTenant(), Wrappers.<SysTenant>lambdaUpdate()
                 .set(SysTenant::getStatus, status)
                 .eq(SysTenant::getTenantId, tenantId));
         if (status == 1) {
@@ -178,7 +183,7 @@ public class TenantService {
      * 用 asTenant 把拦截器圈到目标租户,平台管理员自身的租户上下文在窗口结束后恢复。
      */
     private void invalidateTenantSessions(Long tenantId) {
-        TenantContextHolder.asTenant(tenantId, () -> userMapper.update(null,
+        TenantContextHolder.asTenant(tenantId, () -> userMapper.update(new SysUser(),
                 Wrappers.<SysUser>lambdaUpdate()
                         .setSql("token_version = token_version + 1")
                         .eq(SysUser::getTenantId, tenantId)));
