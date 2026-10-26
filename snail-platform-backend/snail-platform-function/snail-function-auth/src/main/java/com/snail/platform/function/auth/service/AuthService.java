@@ -19,7 +19,9 @@ import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 职责:登录校验链的唯一实现——锁定检查 → 验证码 → 定位用户(无租户旁路窄窗口)→ 租户状态 → 用户状态 → BCrypt。
@@ -102,6 +104,18 @@ public class AuthService {
             failGuard.increase(username);
             throw e;
         }
+    }
+
+    /**
+     * 登出:令牌版本自增,该用户全部设备立即失效;userSession 必须同事务清掉,
+     * 否则下次登录读到旧版本快照,新令牌会被过滤器判成已吊销。
+     */
+    @Transactional
+    @CacheEvict(cacheNames = "userSession", key = "#userId")
+    public void logout(Long userId) {
+        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+                .setSql("token_version = token_version + 1")
+                .eq(SysUser::getUserId, userId));
     }
 
     /** 留痕写失败不许反过来影响登录响应——库都挂了的场景没有一致性问题可言 */

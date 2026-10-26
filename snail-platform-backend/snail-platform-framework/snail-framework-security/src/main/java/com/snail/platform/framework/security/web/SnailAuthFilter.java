@@ -97,7 +97,7 @@ public class SnailAuthFilter extends OncePerRequestFilter {
                             heartbeat.beat(principal, request.getRemoteAddr(), request.getHeader("User-Agent"));
                         }
                     }
-                    // 快照无版本(用户已删/停用)跳过比对;版本不一致视同令牌已被吊销,保持匿名交授权规则出 401
+                    // 快照无版本(用户已删/停用、租户停用/到期)直接判无效;版本不一致视同令牌已被吊销,保持匿名交授权规则出 401
                 }
             }
             chain.doFilter(request, response);

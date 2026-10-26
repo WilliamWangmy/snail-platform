@@ -139,7 +139,10 @@ public class TenantService {
     @Transactional
     @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void update(Long tenantId, TenantUpdateRequest request) {
-        requireTenant(tenantId);
+        SysTenant existing = requireTenant(tenantId);
+        boolean disabling = Integer.valueOf(1).equals(request.status())
+                && !Integer.valueOf(1).equals(existing.getStatus());
+        boolean expireChanged = !Objects.equals(existing.getExpireTime(), request.expireTime());
         // updateById 会跳过 null,而"清空到期时间/账号上限"恰是合法意图,故逐字段显式 set
         tenantMapper.update(null, Wrappers.<SysTenant>lambdaUpdate()
                 .set(SysTenant::getName, request.name().trim())
@@ -150,9 +153,13 @@ public class TenantService {
                 .set(SysTenant::getRemark, request.remark())
                 .set(request.status() != null, SysTenant::getStatus, request.status())
                 .eq(SysTenant::getTenantId, tenantId));
+        if (disabling || expireChanged) {
+            invalidateTenantSessions(tenantId);
+        }
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void changeStatus(Long tenantId, int status) {
         SysTenant tenant = requireTenant(tenantId);
         if (Objects.equals(tenant.getStatus(), status)) {
@@ -161,6 +168,20 @@ public class TenantService {
         tenantMapper.update(null, Wrappers.<SysTenant>lambdaUpdate()
                 .set(SysTenant::getStatus, status)
                 .eq(SysTenant::getTenantId, tenantId));
+        if (status == 1) {
+            invalidateTenantSessions(tenantId);
+        }
+    }
+
+    /**
+     * 租户级会话失效:停用/到期变更时把该租户全部用户的令牌版本前推,旧令牌即使缓存未及时失效也过不了版本比对。
+     * 用 asTenant 把拦截器圈到目标租户,平台管理员自身的租户上下文在窗口结束后恢复。
+     */
+    private void invalidateTenantSessions(Long tenantId) {
+        TenantContextHolder.asTenant(tenantId, () -> userMapper.update(null,
+                Wrappers.<SysUser>lambdaUpdate()
+                        .setSql("token_version = token_version + 1")
+                        .eq(SysUser::getTenantId, tenantId)));
     }
 
     private SysTenant requireTenant(Long tenantId) {

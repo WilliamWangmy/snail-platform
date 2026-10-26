@@ -23,9 +23,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 职责:认证入口三端点——取验证码、登录、查看当前身份(/me 兼作过滤器链的自检点)。
- * 登出即前端丢弃令牌:本期 JWT 无状态、不设黑名单,口径见 JwtTokenService。
- * 上游:登录页;下游:CaptchaService、AuthService。
+ * 职责:认证入口四端点——取验证码、登录、查看当前身份(/me 兼作过滤器链的自检点)、登出。
+ * 登出由服务端自增令牌版本,当前用户全部设备立即失效;本期仍不设 refresh token 与 jti 黑名单。
+ * 上游:登录页与全局登出入口;下游:CaptchaService、AuthService。
  */
 @Tag(name = "认证")
 @RestController
@@ -60,6 +60,14 @@ public class AuthController {
     @PostMapping("/login")
     public R<LoginSuccessVO> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
         return R.ok(authService.login(request, http));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "登出(当前用户全部设备立即失效)")
+    @PostMapping("/logout")
+    public R<Void> logout() {
+        authService.logout(LoginUserContextHolder.userId());
+        return R.ok(null);
     }
 
     @PreAuthorize("isAuthenticated()")

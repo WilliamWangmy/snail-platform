@@ -190,6 +190,10 @@ public class UserService {
             throw BizException.badRequest("不能删除自己的账号");
         }
         requireUserInScope(userId);
+        // 逻辑删后旧令牌仍可能落在其他节点缓存里,版本前推让最小快照之外的残留也失去会话资格
+        userMapper.update(null, Wrappers.<SysUser>lambdaUpdate()
+                .setSql("token_version = token_version + 1")
+                .eq(SysUser::getUserId, userId));
         userMapper.deleteById(userId);
         userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, userId));
     }
