@@ -45,5 +45,12 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-system</artifactId>
         </dependency>
+
+        <!-- 纯单测:按类型路由与入库失败补偿不需要数据库,用 Mockito 替代 mapper -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

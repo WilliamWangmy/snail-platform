@@ -9,18 +9,16 @@ import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
-import com.snail.platform.framework.storage.StoragePort;
 import com.snail.platform.framework.storage.SnailStorageProperties;
+import com.snail.platform.framework.storage.StoragePort;
+import com.snail.platform.framework.storage.StoragePortRegistry;
 import com.snail.platform.function.storage.dto.FileQuery;
 import com.snail.platform.function.storage.dto.FileVO;
 import com.snail.platform.function.storage.entity.SysFile;
 import com.snail.platform.function.storage.mapper.SysFileMapper;
-import com.snail.platform.function.system.tenant.entity.SysTenant;
-import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -28,17 +26,17 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 职责:文件元数据与对象内容的全链编排——上传校验链(文件名清洗→白名单→大小→配额)、
- * 本租户下载、逻辑删+尽力物理删、本租户与平台面分页。
- * 上游:FileController/FilePlatformController;下游:StoragePort(可缺席)、sys_file 读写、
- * SysTenantMapper 配额直读(与 auth 同款的登记例外,单一只读边)。
- * 口径:端口缺席(snail.storage.type 为空)一律 400"文件存储未配置";租户内全可见(检索面口径);
- * 物理删失败只告警不回滚,残留对象由将来的 GC 任务清扫;事务里不做外部 IO,上传/删除均不开事务。
+ * 职责:文件元数据与对象内容的全链编排——上传校验链(文件名清洗→白名单→大小→配额预检)、
+ * 入库失败的对象补偿、文件级可见性判权、按 storage_type 路由的下载与删除、本租户与平台面分页。
+ * 上游:FileController/FilePlatformController;下游:StoragePortRegistry(按类型取端口)、
+ * FileQuotaService(配额预检与锁行入库)、FileAccessPolicy(文件级可见性)、sys_file 读写。
+ * 口径:写入端口缺席(snail.storage.type 为空)一律 400"文件存储未配置";
+ * 下载先过权限码(@PreAuthorize)再过文件级可见性;历史对象按 sys_file.storage_type 取端口,
+ * 类型未配置明确报错,绝不回退当前后端;物理删失败只告警不回滚,残留对象由将来的 GC 任务清扫。
  */
 @Service
 public class FileStorageService {
@@ -69,22 +67,25 @@ public class FileStorageService {
     /** 非法字符替换符 */
     private static final String NAME_REPLACEMENT = "_";
 
-    /** 配额汇总列别名,selectObjs 取首个单元格 */
-    private static final String USED_SIZE_SELECT = "COALESCE(SUM(`size`), 0) AS used_size";
-
-    /** 存储端口缺席时的统一文案 */
+    /** 写入端口缺席时的统一文案 */
     private static final String STORAGE_NOT_CONFIGURED = "文件存储未配置";
 
-    /** 存储端口提供者:type 为空时无实现,按缺席降级 */
-    private final ObjectProvider<StoragePort> storagePortProvider;
+    /** 历史对象所属后端未配置时的文案前缀 */
+    private static final String BACKEND_NOT_CONFIGURED = "文件所属存储后端未配置: ";
+
+    /** 存储后端注册表:当前写入端口 + 历史类型端口 */
+    private final StoragePortRegistry storageRegistry;
 
     /** 文件元数据读写 */
     private final SysFileMapper fileMapper;
 
-    /** 租户资料读:存储配额直读(登记例外,与 auth 同款) */
-    private final SysTenantMapper tenantMapper;
+    /** 配额预检与锁行入库 */
+    private final FileQuotaService quotaService;
 
-    /** 存储后端类型标识,落 sys_file.storage_type */
+    /** 文件级可见性判定 */
+    private final FileAccessPolicy accessPolicy;
+
+    /** 上传约束:白名单、单文件上限与当前写入类型 */
     private final SnailStorageProperties properties;
 
     /** 归一化后的扩展名白名单,小写无点 */
@@ -93,13 +94,15 @@ public class FileStorageService {
     /** 单文件上限字节数,构造时换算一次 */
     private final long maxSizeBytes;
 
-    public FileStorageService(ObjectProvider<StoragePort> storagePortProvider,
+    public FileStorageService(StoragePortRegistry storageRegistry,
                               SysFileMapper fileMapper,
-                              SysTenantMapper tenantMapper,
+                              FileQuotaService quotaService,
+                              FileAccessPolicy accessPolicy,
                               SnailStorageProperties properties) {
-        this.storagePortProvider = storagePortProvider;
+        this.storageRegistry = storageRegistry;
         this.fileMapper = fileMapper;
-        this.tenantMapper = tenantMapper;
+        this.quotaService = quotaService;
+        this.accessPolicy = accessPolicy;
         this.properties = properties;
         this.extWhitelist = properties.getUpload().getExtWhitelist().stream()
                 .map(ext -> ext.toLowerCase(Locale.ROOT))
@@ -110,11 +113,12 @@ public class FileStorageService {
     }
 
     /**
-     * 上传:校验链顺序固定——文件名清洗→扩展名白名单(deny-by-default)→大小上限→租户配额;
+     * 上传:校验链顺序固定——文件名清洗→扩展名白名单(deny-by-default)→大小上限→配额预检;
      * 通过后对象键服务端生成,原文件名只进元数据,下载路径永不拼用户输入。
+     * 对象写成功后元数据入库失败(含授权配额竞态)时,尽力回收刚写入的对象,避免孤儿文件。
      */
     public FileVO upload(MultipartFile file, String bizType, Long bizId) {
-        StoragePort port = requirePort();
+        StoragePort port = requireActivePort();
         if (file == null || file.isEmpty()) {
             throw BizException.badRequest("上传文件为空");
         }
@@ -127,7 +131,7 @@ public class FileStorageService {
         if (size > maxSizeBytes) {
             throw BizException.badRequest("文件超过单文件上限 " + properties.getUpload().getMaxSizeMb() + "MB");
         }
-        checkQuota(size);
+        quotaService.assertCapacity(size);
 
         String storageKey = storageKey(ext);
         try (InputStream in = file.getInputStream()) {
@@ -142,34 +146,42 @@ public class FileStorageService {
         row.setContentType(file.getContentType());
         row.setSize(size);
         row.setStorageKey(storageKey);
-        row.setStorageType(properties.getType());
+        row.setStorageType(storageRegistry.activeType());
         row.setBizType(trimToNull(bizType));
         row.setBizId(bizId);
         LoginUser uploader = LoginUserContextHolder.get();
         row.setUploadBy(uploader == null ? null : uploader.userId());
         row.setUploadByName(uploader == null ? null : uploader.nickname());
-        fileMapper.insert(row);
+        try {
+            quotaService.insertWithinQuota(row);
+        } catch (RuntimeException e) {
+            deleteObjectQuietly(port, storageKey, "元数据入库失败");
+            throw e;
+        }
         return FileVO.from(row);
     }
 
     /**
      * 下载:本租户语义——selectById 被租户拦截器圈定,跨租户/已删一律按不存在拒绝
-     * (存在性即租户隐私,与 OperLogService.detail 同口径);内容流由调用方负责关闭。
+     * (存在性即租户隐私,与 OperLogService.detail 同口径);
+     * 再判文件级可见性,最后按元数据记录的 storage_type 取端口;内容流由调用方负责关闭。
      */
     public StorageDownload download(Long fileId) {
         SysFile file = requireFile(fileId);
-        return new StorageDownload(file, requirePort().get(file.getStorageKey()));
+        if (!accessPolicy.canRead(file, LoginUserContextHolder.get())) {
+            throw BizException.forbidden("无权访问该文件");
+        }
+        return new StorageDownload(file, requirePortOf(file).get(file.getStorageKey()));
     }
 
-    /** 删除:逻辑删即时生效;物理删尽力而为,失败只告警不回滚,残留由 GC 任务清扫 */
+    /** 删除:逻辑删即时生效;物理删按记录类型路由,失败或后端未配置只告警,残留由 GC 任务清扫 */
     public void remove(Long fileId) {
         SysFile file = requireFile(fileId);
         fileMapper.deleteById(fileId);
-        try {
-            requirePort().delete(file.getStorageKey());
-        } catch (Exception e) {
-            log.warn("文件 {} 物理删除失败,残留对象等待 GC 任务清扫: {}", fileId, e.getMessage());
-        }
+        storageRegistry.of(file.getStorageType()).ifPresentOrElse(
+                port -> deleteObjectQuietly(port, file.getStorageKey(), "逻辑删除后清理"),
+                () -> log.warn("文件 {} 所属存储后端 {} 未配置,对象留待 GC 清扫",
+                        fileId, file.getStorageType()));
     }
 
     /** 本租户文件分页,租户拦截器圈定 */
@@ -198,12 +210,14 @@ public class FileStorageService {
                 result.getTotal());
     }
 
-    private StoragePort requirePort() {
-        StoragePort port = storagePortProvider.getIfAvailable();
-        if (port == null) {
-            throw BizException.badRequest(STORAGE_NOT_CONFIGURED);
-        }
-        return port;
+    private StoragePort requireActivePort() {
+        return storageRegistry.active().orElseThrow(
+                () -> BizException.badRequest(STORAGE_NOT_CONFIGURED));
+    }
+
+    private StoragePort requirePortOf(SysFile file) {
+        return storageRegistry.of(file.getStorageType()).orElseThrow(
+                () -> BizException.badRequest(BACKEND_NOT_CONFIGURED + file.getStorageType()));
     }
 
     private SysFile requireFile(Long fileId) {
@@ -212,6 +226,15 @@ public class FileStorageService {
             throw BizException.badRequest("文件不存在");
         }
         return file;
+    }
+
+    /** 回收对象:失败只告警,原异常继续抛,补偿不掩盖真实失败原因 */
+    private void deleteObjectQuietly(StoragePort port, String storageKey, String reason) {
+        try {
+            port.delete(storageKey);
+        } catch (Exception e) {
+            log.warn("对象 {} 清理失败({}),残留等待 GC 任务清扫: {}", storageKey, reason, e.getMessage());
+        }
     }
 
     /** 清洗文件名:去路径段(浏览器可能原样传全路径)、替换控制字符、保留尾段截断到列宽 */
@@ -241,30 +264,6 @@ public class FileStorageService {
             return null;
         }
         return fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
-    }
-
-    /** 配额校验:storageLimitMb 为 NULL 不限;占用为全租户 SUM(十万行内可接受,phase 2 上汇总表) */
-    private void checkQuota(long incomingSize) {
-        Long tenantId = TenantContextHolder.get();
-        if (tenantId == null) {
-            return;
-        }
-        SysTenant tenant = tenantMapper.selectById(tenantId);
-        if (tenant == null || tenant.getStorageLimitMb() == null) {
-            return;
-        }
-        long limitBytes = tenant.getStorageLimitMb() * BYTES_PER_MB;
-        if (usedBytes() + incomingSize > limitBytes) {
-            throw BizException.badRequest("租户存储配额不足");
-        }
-    }
-
-    /** 全租户已用字节数;租户条件与逻辑删条件由拦截器自动注入 */
-    private long usedBytes() {
-        List<Object> totals = fileMapper.selectObjs(
-                Wrappers.<SysFile>query().select(USED_SIZE_SELECT));
-        Object first = totals.isEmpty() ? null : totals.get(0);
-        return first instanceof Number number ? number.longValue() : 0L;
     }
 
     /** 对象键:{tenantId}/{yyyyMM}/{uuid}.{ext}——隔离靠元数据表与接口层,键布局只方便人工排查 */

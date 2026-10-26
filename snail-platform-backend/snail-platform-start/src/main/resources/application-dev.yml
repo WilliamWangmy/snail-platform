@@ -21,3 +21,12 @@ snail:
     jwt:
       # 开发占位密钥只住 dev profile;生产密钥必须由 SNAIL_JWT_SECRET 提供,共享配置无默认可漏
       secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}
+  storage:
+    sftp:
+      # 本机 SFTP 的开发默认连接;生产必须由环境变量提供,共享配置不放开任何默认口令
+      host: ${SNAIL_SFTP_HOST:127.0.0.1}
+      username: ${SNAIL_SFTP_USERNAME:snail}
+      password: ${SNAIL_SFTP_PASSWORD:snail}
+      base-dir: ${SNAIL_SFTP_BASE_DIR:/data/snail/files}
+      # 本机存储多为自签指纹;生产保持严格校验并按 known-hosts 带外分发
+      strict-host-key-checking: ${SNAIL_SFTP_STRICT_HOST_KEY:false}

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,8 +20,15 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -38,10 +46,11 @@ import org.springframework.test.web.servlet.MvcResult;
 
 /**
  * 职责:文件存储端到端回归——内嵌 SFTP 起 SFTP 服务,走"上传→列表→平台检索→下载字节一致→
- * 白名单拒绝→删除→再下载按不存在拒绝",外加配额拒绝、跨租户隐身、文件名清洗三条设计口径用例。
+ * 白名单拒绝→删除→再下载按不存在拒绝",外加配额拒绝、跨租户隐身、文件名清洗三条设计口径用例;
+ * 并覆盖下载权限码、文件级可见性、停用用户 401、按 storage_type 路由与并发配额。
  * 上游:snail-platform-start 真实上下文(需本机 MySQL/Valkey,SNAIL_DB_* 注入口令,未设则整类跳过);
  * 下游:无断言外设。上传的文件与元数据行有意残留,与阶段③流程测试同一口径。
- * 配额用例改过本租户的 storage_limit_mb,收尾恢复原值;跨租户用例直插一条外来租户的元数据行,
+ * 配额用例改过本租户的 storage_limit_mb,收尾恢复原值;跨租户与类型路由用例直插元数据行,
  * 断言完即删——这两类都要动别人的数据,不留残留是底线。
  */
 @SpringBootTest
@@ -64,8 +73,12 @@ class FileStorageFlowTest {
 
     private static final Pattern TOKEN = Pattern.compile("\"token\":\"([^\"]+)\"");
     private static final Pattern CODE = Pattern.compile("\"code\":(\\d+)");
+    private static final Pattern DATA_ID = Pattern.compile("\"data\":(\\d+)");
     private static final Pattern FILE_ID = Pattern.compile("\"fileId\":(\\d+)");
     private static final Pattern FILE_NAME = Pattern.compile("\"fileName\":\"([^\"]*)\"");
+
+    /** 新建测试用户的统一口令 */
+    private static final String PASSWORD = "User@1234";
 
     /** 白名单拒绝文案的判别片段 */
     private static final String NOT_IN_WHITELIST = "白名单";
@@ -108,6 +121,8 @@ class FileStorageFlowTest {
         registry.add("snail.storage.sftp.password", () -> SftpTestServer.PASSWORD);
         // 虚拟根即 SFTP 根:/ + 对象键,物理位置就是夹具目录下的 <键>
         registry.add("snail.storage.sftp.base-dir", () -> "/");
+        // 内嵌服务端主机密钥随机自签,夹具显式关闭严格指纹;生产默认开启
+        registry.add("snail.storage.sftp.strict-host-key-checking", () -> "false");
     }
 
     @Test
@@ -245,6 +260,122 @@ class FileStorageFlowTest {
         assertTrue(truncated.endsWith(".txt"), "截断必须保住扩展名: " + truncated);
     }
 
+    /**
+     * 下载的双层闸:权限码回答"能不能下载",FileAccessPolicy 回答"这一条能不能读"。
+     * 无下载码 403;有码但非上传者且非文件管理者被文件级可见性拒绝;上传者本人与租户管理员可读;
+     * 停用用户旧令牌在认证闸即 401,不会走到权限码。
+     */
+    @Test
+    void downloadNeedsPermissionAndFileAccessPolicy() throws Exception {
+        String suffix = String.valueOf(System.nanoTime() % 100_000_000L);
+        String adminToken = login("admin", "admin123");
+        byte[] adminContent = ("admin-file-" + suffix).getBytes(StandardCharsets.UTF_8);
+        long adminFile = upload(adminToken, "acl-admin-" + suffix + ".txt", adminContent, "acl-" + suffix);
+
+        long downloadRole = createRole("下载角色" + suffix, "file_dl_" + suffix, adminToken);
+        grantMenus(downloadRole, 180L, 1802L, 1803L);
+        long listRole = createRole("列表角色" + suffix, "file_ls_" + suffix, adminToken);
+        grantMenus(listRole, 180L);
+
+        String downloadUser = "aclFull" + suffix;
+        String listUser = "aclList" + suffix;
+        long downloadUserId = createUser(downloadUser, downloadRole, adminToken);
+        long listUserId = createUser(listUser, listRole, adminToken);
+        String downloadToken = login(downloadUser, PASSWORD);
+        String listToken = login(listUser, PASSWORD);
+        try {
+            // 无 system:file:download:权限闸直接拒绝
+            mockMvc.perform(get("/system/file/" + adminFile + "/raw")
+                            .header("Authorization", "Bearer " + listToken))
+                    .andExpect(status().isForbidden());
+
+            // 有下载码但不是上传者、也不是文件管理者:文件级可见性拒绝
+            String denied = downloadBody(downloadToken, adminFile);
+            assertEquals(403, jsonCode(denied), "非上传者应被文件级可见性拒绝: " + denied);
+            assertTrue(denied.contains("无权访问"), denied);
+
+            // 上传者本人可读自己的文件
+            byte[] ownContent = ("own-" + suffix).getBytes(StandardCharsets.UTF_8);
+            long ownFile = upload(downloadToken, "acl-own-" + suffix + ".txt", ownContent, "acl-" + suffix);
+            assertArrayEquals(ownContent, downloadResult(downloadToken, ownFile)
+                    .getResponse().getContentAsByteArray(), "上传者本人应能读自己的文件");
+
+            // 租户管理员可读他人文件
+            assertArrayEquals(ownContent, downloadResult(adminToken, ownFile)
+                    .getResponse().getContentAsByteArray(), "租户管理员应可读全部文件");
+
+            // 停用用户后旧令牌下载 401:认证闸先于权限码与文件策略
+            changeUserStatus(downloadUserId, 1, adminToken);
+            mockMvc.perform(get("/system/file/" + ownFile + "/raw")
+                            .header("Authorization", "Bearer " + downloadToken))
+                    .andExpect(status().isUnauthorized());
+        } finally {
+            deleteUser(downloadUserId, adminToken);
+            deleteUser(listUserId, adminToken);
+            deleteRole(downloadRole, adminToken);
+            deleteRole(listRole, adminToken);
+        }
+    }
+
+    /** 元数据里的 storage_type 没配后端时明确拒绝,不静默回退当前 sftp 去读错对象 */
+    @Test
+    void downloadRejectsUnconfiguredStoredBackend() throws Exception {
+        String suffix = String.valueOf(System.nanoTime() % 100_000_000L);
+        String adminToken = login("admin", "admin123");
+        String storageKey = TENANT_ID + "/197001/legacy-" + suffix + ".txt";
+        long fileId = insertFileWithStorageType("route-" + suffix, "minio-legacy", storageKey);
+        try {
+            String denied = downloadBody(adminToken, fileId);
+            assertEquals(400, jsonCode(denied), "未配置存储后端应走业务拒绝: " + denied);
+            assertTrue(denied.contains("minio-legacy"), "报错应点名缺失的后端类型: " + denied);
+        } finally {
+            jdbcTemplate.update("DELETE FROM sys_file WHERE file_id = ?", fileId);
+        }
+    }
+
+    /**
+     * 并发配额:额度只够一笔时,两笔同时上传必须一成一败。
+     * 两笔都能通过无锁预检,胜负由锁租户行后的重算决定;失败笔的对象应被补偿清理。
+     */
+    @Test
+    void concurrentUploadsCannotExceedQuota() throws Exception {
+        String suffix = String.valueOf(System.nanoTime() % 100_000_000L);
+        String adminToken = login("admin", "admin123");
+        Integer originalLimit = storageLimitMb();
+        long usedBefore = usedSizeBytes();
+        long size = MB;
+        // 额度按 MB 上取整到"恰好够一笔":剩余区间 [1MB, 2MB),两笔必然放不下
+        updateStorageLimit((int) ((usedBefore + size + MB - 1) / MB));
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch go = new CountDownLatch(1);
+            Callable<String> upload = () -> {
+                ready.countDown();
+                go.await(10, TimeUnit.SECONDS);
+                return uploadResponse(adminToken, "race-race-" + System.nanoTime() + ".txt",
+                        randomBytes((int) size, suffix), "race-" + suffix);
+            };
+            Future<String> first = pool.submit(upload);
+            Future<String> second = pool.submit(upload);
+            assertTrue(ready.await(10, TimeUnit.SECONDS), "上传线程未就绪");
+            go.countDown();
+            String firstResponse = first.get(60, TimeUnit.SECONDS);
+            String secondResponse = second.get(60, TimeUnit.SECONDS);
+
+            long accepted = Stream.of(firstResponse, secondResponse)
+                    .filter(response -> jsonCode(response) == 0)
+                    .count();
+            assertEquals(1, accepted, "并发上传只能有一笔成功: " + firstResponse + " | " + secondResponse);
+            String rejected = jsonCode(firstResponse) == 0 ? secondResponse : firstResponse;
+            assertTrue(rejected.contains(QUOTA_DENIED), "失败笔应为配额拒绝: " + rejected);
+            assertEquals(usedBefore + size, usedSizeBytes(), "成功笔应恰好计入一份配额");
+        } finally {
+            pool.shutdownNow();
+            updateStorageLimit(originalLimit);
+        }
+    }
+
     /* ------------------------------ 辅助 ------------------------------ */
 
     private long upload(String token, String fileName, byte[] content) throws Exception {
@@ -337,6 +468,88 @@ class FileStorageFlowTest {
                 "SELECT file_id FROM sys_file WHERE storage_key = ?", Long.class, FOREIGN_STORAGE_KEY);
         assertTrue(fileId != null && fileId > 0, "跨租户元数据行应插入成功");
         return fileId;
+    }
+
+    /** 建测试角色:数据权限取"仅本人",与下载权限面无关 */
+    private long createRole(String name, String code, String token) throws Exception {
+        String response = postJson("/system/role",
+                "{\"roleName\":\"" + name + "\",\"roleCode\":\"" + code + "\",\"dataScope\":4,\"sort\":9}",
+                token);
+        assertEquals(0, jsonCode(response), "建角色失败: " + response);
+        return Long.parseLong(extract(DATA_ID, response));
+    }
+
+    /** 角色授权直接落库:授权接口另有用例覆盖,这里只负责把权限码挂上 */
+    private void grantMenus(long roleId, long... menuIds) {
+        for (long menuId : menuIds) {
+            jdbcTemplate.update("INSERT INTO sys_role_menu (role_id, menu_id) VALUES (?, ?)", roleId, menuId);
+        }
+    }
+
+    private long createUser(String username, long roleId, String token) throws Exception {
+        String response = postJson("/system/user",
+                "{\"username\":\"" + username + "\",\"password\":\"" + PASSWORD + "\","
+                        + "\"nickname\":\"文件权限测试\",\"orgId\":1,\"roleIds\":[" + roleId + "]}", token);
+        assertEquals(0, jsonCode(response), "建用户失败: " + response);
+        return Long.parseLong(extract(DATA_ID, response));
+    }
+
+    /** 停用/启用用户:停用会自增 token_version,旧令牌随即失效 */
+    private void changeUserStatus(long userId, int status, String token) throws Exception {
+        String response = mockMvc.perform(put("/system/user/" + userId + "/status")
+                        .param("status", String.valueOf(status))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertEquals(0, jsonCode(response), "改用户状态失败: " + response);
+    }
+
+    private void deleteUser(long userId, String token) throws Exception {
+        String response = mockMvc.perform(delete("/system/user/" + userId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertEquals(0, jsonCode(response), "删除测试用户失败: " + response);
+    }
+
+    private void deleteRole(long roleId, String token) throws Exception {
+        String response = mockMvc.perform(delete("/system/role/" + roleId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertEquals(0, jsonCode(response), "删除测试角色失败: " + response);
+    }
+
+    /** 成功下载的完整响应:异步流必须在分派后才拿到字节 */
+    private MvcResult downloadResult(String token, long fileId) throws Exception {
+        MvcResult started = mockMvc.perform(get("/system/file/" + fileId + "/raw")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        return mockMvc.perform(asyncDispatch(started))
+                .andExpect(status().isOk())
+                .andReturn();
+    }
+
+    /** 直插一条指定 storage_type 的本租户元数据行:验证按行内类型路由,而不是回退当前生效后端 */
+    private long insertFileWithStorageType(String bizType, String storageType, String storageKey) {
+        jdbcTemplate.update("INSERT INTO sys_file "
+                        + "(tenant_id, file_name, ext, content_type, size, storage_key, storage_type, "
+                        + "biz_type, upload_by, upload_by_name, create_time, update_time, deleted) "
+                        + "VALUES (?, ?, 'txt', 'text/plain', ?, ?, ?, ?, 1, '超级管理员', NOW(), NOW(), 0)",
+                TENANT_ID, bizType + ".txt", 4L, storageKey, storageType, bizType);
+        Long fileId = jdbcTemplate.queryForObject(
+                "SELECT file_id FROM sys_file WHERE storage_key = ?", Long.class, storageKey);
+        assertTrue(fileId != null && fileId > 0, "路由用例元数据行应插入成功");
+        return fileId;
+    }
+
+    private String postJson(String url, String body, String token) throws Exception {
+        return mockMvc.perform(post(url)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
     /** 造定长内容:用唯一标记按自身长度重复铺满,只为凑到目标体积 */

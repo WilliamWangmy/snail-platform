@@ -32,7 +32,7 @@ import org.springframework.web.util.UriUtils;
 
 /**
  * 职责:租户文件管理入口——上传、本租户分页、流式下载与删除。
- * 下载只要求登录:知道 fileId 的本租户用户即可取,与用户域"检索面"口径一致;
+ * 下载要求 system:file:download,文件级可见性再由 FileAccessPolicy 判定;
  * 上传/删除是写操作挂 system:file:* 权限码并留痕。
  * 上游:文件管理页面;下游:FileStorageService。
  */
@@ -90,8 +90,8 @@ public class FileController {
         return R.ok(fileStorageService.page(query));
     }
 
-    @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "下载文件(认证即可,本租户语义)")
+    @PreAuthorize("hasAuthority('system:file:download')")
+    @Operation(summary = "下载文件(本租户 + 文件级可见性)")
     @GetMapping("/{fileId}/raw")
     public ResponseEntity<StreamingResponseBody> raw(@PathVariable Long fileId) {
         FileStorageService.StorageDownload download = fileStorageService.download(fileId);
