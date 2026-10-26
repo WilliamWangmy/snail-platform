@@ -47,6 +47,12 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
         <hutool.version>5.8.38</hutool.version>
+        <!-- SFTP 客户端: mwiede 维护分支,com.jcraft 原版已停更 -->
+        <jsch.version>0.2.21</jsch.version>
+        <!-- AWS SDK v2: S3 协议兼容存储(MinIO/云 OSS)走同一套协议栈,BOM 单点锁版本 -->
+        <awssdk-bom.version>2.25.60</awssdk-bom.version>
+        <!-- 内嵌 SFTP 服务器:仅流程测试用,验证 storage 流程不再依赖外部 SFTP -->
+        <sshd.version>2.12.1</sshd.version>
 
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
@@ -100,6 +106,42 @@
                 <groupId>com.snail.platform</groupId>
                 <artifactId>snail-function-notify</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.snail.platform</groupId>
+                <artifactId>snail-framework-storage</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.snail.platform</groupId>
+                <artifactId>snail-function-storage</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- 对象存储客户端单一收敛：JSch 只在 framework-storage 内使用 -->
+            <dependency>
+                <groupId>com.github.mwiede</groupId>
+                <artifactId>jsch</artifactId>
+                <version>${jsch.version}</version>
+            </dependency>
+            <!-- S3 协议栈版本由 BOM 单点,业务模块引 s3 不写版本;HTTP 客户端收敛 url-connection -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- 内嵌 SFTP 服务器:仅 start 的流程测试引入,不进主依赖树 -->
+            <dependency>
+                <groupId>org.apache.sshd</groupId>
+                <artifactId>sshd-core</artifactId>
+                <version>${sshd.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.sshd</groupId>
+                <artifactId>sshd-sftp</artifactId>
+                <version>${sshd.version}</version>
             </dependency>
 
             <!-- ORM：boot4 starter 线，方言在 snail-framework-db 固定为 MYSQL -->

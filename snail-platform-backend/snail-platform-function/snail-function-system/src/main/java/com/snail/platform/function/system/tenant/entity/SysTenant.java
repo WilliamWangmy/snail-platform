@@ -39,6 +39,9 @@ public class SysTenant extends AuditedEntity {
     /** 账号数上限,null 为不限 */
     private Integer accountLimit;
 
+    /** 存储配额 MB,null 为不限 */
+    private Long storageLimitMb;
+
     /** 状态:0 正常 1 停用 */
     private Integer status;
 

@@ -33,7 +33,7 @@ public final class TenantContextHolder {
     /**
      * 在无租户过滤的窄窗口内执行一段查询,结束(含异常)必恢复原状态。
      * 只允许三类路径使用:登录按全局唯一键定位用户;新增/改名时按 username 做全表查重;
-     * 平台面的跨租户检索(如公告列表,平台管理动作的读侧豁免)。
+     * 平台面的跨租户检索(如公告列表、平台文件列表,平台管理动作的读侧豁免)。
      * 除此之外的业务 CRUD 严禁调用。
      */
     public static <T> T withoutTenant(java.util.function.Supplier<T> action) {
