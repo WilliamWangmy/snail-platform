@@ -35,6 +35,9 @@ snail:
       # secret 不在共享配置给默认值:开发占位只住 dev profile,prod 缺 SNAIL_JWT_SECRET 启动即失败;短于 32 字符拒绝启动
       secret: ${SNAIL_JWT_SECRET}
       expire-minutes: 120
+    cors:
+      # 令牌走 Authorization 头,跨域只按名白名单放开且不带凭证;留空即不下发 CORS 头(同源部署、开发期代理都无需配置)
+      allowed-origins: ${SNAIL_CORS_ALLOWED_ORIGINS:}
   db:
     tenant:
       # 租户过滤豁免清单：平台级表、纯关系表、只增日志表；口径详见 docs/system-business-design.md

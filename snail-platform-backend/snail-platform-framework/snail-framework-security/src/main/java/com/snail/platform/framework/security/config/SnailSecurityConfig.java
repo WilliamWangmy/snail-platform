@@ -7,6 +7,8 @@ import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import com.snail.platform.framework.security.token.JwtTokenService;
 import com.snail.platform.framework.security.web.SnailAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Duration;
+import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * 职责:HTTP 安全链的唯一装配——无状态 JWT、白名单放行、其余一律认证;401/403 输出 R 同构 JSON。
@@ -46,13 +51,18 @@ public class SnailSecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain snailSecurityFilterChain(HttpSecurity http, JwtTokenService jwtTokenService,
+    public SecurityFilterChain snailSecurityFilterChain(HttpSecurity http, SnailSecurityProperties properties,
+                                                        JwtTokenService jwtTokenService,
                                                         ObjectProvider<UserAuthorityProvider> authorityProviders,
                                                         ObjectProvider<LoginUserProvider> loginUserProviders,
                                                         ObjectProvider<SessionHeartbeatPort> heartbeats)
             throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> {
+                    CorsConfigurationSource corsSource = corsSource(properties.getCors());
+                    if (corsSource != null) {
+                        cors.configurationSource(corsSource);
+                    }
                 })
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
@@ -67,6 +77,25 @@ public class SnailSecurityConfig {
                         .accessDeniedHandler((request, response, ex) ->
                                 writeJson(response, 403, "无权限访问")));
         return http.build();
+    }
+
+    /**
+     * 跨域来源白名单装配:未配置即返回 null,过滤器链保持不下发 CORS 头。
+     * 口径:令牌走 Authorization 头而不是 Cookie,故 allowCredentials 保持默认 false,
+     * 来源必须逐名写全(不给 *),避免任意站点借无凭证跨域打到内网管理端。
+     */
+    private static CorsConfigurationSource corsSource(SnailSecurityProperties.Cors corsProperties) {
+        if (corsProperties.getAllowedOrigins().isEmpty()) {
+            return null;
+        }
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setMaxAge(Duration.ofHours(1));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     /** 入口点直接吐与 R 同构的最小 JSON,避免为一行响应引序列化器 */
