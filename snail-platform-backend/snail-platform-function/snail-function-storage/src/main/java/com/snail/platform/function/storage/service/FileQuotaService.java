@@ -10,6 +10,7 @@ import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -60,8 +61,10 @@ public class FileQuotaService {
     /**
      * 锁租户行后重算占用并插入元数据:同一租户的并发上传在此串行,
      * 任一请求拿锁时都能看到前一笔已提交的 size,配额不会被竞态突破。
+     * REQUIRED:调用方(FileStorageService.upload)已有事务时加入同一事务,回滚一起回滚,
+     * 不再出现"对象已写、元数据未落"的悬挂窗口。
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(propagation = Propagation.REQUIRED, isolation = Isolation.READ_COMMITTED)
     public void insertWithinQuota(SysFile row) {
         Long tenantId = TenantContextHolder.get();
         if (tenantId != null) {
