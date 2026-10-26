@@ -36,6 +36,13 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-storage</artifactId>
         </dependency>
+        <!-- 存储端口层的内嵌 SFTP 测试夹具:仅测试期使用,不进入运行时依赖树 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-storage</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
         <!-- 接口文档：springdoc 3.x 对应 Boot 4；api-docs 与 swagger-ui 路径的放行已在 framework-security 白名单 -->
         <dependency>

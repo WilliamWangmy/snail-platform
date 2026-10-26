@@ -172,7 +172,8 @@ class FileStorageFlowTest {
         String adminToken = login("admin", "admin123");
         Integer originalLimit = storageLimitMb();
         long firstSize = 300 * 1024L;
-        long secondSize = 900 * 1024L;
+        // 第二笔取 2MB:额度按整数 MB 上取整,剩余空间最宽也到不了 2MB,拒绝才是确定性的
+        long secondSize = 2 * MB;
         long usedBefore = usedSizeBytes();
         try {
             // 额度 = 既有占用 + 1MB:够第一笔 300KB,不够再加 900KB
@@ -228,15 +229,17 @@ class FileStorageFlowTest {
         String suffix = String.valueOf(System.nanoTime() % 100_000_000L);
         String adminToken = login("admin", "admin123");
 
-        String hostile = "C:\\Users\\snail\\..\\.." + (char) 7 + "报告\"<>|.txt";
-        String response = uploadRaw(adminToken, hostile, ("clean-" + suffix).getBytes(StandardCharsets.UTF_8));
+        // 路径以分隔符收尾,尾段才是控制字符+报告名;BEL 与 " <> | 各替换成一个下划线
+        String hostile = "C:\\Users\\snail\\..\\..\\" + (char) 7 + "报告\"<>|.txt";
+        String response = uploadRaw(adminToken, hostile,
+                ("clean-" + suffix).getBytes(StandardCharsets.UTF_8), "clean-test");
         String cleaned = extract(FILE_NAME, response);
-        assertEquals("报告_____.txt", cleaned, "路径段与控制字符应被清洗掉");
+        assertEquals("_报告____.txt", cleaned, "路径段与控制字符应被清洗掉");
         assertFalse(cleaned.contains(".."), "清洗后的文件名不该再含上级路径段: " + cleaned);
 
         byte[] filler = randomBytes(1024, suffix);
         String longName = "a".repeat(300) + ".txt";
-        String longResponse = uploadRaw(adminToken, longName, filler);
+        String longResponse = uploadRaw(adminToken, longName, filler, "clean-test");
         String truncated = extract(FILE_NAME, longResponse);
         assertEquals(255, truncated.length(), "超长文件名应截断到列宽: " + truncated.length());
         assertTrue(truncated.endsWith(".txt"), "截断必须保住扩展名: " + truncated);
@@ -285,15 +288,17 @@ class FileStorageFlowTest {
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
-    /** 下载并回体:本租户语义拒绝时是 JSON 信封,断言 code 与文案都用它 */
+    /** 下载并回体:成功链走异步流,语义拒绝是同步 JSON 信封,按是否已启动异步分派取响应 */
     private String downloadBody(String token, long fileId) throws Exception {
-        MvcResult started = mockMvc.perform(get("/system/file/" + fileId + "/raw")
+        MvcResult result = mockMvc.perform(get("/system/file/" + fileId + "/raw")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(request().asyncStarted())
                 .andReturn();
-        return mockMvc.perform(asyncDispatch(started))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        if (result.getRequest().isAsyncStarted()) {
+            result = mockMvc.perform(asyncDispatch(result))
+                    .andExpect(status().isOk())
+                    .andReturn();
+        }
+        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
     private long fileIdOf(String response) {

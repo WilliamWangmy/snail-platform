@@ -112,6 +112,14 @@
                 <artifactId>snail-framework-storage</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <!-- 端口层测试夹具随 test-jar 发布,start 的流程测试复用,避免夹具源码跨模块复制 -->
+            <dependency>
+                <groupId>com.snail.platform</groupId>
+                <artifactId>snail-framework-storage</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
             <dependency>
                 <groupId>com.snail.platform</groupId>
                 <artifactId>snail-function-storage</artifactId>
