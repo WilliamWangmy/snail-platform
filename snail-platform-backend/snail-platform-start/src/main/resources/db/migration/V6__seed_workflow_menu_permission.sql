@@ -1,6 +1,6 @@
 -- =========================================================
--- 流程中心菜单与权限码(Flowable 集成 P2)
--- 菜单口径同 V2:scope=2 租户面、scope=1 平台面;perm_code 全局唯一含已删记录,建后不可改
+-- 流程中心数据初始化:菜单节点与权限码(建表在 V3__init_workflow_schema.sql)
+-- 菜单口径同 V4:scope=2 租户面、scope=1 平台面;perm_code 全局唯一含已删记录,建后不可改
 -- 内置 admin 按 A 语义隐式持有全部 scope=2 权限码,不落 sys_role_menu;平台面(scope=1)要显式授,见文末
 -- 组件路径按 admin 前端 views 目录约定(workflow/*/index、platform/workflow/*/index),页面在前端批次落地
 -- 待办与已办是两个独立列表页,权限码必须分开:sys_menu.perm_code 全局唯一,同码只能挂一个节点
@@ -29,7 +29,7 @@ VALUES
 (2403, 240, '删除模板',   3, 1, NULL,                     NULL,                          'platform:workflow:template:delete', NULL, 3, 1, NOW());
 
 -- ---------- 默认租户 admin 的平台面授权 ----------
--- V2 尾段的 CROSS JOIN 只覆盖当时已存在的 scope=1 行,本文件新增的 4 个节点必须在这里补授,
+-- V4 尾段的 CROSS JOIN 只覆盖当时已存在的 scope=1 行,本文件新增的 4 个节点必须在这里补授,
 -- 否则平台管理员看不到"流程模板"菜单。INSERT IGNORE 保幂等(PK 是 role_id+menu_id)
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)
 SELECT r.role_id, m.menu_id

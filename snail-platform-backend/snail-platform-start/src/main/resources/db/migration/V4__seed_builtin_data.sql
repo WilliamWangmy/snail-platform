@@ -8,8 +8,8 @@
 -- dashboard/外链菜单待对应页面落地后再追加种子
 -- 授权按 A 语义:租户面(scope=2)隐式全量,不落库;只显式授平台面(scope=1)节点
 -- 若改走 B 语义(租户面也全量显式):追加 scope=2 全量授权,provision 同步复制
--- 通知中心/公告管理/在线用户菜单与按钮一并在列(原 V4/V6,整并为本文件)
--- 文件管理(租户面 180 + 按钮 1801/1802)与平台文件(平台面 230)同并在列(原 V4 存储种子,整并为本文件)
+-- 通知中心/公告管理/在线用户菜单与按钮一并在列(整并为本文件,不再留增量脚本)
+-- 本文件只装系统面种子:文件面的菜单与权限码见 V5,流程中心见 V6——建表与数据初始化分文件,域也分文件
 -- =========================================================
 
 -- ---------- 默认租户与初始组织 ----------
@@ -65,9 +65,6 @@ VALUES
 (160,  1,   '通知中心',     2, 2, '/system/notify',   'system/notify/index',    'system:notify:list',         'Bell',           7, 1, NOW()),
 (170,  1,   '在线用户',     2, 2, '/system/online',   'system/online/index',    'system:online:list',         'User',           8, 1, NOW()),
 (1701, 170, '强制下线',     3, 2, NULL,               NULL,                     'system:online:kick',         NULL,             1, 1, NOW()),
-(180,  1,   '文件管理',     2, 2, '/system/file',     'system/file/index',      'system:file:list',           'Document',       9, 1, NOW()),
-(1801, 180, '删除文件',     3, 2, NULL,               NULL,                     'system:file:delete',         NULL,             1, 1, NOW()),
-(1802, 180, '上传文件',     3, 2, NULL,               NULL,                     'system:file:upload',         NULL,             2, 1, NOW()),
 -- 平台面(scope=1)
 (2,    0,   '平台管理',     1, 1, '/platform',        NULL,                     NULL,                         'Platform',       2, 1, NOW()),
 (200,  2,   '租户管理',     2, 1, '/platform/tenant', 'platform/tenant/index',  'platform:tenant:list',       'School',         1, 1, NOW()),
@@ -78,12 +75,11 @@ VALUES
 (2102, 210, '修改菜单',     3, 1, NULL,               NULL,                     'platform:menu:update',       NULL,             2, 1, NOW()),
 (2103, 210, '删除菜单',     3, 1, NULL,               NULL,                     'platform:menu:delete',       NULL,             3, 1, NOW()),
 (220,  2,   '公告管理',     2, 1, '/platform/notify', 'platform/notify/index',  'platform:notify:list',       'Message',        3, 1, NOW()),
-(2201, 220, '发送公告',     3, 1, NULL,               NULL,                     'platform:notify:send',       NULL,             1, 1, NOW()),
-(230,  2,   '平台文件',     2, 1, '/platform/file',   'platform/file/index',    'platform:file:list',         'Collection',     4, 1, NOW());
+(2201, 220, '发送公告',     3, 1, NULL,               NULL,                     'platform:notify:send',       NULL,             1, 1, NOW());
 
 -- ---------- 默认租户 admin 的平台面授权 ----------
--- A 语义下租户面隐式全量,这里只落 scope=1 的 14 个节点(2/200/2001/2002/210/2101/2102/2103/1105/1402/1502/220/2201/230)
--- 谓词按 m.scope=1 一刀切,新增平台面节点无需改本段
+-- A 语义下租户面隐式全量,这里只落 scope=1 的 13 个节点(2/200/2001/2002/210/2101/2102/2103/1105/1402/1502/220/2201)
+-- 谓词按 m.scope=1 一刀切,后建的域种子(V5/V6)新增平台节点时无需改本段,各自文末补授即可
 INSERT INTO sys_role_menu (role_id, menu_id)
 SELECT r.role_id, m.menu_id
 FROM sys_role r
