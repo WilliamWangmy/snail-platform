@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.function.system.api.UserBriefPort;
+import com.snail.platform.function.system.role.entity.SysUserRole;
+import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.entity.SysUser;
@@ -14,9 +16,10 @@ import java.util.Objects;
 import org.springframework.stereotype.Service;
 
 /**
- * 职责:UserBriefPort 的唯一实现——收件人快照与平台公告扇出的用户面数据源。
+ * 职责:UserBriefPort 的唯一实现——收件人快照与扇出取人的用户面数据源。
  * briefs 走当前租户口径;enabledUsersOfTenant 自行切到目标租户窗口,调用方无需关心上下文。
- * 上游:notify 模块经 api 包调用;下游:sys_user/sys_tenant 读(既有白名单边 user->tenant)。
+ * 上游:notify 与 workflow 模块经 api 包调用;下游:sys_user/sys_user_role/sys_tenant 读
+ * (既有白名单边 user->tenant、user->role,不新增跨子域边)。
  */
 @Service
 public class UserBriefService implements UserBriefPort {
@@ -27,11 +30,16 @@ public class UserBriefService implements UserBriefPort {
     /** 用户表读,简要信息事实源 */
     private final SysUserMapper userMapper;
 
+    /** 授权行读,按角色取成员用(关联表不带租户列,租户边界由 sys_user 的过滤现出) */
+    private final SysUserRoleMapper userRoleMapper;
+
     /** 租户表读,ignore 表,扇出前的存在性/状态校验 */
     private final SysTenantMapper tenantMapper;
 
-    public UserBriefService(SysUserMapper userMapper, SysTenantMapper tenantMapper) {
+    public UserBriefService(SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
+                            SysTenantMapper tenantMapper) {
         this.userMapper = userMapper;
+        this.userRoleMapper = userRoleMapper;
         this.tenantMapper = tenantMapper;
     }
 
@@ -59,6 +67,20 @@ public class UserBriefService implements UserBriefPort {
         return TenantContextHolder.asTenant(tenantId, () -> userMapper.selectList(
                         Wrappers.<SysUser>lambdaQuery().eq(SysUser::getStatus, STATUS_ACTIVE)))
                 .stream().map(UserBriefService::toBrief).toList();
+    }
+
+    @Override
+    public List<Long> enabledUserIdsOfRole(Long roleId) {
+        if (roleId == null) {
+            return List.of();
+        }
+        List<Long> memberIds = userRoleMapper.selectList(
+                        Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getRoleId, roleId))
+                .stream().map(SysUserRole::getUserId).toList();
+        return briefs(memberIds).stream()
+                .filter(brief -> Objects.equals(brief.status(), STATUS_ACTIVE))
+                .map(UserBrief::userId)
+                .toList();
     }
 
     private static UserBrief toBrief(SysUser user) {

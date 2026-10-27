@@ -18,6 +18,12 @@ public interface UserBriefPort {
     List<UserBrief> enabledUsersOfTenant(Long tenantId);
 
     /**
+     * 当前租户内某个角色的启用成员 ID(流程待办按候选角色扇出用);无人即空集。
+     * 口径:授权行不带租户列,成员按 sys_user 的租户过滤现出——所以"他租户的同一角色"天然查不到人。
+     */
+    List<Long> enabledUserIdsOfRole(Long roleId);
+
+    /**
      * 用户简要快照:认证展示名与出站通道地址的最小集合;
      * email/phone 供出站通道寻址,属平台内部流转,不进任何对外接口出参。
      */
