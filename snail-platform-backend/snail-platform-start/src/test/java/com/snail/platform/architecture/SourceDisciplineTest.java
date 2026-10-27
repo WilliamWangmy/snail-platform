@@ -64,7 +64,7 @@ class SourceDisciplineTest {
         try (var paths = Files.walk(root)) {
             paths.filter(Files::isRegularFile)
                     .filter(path -> path.getFileName().toString().endsWith(".java"))
-                    .filter(path -> path.contains(Path.of("src", "main", "java")))
+                    .filter(path -> path.toString().replace('\\', '/').contains("/src/main/java/"))
                     .forEach(files::add);
         }
         return files;
