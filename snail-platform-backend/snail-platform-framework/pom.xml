@@ -27,6 +27,7 @@
         <module>snail-framework-log</module>
         <module>snail-framework-excel</module>
         <module>snail-framework-storage</module>
+        <module>snail-framework-workflow</module>
     </modules>
 
     <build>

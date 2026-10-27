@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-framework-workflow：Flowable 流程引擎接入层。
+  P0 只做兼容性验证；P1 起承载引擎网关(唯一读写门面)、BPMN 安全校验器、变量口径、异常映射与租户桥。
+  约束：全仓只有本构件允许 import org.flowable.*（ArchUnit 锁）；不建 ACT_* Mapper，不提供 REST，
+  不依赖 function，不声明 @Transactional（事务边界归调用方的 service）。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-framework</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-framework-workflow</artifactId>
+    <name>snail-framework-workflow</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-core</artifactId>
+        </dependency>
+        <!-- process 引擎单点：IDM/CMMN/DMN/Form/REST/UI 不引 -->
+        <dependency>
+            <groupId>org.flowable</groupId>
+            <artifactId>flowable-spring-boot-starter-process</artifactId>
+        </dependency>
+        <!-- 校验器与变量口径是纯逻辑，单测不起 Spring 上下文、不连库 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
