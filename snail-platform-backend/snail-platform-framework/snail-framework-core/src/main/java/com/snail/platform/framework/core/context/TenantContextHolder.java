@@ -52,6 +52,26 @@ public final class TenantContextHolder {
      * 拦截器注入与审计必须落在新租户头上,而不是发起请求的平台管理员租户。
      */
     public static <T> T asTenant(Long tenantId, java.util.function.Supplier<T> action) {
+        return runAs(tenantId, action);
+    }
+
+    /**
+     * 在指定租户身份下执行一段流程引擎回调,结束(含异常)必恢复原值。
+     * 只允许 framework-workflow 的租户桥使用:Flowable 的定时器与异步作业线程不经过请求链,
+     * 登录人与租户上下文都是空的,而回调要替"该流程实例所属的租户"写库——这个租户 ID 只能由
+     * 引擎侧的实例/作业反查得到,不接受调用方自选,所以它与 asTenant(主动替他人播种)语义不同,
+     * 单独登记为约定 §6 的第四类合法旁路,并由 ArchUnit 把调用点锁在租户桥一处。
+     * 租户 ID 为空即拒绝:反查不到租户说明实例不属于任何租户,宁可失败也不让数据落错家。
+     */
+    public static <T> T runAsEngineTenant(Long tenantId, java.util.function.Supplier<T> action) {
+        if (tenantId == null) {
+            throw new IllegalStateException("引擎回调缺少租户上下文:目标流程实例的 tenantId 为空,拒绝执行");
+        }
+        return runAs(tenantId, action);
+    }
+
+    /** 两个切换入口共用的线程身份换入换出:恢复时区分"原本有值"与"原本无值",无值必须 remove 而非 set(null) */
+    private static <T> T runAs(Long tenantId, java.util.function.Supplier<T> action) {
         Long previous = TENANT_ID.get();
         TENANT_ID.set(tenantId);
         try {
