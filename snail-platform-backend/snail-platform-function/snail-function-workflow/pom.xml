@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-function-workflow：流程中心业务模块——流程模型(草稿/发布指针)、平台流程模板、任务中心与审批留痕。
+  引擎的一切读写都经 snail-framework-workflow 的 WorkflowEngineGateway，本模块不 import org.flowable.*；
+  对 system 的依赖只准经 com.snail.platform.function.system.api 包(ArchUnit 机械执法)。
+  事务边界只在本模块的 service 包；引擎与业务共用同一 DataSource，发布动作整体落在一个事务里。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-function</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-function-workflow</artifactId>
+    <name>snail-function-workflow</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-db</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-log</artifactId>
+        </dependency>
+        <!-- 引擎门面:业务侧唯一的流程入口,Flowable 词汇关在它里面 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-workflow</artifactId>
+        </dependency>
+        <!-- 办理人/发起人的显示名与档案校验经 system 的 api 包端口,不得触达其内部子域 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-system</artifactId>
+        </dependency>
+        <!-- 待办提醒与审批结果通知一律经 notify 的 api 包发,流程侧不自建消息表 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-notify</artifactId>
+        </dependency>
+    </dependencies>
+</project>
