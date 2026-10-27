@@ -36,6 +36,11 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-storage</artifactId>
         </dependency>
+        <!-- 流程中心:引擎接入层 framework-workflow 由它传递带入,start 不再直引(方案 §2 边界) -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-workflow</artifactId>
+        </dependency>
         <!-- 存储端口层的内嵌 SFTP 测试夹具:仅测试期使用,不进入运行时依赖树 -->
         <dependency>
             <groupId>com.snail.platform</groupId>

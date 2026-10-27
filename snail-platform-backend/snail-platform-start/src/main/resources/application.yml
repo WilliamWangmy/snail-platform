@@ -29,6 +29,25 @@ springdoc:
   swagger-ui:
     enabled: true
 
+flowable:
+  # 建表归 Flyway(V4)，引擎不得自动建表/自动升级
+  database-schema-update: false
+  # 不从 classpath 自动部署流程定义，发布只走业务发布链路
+  check-process-definitions: false
+  # 定时器与异步作业需要执行器；异步历史关闭，避免多一条后台写链路
+  async-executor-activate: true
+  async-history-executor-activate: false
+  # AUDIT 不记变量明细，控制 ACT_HI_DETAIL 膨胀
+  history-level: audit
+  # 平台自有用户体系，不启用 Flowable IDM/JPA
+  jpa-enabled: false
+  idm:
+    enabled: false
+  process:
+    # 禁用 DTD/外部实体；BPMN 发布前还有业务侧白名单校验
+    enable-safe-xml: true
+    definition-cache-limit: 128
+
 snail:
   security:
     jwt:
@@ -49,6 +68,8 @@ snail:
         - sys_menu
         - sys_role_menu
         - sys_notify_outbound
+        # 流程模板与菜单同口径:平台维护一份全局目录,租户只读来建模型,本身不带租户列
+        - sys_workflow_template
     pagination:
       max-limit: 500
   storage:
