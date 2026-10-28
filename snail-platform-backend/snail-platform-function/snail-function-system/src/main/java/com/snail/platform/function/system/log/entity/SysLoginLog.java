@@ -20,7 +20,7 @@ public class SysLoginLog {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
-    /** 归属租户;0=用户不存在的归属不明失败 */
+    /** 归属租户;0=登录链还没定位到用户就失败了(验证码先行、锁定拦截、账号不存在),不等于"用户不存在" */
     private Long tenantId;
 
     /** 登录名快照:失败时用户可能不存在,删除后日志仍要可读 */

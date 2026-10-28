@@ -85,6 +85,7 @@ public class OnlineSessionService implements SessionHeartbeatPort {
                     List.of(SnailRedisKeys.onlineIndex(principal.tenantId())),
                     String.valueOf(principal.userId()), String.valueOf(ONLINE_TTL.toSeconds()));
         } catch (Exception e) {
+            // %1 让第一次失败就告警,之后每 100 次一条,宕机期间不刷屏也不至于全无提示
             if (failures.incrementAndGet() % WARN_EVERY == 1) {
                 log.warn("在线心跳写入失败(限频告警): {}", e.getMessage());
             }
@@ -99,6 +100,7 @@ public class OnlineSessionService implements SessionHeartbeatPort {
         List<OnlineSessionVO> all = members == null ? List.of() : members.stream()
                 .map(Long::valueOf)
                 .map(userId -> read(tenantId, userId))
+                // 索引里可能残留会话键已过期的成员,读不到快照就当不在线,不让列表出空行
                 .filter(Objects::nonNull)
                 .filter(vo -> keyword.isEmpty() || (vo.username() != null && vo.username().contains(keyword)))
                 .sorted(Comparator.comparing(OnlineSessionVO::lastActive).reversed())

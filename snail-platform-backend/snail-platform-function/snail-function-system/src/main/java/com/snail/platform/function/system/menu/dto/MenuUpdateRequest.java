@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 /**
  * 职责:修改菜单契约。menu_type/target/scope/perm_code 建后不可改,故不在契约里;
  * status 可改,但内置节点禁止停用由 MenuService 守。
+ * 空值语义分两簇:sort/visible/status 不传不改(条件 set),path/component/icon/remark 不传即清空(无条件 set)。
  * 上游:平台菜单管理页面;下游:MenuService.update。
  */
 @Schema(description = "修改菜单请求")
@@ -19,15 +20,15 @@ public record MenuUpdateRequest(
         @Size(max = 50, message = "菜单名称过长")
         String menuName,
 
-        @Schema(description = "路由/地址:站内与数据大屏为前端路由,外链为完整 URL")
+        @Schema(description = "路由/地址:站内与数据大屏为前端路由,外链为完整 URL;不传即清空")
         @Size(max = 500, message = "路由/地址过长")
         String path,
 
-        @Schema(description = "前端组件路径:站内与数据大屏菜单必填,目录与外链留空")
+        @Schema(description = "前端组件路径:站内与数据大屏菜单必填,目录与外链留空;不传即清空")
         @Size(max = 255, message = "组件路径过长")
         String component,
 
-        @Schema(description = "图标名")
+        @Schema(description = "图标名;不传即清空")
         @Size(max = 100, message = "图标名过长")
         String icon,
 
@@ -45,7 +46,7 @@ public record MenuUpdateRequest(
         @Max(value = 1, message = "状态取值 0/1")
         Integer status,
 
-        @Schema(description = "备注")
+        @Schema(description = "备注;不传即清空")
         @Size(max = 500, message = "备注过长")
         String remark) {
 }

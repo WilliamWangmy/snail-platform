@@ -23,6 +23,7 @@ public record OnlineQuery(
         String keyword) implements PageQuery {
 
     public OnlineQuery {
+        // 与 UserQuery 同法:包装类型接绑定,不传即 null,紧凑构造器落默认值(本页每页 20 条)
         pageNum = pageNum == null ? 1 : pageNum;
         pageSize = pageSize == null ? 20 : pageSize;
     }

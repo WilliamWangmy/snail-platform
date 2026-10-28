@@ -54,6 +54,10 @@ public class DictService {
         this.dataMapper = dataMapper;
     }
 
+    /**
+     * 类型分页:名称与标识都按模糊匹配,先 trimToNull——留空要落到"根本不拼这段 like"上,而不是留一条恒真的 LIKE '%%'。
+     * 按 dictId 倒序,新建的排最前;租户条件由拦截器注入,这里不写也只看本租户。
+     */
     public PageResult<DictTypeVO> pageTypes(DictTypeQuery query) {
         Page<SysDictType> page = PageAssembler.from(query);
         String dictName = trimToNull(query.dictName());
@@ -67,6 +71,10 @@ public class DictService {
                 result.getTotal());
     }
 
+    /**
+     * 新增类型:status 一律建为正常,契约里没有这一列,先建后停是修改的事;dictType 只在新增出现,建后不可改。
+     * 不做应用层查重:uk_dict_type(tenant_id, dict_type) 不含 deleted,并发重名由数据库拦下再转业务拒绝。
+     */
     @Transactional
     @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public Long createType(DictTypeCreateRequest request) {
@@ -84,6 +92,11 @@ public class DictService {
         return type.getDictId();
     }
 
+    /**
+     * 修改类型:契约不含 dict_type,改不动。remark 无条件 set 即"不传就清空",status 不传沿用现值——
+     * 管理页整表单回填后提交,所以清空只在用户真删了备注时发生。
+     * 停用类型不级联停用数据项:解析只看类型状态,数据行各自的停用位要跨这次开关活下来。
+     */
     @Transactional
     @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void updateType(Long dictId, DictTypeUpdateRequest request) {
@@ -96,7 +109,11 @@ public class DictService {
                 .eq(SysDictType::getDictId, dictId));
     }
 
-    /** 删类型同事务逻辑删其全部数据项;历史业务行保留原始 dictValue,不做回写 */
+    /**
+     * 删类型同事务逻辑删其全部数据项;历史业务行保留原始 dictValue,不做回写。
+     * 不拦"仍有数据项":字典是配置而不是被外键引用的实体,删类型就是整组作废。
+     * 类型标识终身占用唯一键(uk_dict_type 不含 deleted),同标识重建必被数据库拦下,只能另起一个码。
+     */
     @Transactional
     @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void deleteType(Long dictId) {
@@ -105,6 +122,10 @@ public class DictService {
         typeMapper.deleteById(dictId);
     }
 
+    /**
+     * 数据分页:先 requireType,别的租户递来的 dictId 被拦截器滤成查不到,同样报"字典类型不存在",不做特判。
+     * sort 允许并列,第二排序键恒为 dictDataId,否则同值行的翻页次序会漂。
+     */
     public PageResult<DictDataVO> pageData(DictDataQuery query) {
         requireType(query.dictId());
         Page<SysDictData> page = PageAssembler.from(query);
@@ -118,6 +139,10 @@ public class DictService {
                 result.getTotal());
     }
 
+    /**
+     * 新增数据:requireType 先跑,孤儿 dictId 进不了库;status 一律建为正常。
+     * 唯一键是 (tenant_id, dict_id, dict_value)——同类型内值不许重,跨类型同值合法,查重交给数据库。
+     */
     @Transactional
     @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public Long createData(DictDataCreateRequest request) {
@@ -137,6 +162,10 @@ public class DictService {
         return data.getDictDataId();
     }
 
+    /**
+     * 修改数据:契约不含 dictValue 与 dictId——值建后不可改,归属类型也不给迁移的入口。
+     * label 必传,status 与 sort 不传即沿用现值,remark 不传即清空。
+     */
     @Transactional
     @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void updateData(Long dictDataId, DictDataUpdateRequest request) {
@@ -150,6 +179,10 @@ public class DictService {
                 .eq(SysDictData::getDictDataId, dictDataId));
     }
 
+    /**
+     * 删数据项:不查业务引用,已落库的历史值不回写。逻辑删行仍占 (tenant_id, dict_id, dict_value) 唯一键,
+     * 删掉的值在同类型下不能原样重建——与"值建后不可改"是同一条终身口径。
+     */
     @Transactional
     @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void deleteData(Long dictDataId) {
@@ -160,6 +193,8 @@ public class DictService {
     /**
      * 下拉项解析:类型必须存在且启用,只返回启用数据项,按 sort 升序。
      * 缓存键为 (租户, 类型标识) 双段——dictType 只在租户内唯一,单段键会让租户间串数据。
+     * 取不到类型走业务拒绝而不是回空列表:空列表意味着"这组字典配置项确实为空",静默会让业务页把配置缺失
+     * 当成没数据,两类问题混成一次空白下拉。
      */
     @Cacheable(cacheNames = "dictItem",
             key = "T(com.snail.platform.framework.core.context.TenantContextHolder).get() + ':' + #dictType")
@@ -196,6 +231,7 @@ public class DictService {
         return data;
     }
 
+    /** 查询条件与可空列共用这把尺子:空串一律折成 null——前者据此不拼 like,后者据此把清空落库 */
     private static String trimToNull(String value) {
         if (value == null) {
             return null;

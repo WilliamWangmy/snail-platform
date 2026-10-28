@@ -55,6 +55,7 @@ onMounted(async () => {
 
 const savingProfile = ref(false);
 
+/** 顶栏显示名来自登录快照而非档案接口,所以存完资料必须重取会话,否则名字还是旧的 */
 async function submitProfile(): Promise<void> {
   await profileFormRef.value?.validate();
   savingProfile.value = true;
@@ -73,6 +74,7 @@ async function submitProfile(): Promise<void> {
 
 const changingPwd = ref(false);
 
+/** 改密成功即令牌版本自增,当前令牌下一次请求就废,所以主动登出比等 401 再跳更干净 */
 async function submitPassword(): Promise<void> {
   await pwdFormRef.value?.validate();
   await ElMessageBox.confirm('修改成功后所有设备将被强制重新登录,确认修改?', '修改口令', { type: 'warning' });
@@ -88,6 +90,7 @@ async function submitPassword(): Promise<void> {
 
 const forcingLogout = ref(false);
 
+/** 服务端吊销自己全部会话(含本设备),本地清理只是把界面带回登录页;取消确认框则什么都不发生 */
 async function handleForceLogout(): Promise<void> {
   await ElMessageBox.confirm('将强制下线自己的全部会话(含本设备),确认执行?', '强制下线', { type: 'warning' });
   forcingLogout.value = true;
@@ -100,6 +103,7 @@ async function handleForceLogout(): Promise<void> {
   }
 }
 
+/** 只清本地状态:这两条路径的令牌已被服务端版本前推作废,不必再跑一次登出接口 */
 function signOutLocal(): void {
   auth.signOut();
   void router.push('/login');

@@ -36,6 +36,7 @@ public record OrgNodeVO(
         @Schema(description = "子节点")
         List<OrgNodeVO> children) {
 
+    /** PO 转节点:children 先给可变空列表,由 OrgService.tree 按 parentId 逐个挂入 */
     public static OrgNodeVO of(SysOrg org) {
         return new OrgNodeVO(org.getOrgId(), org.getParentId(), org.getName(), org.getAncestors(),
                 org.getSort(), org.getStatus(), org.getRemark(), new ArrayList<>());

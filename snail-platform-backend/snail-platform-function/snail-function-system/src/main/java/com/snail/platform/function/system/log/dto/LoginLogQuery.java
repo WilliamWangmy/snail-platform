@@ -10,7 +10,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 /**
  * 职责:登录日志分页/导出共用查询契约。参数超过三个即收敛成对象,两端口径天然一致。
  * 上游:LoginLogController 的 GET 查询参数绑定;下游:LoginLogService.page/export。
- * 口径:tenantId 仅平台侧生效;tenant_id=0 的"归属不明失败"行只有平台侧不筛租户时看得见;
+ * 口径:tenantId 仅平台侧生效;tenant_id=0 的"未定位到用户"行只有平台侧看得见(不筛租户或显式筛 0)。
  * 实现 framework-core PageQuery,分页对象由 PageAssembler 单点装配。
  */
 @Schema(description = "登录日志查询参数")

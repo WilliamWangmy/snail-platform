@@ -60,6 +60,7 @@ public record MenuNodeVO(
         @Schema(description = "子节点")
         List<MenuNodeVO> children) {
 
+    /** PO 转节点:children 先给可变空列表,由 MenuService.tree 按 parentId 逐个挂入 */
     public static MenuNodeVO of(SysMenu menu) {
         return new MenuNodeVO(menu.getMenuId(), menu.getParentId(), menu.getMenuName(), menu.getMenuType(),
                 menu.getTarget(), menu.getScope(), menu.getPath(), menu.getComponent(), menu.getPermCode(),

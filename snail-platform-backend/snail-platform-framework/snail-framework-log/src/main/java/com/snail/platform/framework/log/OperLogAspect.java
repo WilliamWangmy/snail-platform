@@ -103,6 +103,11 @@ public class OperLogAspect {
         }
     }
 
+    /**
+     * 整条记录在请求线程组装完才入队:耗时与操作时刻此刻定格,池线程只负责一次 insert。
+     * sink 每次现查 ObjectProvider——function 侧实现缺席(纯框架冒烟上下文)时切面要能退化丢弃,
+     * 而不是在构造期就绑死一个可能不存在的 Bean。
+     */
     private void submit(Long tenantId, String traceId, OperLog operLog, String method,
                         String requestMethod, LoginUser operator,
                         String ip, String url, String param, String result,

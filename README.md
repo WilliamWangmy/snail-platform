@@ -35,7 +35,7 @@ snail-platform/
 | &nbsp;&nbsp;├ `snail-framework-log` | 基建 | traceId 过滤器与 MDC、操作日志注解与切面；不落库，经端口下沉给业务层 |
 | &nbsp;&nbsp;└ `snail-framework-excel` | 基建 | fastexcel 流式导出、分批导入 |
 | `snail-platform-function` | 业务层（聚合） | 模块 = 上下文聚类，子域只到包级 |
-| &nbsp;&nbsp;└ `snail-function-system` | 业务 | 系统管理：`tenant/user/org/role/menu/dict/log` + `api`，表分组 `sys_*` |
+| &nbsp;&nbsp;└ `snail-function-system` | 业务 | 系统管理：`tenant/user/org/role/menu/dict/log` + `api`，表分组 `sys_*`；详见[模块说明](snail-platform-backend/snail-platform-function/snail-function-system/README.md) |
 | `snail-platform-start` | 装配层 | 唯一装配点与唯一启动类，配置、日志、Flyway 脚本与 ArchUnit 测试都住在这里 |
 
 三条硬约束：

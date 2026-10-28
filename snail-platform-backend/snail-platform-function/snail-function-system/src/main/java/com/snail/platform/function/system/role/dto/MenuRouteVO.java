@@ -45,6 +45,7 @@ public record MenuRouteVO(
         @Schema(description = "子节点")
         List<MenuRouteVO> children) {
 
+    /** PO 转节点:children 先给可变空列表,由 RoleMenuService.currentRoutes 按 parentId 逐个挂入 */
     public static MenuRouteVO of(SysMenu menu) {
         return new MenuRouteVO(menu.getMenuId(), menu.getParentId(), menu.getMenuName(), menu.getMenuType(),
                 menu.getTarget(), menu.getPath(), menu.getComponent(), menu.getIcon(), menu.getSort(),

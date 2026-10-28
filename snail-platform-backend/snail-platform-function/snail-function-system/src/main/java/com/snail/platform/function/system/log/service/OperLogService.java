@@ -45,6 +45,9 @@ public class OperLogService {
         this.operLogMapper = operLogMapper;
     }
 
+    /**
+     * 分页:谓词见 buildWrapper,排序恒按自增 ID 倒序——新记录顶到最前,同毫秒并发写入也不因 oper_time 并列而漂页。
+     */
     public PageResult<OperLogListVO> page(OperLogQuery query) {
         Page<SysOperLog> page = PageAssembler.from(query);
         IPage<SysOperLog> result = operLogMapper.selectPage(page,
@@ -61,6 +64,11 @@ public class OperLogService {
         return OperLogDetailVO.of(log);
     }
 
+    /**
+     * 导出:先数后取,超上限直接拒——悄悄截断会给审计人一份"看起来完整"的文件;
+     * 两次查询共用同一套谓词,文件里的就是页面上看到的;last 拼的是常量上限,不是请求参数。
+     * 导出本身被 @OperLog 打标:谁把多少行审计数据带走,也要留在审计里。
+     */
     public void export(HttpServletResponse response, OperLogQuery query) throws IOException {
         Long counted = operLogMapper.selectCount(buildWrapper(query));
         if (counted > EXPORT_ROW_LIMIT) {
@@ -74,6 +82,11 @@ public class OperLogService {
                 rows.stream().map(OperLogExportRow::of).toList());
     }
 
+    /**
+     * 谓词单点,分页/计数/列表三处共用:租户边界来自 pinTenant,请求里的 tenantId 对非平台侧一概不认;
+     * 模块与操作名 like、类型与结果 eq、时间是 [beginTime, endTime] 闭区间,两端可各缺一边。
+     * 空串条件由 notBlank 收成"不拼这段 like",不留一条恒真的 LIKE '%%'。
+     */
     private LambdaQueryWrapper<SysOperLog> buildWrapper(OperLogQuery query) {
         Long pinned = pinTenant(query.tenantId());
         String module = query.module();
@@ -93,6 +106,7 @@ public class OperLogService {
         return isPlatform() ? requested : TenantContextHolder.get();
     }
 
+    /** 平台侧身份只认权限码,不认"租户 ID 等于几"——种子把码授给谁,谁能跨租户看 */
     private boolean isPlatform() {
         return AuthorityChecker.has(PLATFORM_ALL);
     }

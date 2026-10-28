@@ -12,13 +12,16 @@ export interface OnlineSession {
 }
 
 export interface OnlineQuery extends PageParams {
+  /** 后端只对登录名做包含匹配(不查显示名),内存裁剪因此支持不了复杂条件 */
   keyword?: string;
 }
 
+/** 数据源是 Redis 会话快照,不是档案:30 分钟无心跳即从索引消失,列里的 org/角色一律没有 */
 export function pageOnline(query: OnlineQuery): Promise<PageResult<OnlineSession>> {
   return get<PageResult<OnlineSession>>('/system/online/page', query);
 }
 
+/** 令牌版本自增是真吊销,Redis 会话键清理只是让列表即时消失;踢自己会被后端拒 */
 export function kickOnline(userId: number): Promise<void> {
   return post<void>(`/system/online/${userId}/kick`);
 }

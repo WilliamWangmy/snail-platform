@@ -9,6 +9,7 @@ const props = defineProps<{ nodes: MenuRoute[] }>();
 /** visible=1 的节点只在管理页可见,不进导航。 */
 const visibleNodes = computed(() => props.nodes.filter((node) => node.visible === 0));
 
+/** 目录要剩下可见子项才成导航:后端 prune 只数有没有子,看不见的那层只有界面知道。 */
 function childrenOf(node: MenuRoute): MenuRoute[] {
   return (node.children ?? []).filter((child) => child.visible === 0);
 }

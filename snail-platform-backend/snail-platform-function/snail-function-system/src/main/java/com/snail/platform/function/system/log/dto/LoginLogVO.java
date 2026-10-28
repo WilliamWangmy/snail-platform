@@ -7,12 +7,12 @@ import java.time.LocalDateTime;
 /**
  * 职责:登录日志列表行,表体本身没有大字段,整行即最小面。
  * 上游:LoginLogService 分页投影;下游:登录日志列表页。
- * 口径:status 1 成功 0 失败;失败行的 tenantId 可能是 0(用户不存在的归属不明),展示按"未定位"处理。
+ * 口径:status 1 成功 0 失败;失败行的 tenantId 可能是 0(登录链尚未定位到用户),展示按"未定位"处理。
  */
 @Schema(description = "登录日志行")
 public record LoginLogVO(
         @Schema(description = "日志ID") Long id,
-        @Schema(description = "归属租户,0=归属不明") Long tenantId,
+        @Schema(description = "归属租户,0=登录链未定位到用户") Long tenantId,
         @Schema(description = "登录名快照") String username,
         @Schema(description = "用户ID,成功时回填") Long userId,
         @Schema(description = "客户端IP") String ip,

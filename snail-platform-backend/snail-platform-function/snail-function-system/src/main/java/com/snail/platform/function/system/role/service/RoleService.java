@@ -53,6 +53,11 @@ public class RoleService {
         this.dataScopeService = dataScopeService;
     }
 
+    /**
+     * 分页检索:keyword 一名或一码命中即算(括号成组,免得 or 溢出到 status 条件上)。
+     * 角色查询刻意不开 data_scope 窗口:谓词要打在 org_id 上,而 sys_role 没有这一列,开窗等于拼出坏 SQL;
+     * 角色本就是租户级配置,create_by 只当审计列不做归属过滤,可见性全交给 system:role:* 权限码管。
+     */
     public PageResult<RoleVO> page(RoleQuery query) {
         Page<SysRole> page = PageAssembler.from(query);
         String keyword = query.keyword();
@@ -64,6 +69,12 @@ public class RoleService {
         return PageResult.of(result.getRecords().stream().map(RoleVO::from).toList(), result.getTotal());
     }
 
+    /**
+     * 新增:查重不写 tenant_id 条件——租户拦截器已把 selectCount 圈在本租户,作用域正好对齐唯一键
+     * (tenant_id, role_code);用户登录名那条是全表唯一,别照抄这边的写法。
+     * is_system 恒为 0——内置角色只有种子与租户开通模板能造,接口连这个字段都收不到;
+     * status 一律建为正常,档位先过 requireGrantableDataScope 再落库。
+     */
     @Transactional
     public Long create(RoleCreateRequest request) {
         String roleCode = request.roleCode().trim();
@@ -89,6 +100,11 @@ public class RoleService {
         return role.getRoleId();
     }
 
+    /**
+     * 修改:可改名称/档位/排序/状态/备注,role_code 不在契约里(建后不可改由接口收不到保证)。
+     * 档位闸用的是"提交值,没提交就用角色现值",所以档位比你宽的角色,你连只改名字都改不动——
+     * 否则改名就成了窄档管理员接管宽档角色的侧门。内置角色在这之前已被 requireBuiltinReadOnly 挡下。
+     */
     @Transactional
     @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void update(Long roleId, RoleUpdateRequest request) {
@@ -104,6 +120,11 @@ public class RoleService {
                 .eq(SysRole::getRoleId, role.getRoleId()));
     }
 
+    /**
+     * 停用/启用:与 update 同一把档位尺,比你宽的角色的状态开关你也按不动。
+     * 同状态提前返回只省掉那次写;@CacheEvict 在方法正常返回后照常执行一次全清,幂等无害。
+     * 停用让该角色的权限码在下次鉴权时整体消失(见 UserPermissionService 对停用角色的剔除)。
+     */
     @Transactional
     @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void changeStatus(Long roleId, int status) {
@@ -118,6 +139,12 @@ public class RoleService {
                 .eq(SysRole::getRoleId, roleId));
     }
 
+    /**
+     * 删除:内置拒、档位宽于自己拒(requireGrantableDataScope 按角色现档位判,与 update/changeStatus 同口径)、
+     * 还有人挂着拒,三道都过才动手。
+     * sys_role_menu 是同事务物理删——纯关系表,角色没了授权行就是垃圾,不留"曾经授过"的历史。
+     * 逻辑删后 (tenant_id, role_code) 唯一键仍占位,同码重开会被拒,见 create 的兜底分支。
+     */
     @Transactional
     @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void delete(Long roleId) {
@@ -156,6 +183,7 @@ public class RoleService {
         }
     }
 
+    /** 存在性闸:租户窗口内查不到即拒(他租户角色与本租户不存在的 ID 同形,不额外区分) */
     private SysRole requireRole(Long roleId) {
         SysRole role = roleMapper.selectById(roleId);
         if (role == null) {

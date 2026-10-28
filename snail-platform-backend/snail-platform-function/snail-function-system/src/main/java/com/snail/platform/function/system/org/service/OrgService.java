@@ -67,6 +67,7 @@ public class OrgService {
         DataScopeFilter scope = dataScopeService.currentFilterOrNull();
         List<SysOrg> all = DataScopeContextHolder.filter(scope, () -> orgMapper.selectList(
                 Wrappers.<SysOrg>lambdaQuery().orderByAsc(SysOrg::getSort).orderByAsc(SysOrg::getOrgId)));
+        // 两遍走:先摊平成 ID->节点,再挂 children,免递归;children 顺序直接继承查询的 sort 升序
         Map<Long, OrgNodeVO> nodes = new LinkedHashMap<>();
         for (SysOrg org : all) {
             nodes.put(org.getOrgId(), OrgNodeVO.of(org));
@@ -74,6 +75,7 @@ public class OrgService {
         List<OrgNodeVO> roots = new ArrayList<>();
         for (SysOrg org : all) {
             OrgNodeVO node = nodes.get(org.getOrgId());
+            // 取不到父的三种情形(本就无父 / 父被可见集过滤 / parentId 自指的脏数据)同按根层收口
             OrgNodeVO parent = org.getParentId() == null ? null : nodes.get(org.getParentId());
             if (parent != null && !Objects.equals(parent.orgId(), node.orgId())) {
                 parent.children().add(node);
@@ -90,6 +92,12 @@ public class OrgService {
         return orgQueryService.subtreeIds(orgId);
     }
 
+    /**
+     * 新增子节点:本接口只长子树,根由租户开通模板生成,所以 parentId=0 直接拒。
+     * 可见性按父节点判——操作者看得见父,才有资格往它下面挂;父已停用则不能作为新归属。
+     * ancestors 由父路径追加父 ID 得到,status 一律建为正常(启停用只在 update 里改),
+     * 子树缓存按只读端口"树变更即全清"的口径失效,新节点不能漏进已缓存的清单。
+     */
     @Transactional
     @CacheEvict(cacheNames = "orgSubtree", allEntries = true)
     public Long create(OrgCreateRequest request) {
@@ -112,11 +120,19 @@ public class OrgService {
         return org.getOrgId();
     }
 
+    /**
+     * 改属性:只点改 name/sort/status/remark,父级与 ancestors 一律不碰——换父是 move 的活,代价不同量级。
+     * 停用只拦后续把它选作父级,已挂在树下的用户与子节点不受影响(口径见 OrgUpdateRequest)。
+     * 失效只清 userSession:登录快照缓存了组织名称,改名后必须重取,否则界面继续显示旧名;
+     * 按组织反查受影响用户不如全清便宜,与角色域同口径。orgSubtree 无需清——它只存 ID,集合成员没变。
+     * 传空实体只为走 update(entity, wrapper) 重载,列的取值全在 wrapper 里,顺带让审计列自动填充。
+     */
     @Transactional
     @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void update(Long orgId, OrgUpdateRequest request) {
         SysOrg org = orgQueryService.requireOrg(orgId);
         requireOrgInScope(org.getOrgId());
+        // sort/status 可空:页面局部提交,没带的列保持原值;name 与 remark 是必填/可清空,总是写
         orgMapper.update(new SysOrg(), Wrappers.<SysOrg>lambdaUpdate()
                 .set(SysOrg::getName, request.name().trim())
                 .set(request.sort() != null, SysOrg::getSort, request.sort())
@@ -125,6 +141,13 @@ public class OrgService {
                 .eq(SysOrg::getOrgId, org.getOrgId()));
     }
 
+    /**
+     * 移动:换父并重写整棵子树的 ancestors 前缀,自身行与后代行分两步。
+     * 根不可动;同父提前返回,省掉一次无谓的全子树重写。
+     * 环校验看新父的 ancestors 是否已含本节点——命中就是"把父挂到自己的子孙下面",树会断。
+     * 自身与父同闸判可见,后代行却刻意不过可见集:整棵子树跟着走是结构事实,
+     * 操作者看不见的子女留在原地就等于把树拆断。缓存全清同 create,成员集合变了。
+     */
     @Transactional
     @CacheEvict(cacheNames = "orgSubtree", allEntries = true)
     public void move(Long orgId, Long newParentId) {
@@ -142,6 +165,7 @@ public class OrgService {
             throw BizException.badRequest("不能把组织移入自己的子树");
         }
 
+        // oldPrefix 是本节点移动前的完整路径,既是后代的命中条件,也是被替换掉的前缀
         String oldPrefix = node.getAncestors() + "," + orgId;
         String newAncestors = newParent.getAncestors() + "," + newParent.getOrgId();
         String newPrefix = newAncestors + "," + orgId;
@@ -152,6 +176,7 @@ public class OrgService {
                 .eq(SysOrg::getOrgId, orgId));
 
         for (SysOrg descendant : orgQueryService.descendants(oldPrefix)) {
+            // 只换前缀,oldPrefix 之后的相对路径原样保留,子孙层级深度因此不变
             String rewritten = newPrefix + descendant.getAncestors().substring(oldPrefix.length());
             orgMapper.update(new SysOrg(), Wrappers.<SysOrg>lambdaUpdate()
                     .set(SysOrg::getAncestors, rewritten)
@@ -159,6 +184,11 @@ public class OrgService {
         }
     }
 
+    /**
+     * 删除:先验没有下级、再验没有挂用户,两道都过才删——半删的树比删不掉麻烦得多。
+     * 实际是逻辑删(deleted=1,行仍占主键),后续检索由 @TableLogic 自动排除。
+     * 只清 orgSubtree:userSession 缓存的是组织名,而能删成的组织必然没挂用户,不存在还引用它的快照。
+     */
     @Transactional
     @CacheEvict(cacheNames = "orgSubtree", allEntries = true)
     public void delete(Long orgId) {

@@ -76,6 +76,7 @@ function openCreate(parent: OrgNode): void {
   formVisible.value = true;
 }
 
+/** 上级只回填展示:改父级走移动,不在这个表单里提交 */
 function openEdit(row: OrgNode): void {
   editingId.value = row.orgId;
   parentId.value = row.parentId;
@@ -83,13 +84,14 @@ function openEdit(row: OrgNode): void {
   formVisible.value = true;
 }
 
+/** 新增与修改共用弹窗,靠 editingId 分流;提交后整棵重取,不做本地增量更新 */
 async function submitForm(): Promise<void> {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
   saving.value = true;
   try {
     if (editingId.value === null) {
-      if (parentId.value === null) return;
+      if (parentId.value === null) return; // 新增态必有父,缺了就是不可能的状态,宁可不提交
       await createOrg({
         parentId: parentId.value,
         name: form.name.trim(),
@@ -125,6 +127,7 @@ function openMove(row: OrgNode): void {
   moveVisible.value = true;
 }
 
+/** 树选择器 check-strictly 允许选到子孙,环校验交给后端,前端不重复判 */
 async function submitMove(): Promise<void> {
   const target = moveTarget.value;
   if (!target || moveParentId.value === null) return;
@@ -155,6 +158,7 @@ function actionsOf(row: OrgNode): RowAction[] {
   return [
     { key: 'create', label: '新增下级', show: auth.has('system:org:create'), handler: () => openCreate(row) },
     { key: 'edit', label: '修改', show: auth.has('system:org:update'), handler: () => openEdit(row) },
+    // 根不提供移动,免得点了才被后端拒
     { key: 'move', label: '移动', show: auth.has('system:org:update') && row.parentId !== 0, handler: () => openMove(row) },
     { key: 'delete', label: '删除', tone: 'danger', show: auth.has('system:org:delete'), handler: () => { void remove(row); } },
   ];
@@ -270,6 +274,7 @@ function actionsOf(row: OrgNode): RowAction[] {
             controls-position="right"
           />
         </ElFormItem>
+        <!-- 状态只在修改时给:新节点后端一律置正常。0/1 沿用后端取值,0=正常 映射开关的激活态 -->
         <ElFormItem
           v-if="editingId !== null"
           label="状态"

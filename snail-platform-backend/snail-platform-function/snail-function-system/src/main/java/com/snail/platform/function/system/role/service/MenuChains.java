@@ -23,6 +23,7 @@ final class MenuChains {
             if (!Integer.valueOf(STATUS_ACTIVE).equals(current.getStatus())) {
                 return false;
             }
+            // visited 兼当环哨兵:脏数据把父链绕成圈时按失效收口,而不是把这里绕死
             if (!visited.add(current.getMenuId())) {
                 return false;
             }

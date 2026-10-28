@@ -42,6 +42,7 @@ public record RoleMenuNodeVO(
         @Schema(description = "子节点")
         List<RoleMenuNodeVO> children) {
 
+    /** PO 转节点:children 先给可变空列表,由 RoleMenuService.roleMenuTree 按 parentId 逐个挂入 */
     public static RoleMenuNodeVO of(SysMenu menu, boolean checked) {
         return new RoleMenuNodeVO(menu.getMenuId(), menu.getParentId(), menu.getMenuName(), menu.getMenuType(),
                 menu.getTarget(), menu.getScope(), menu.getPermCode(), menu.getStatus(), checked,

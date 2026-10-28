@@ -54,6 +54,7 @@ async function loadOrgs(): Promise<void> {
   orgLabels.value = map;
 }
 
+/** 角色下拉同样要 system:role:list;一页 200 条当全集用,角色数过 200 就得换成分页搜索。 */
 async function loadRoles(): Promise<void> {
   if (!auth.has('system:role:list')) return;
   roleOptions.value = (await pageRoles({ pageNum: 1, pageSize: 200 })).rows;
@@ -137,6 +138,7 @@ function openCreate(): void {
   formVisible.value = true;
 }
 
+/** 修改态只回填档案五列:username/password 后端契约里没有,清空是为了不让它们出现在提交里 */
 function openEdit(row: UserVO): void {
   editingId.value = row.userId;
   Object.assign(form, {
@@ -150,6 +152,7 @@ function openEdit(row: UserVO): void {
   formVisible.value = true;
 }
 
+/** 新增与修改共用弹窗,靠 editingId 分流;口令只在新增态提交 */
 async function submitForm(): Promise<void> {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
@@ -187,6 +190,7 @@ async function submitForm(): Promise<void> {
 
 /* --------------------------------- 启停 ----------------------------------- */
 
+/** 就地翻牌不重取列表:后端同状态会提前返回,重复点不会多踢一次令牌版本。停自己由后端拒,按钮不隐藏。 */
 async function toggleStatus(row: UserVO): Promise<void> {
   const next = row.status === 0 ? 1 : 0;
   await changeUserStatus(row.userId, next);
@@ -222,6 +226,7 @@ function openResetPassword(row: UserVO): void {
   pwdVisible.value = true;
 }
 
+/** 重置会前推令牌版本,该用户全部设备下一次请求即 401;列表字段没变,不重取 */
 async function submitResetPassword(): Promise<void> {
   const target = pwdTarget.value;
   if (!target) return;
@@ -238,6 +243,7 @@ const roleVisible = ref(false);
 const roleTarget = ref<UserVO | null>(null);
 const roleIds = ref<number[]>([]);
 
+/** 列表行的 roleIds 是 null(后端不为列表回查授权),所以打开对话框前必须按详情再取一次 */
 async function openAssignRoles(row: UserVO): Promise<void> {
   roleTarget.value = row;
   const detail = await getUser(row.userId);
@@ -245,6 +251,7 @@ async function openAssignRoles(row: UserVO): Promise<void> {
   roleVisible.value = true;
 }
 
+/** 全量覆盖:提交当前勾选集即最终态,空集就是清空授权 */
 async function submitAssignRoles(): Promise<void> {
   const target = roleTarget.value;
   if (!target) return;
@@ -277,6 +284,7 @@ function actionsOf(row: UserVO): RowAction[] {
     { key: 'roles', label: '分配角色', show: auth.has('system:user:assign-role'), handler: () => { void openAssignRoles(row); } },
     { key: 'toggle', label: row.status === 0 ? '停用' : '启用', show: auth.has('system:user:update'), handler: () => { void toggleStatus(row); } },
     { key: 'delete', label: '删除', tone: 'danger', show: auth.has('system:user:delete'), handler: () => { void remove(row); } },
+    // 踢自己后端(控制器与服务层两处)都拒,这里先不占位,免得点出一次报错
     { key: 'kick', label: '强制下线', tone: 'danger', show: auth.has('system:user:kick') && row.userId !== auth.user?.userId, handler: () => { void kickUser(row); } },
   ];
 }

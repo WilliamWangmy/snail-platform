@@ -43,6 +43,7 @@ public class MenuRouteController {
     public R<List<MenuRouteVO>> current(
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "展示端取值 1/2")
             @Max(value = 2, message = "展示端取值 1/2") int target) {
+        // userId 只从登录主体取,不做请求参数:换一个人的 ID 就看到一个人的导航,这个口子不能留
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof SnailPrincipal principal)) {
             throw BizException.unauthorized("未认证");

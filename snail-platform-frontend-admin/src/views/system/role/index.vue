@@ -31,7 +31,11 @@ const { rows, total, loading, pageNum, pageSize, refresh, search } = usePageList
   pageRoles({ ...query, ...page }),
 );
 
-/** 与后端 RoleCreateRequest 的 dataScope 注释同一份口径。 */
+/**
+ * 与后端 RoleCreateRequest 的 dataScope 注释同一份口径。
+ * 不按操作者自身档位过滤选项:登录快照不带 data_scope,前端拿不到"最宽档"这个输入,
+ * 选了宽的一律由 create/update 在落库前拒成 403。
+ */
 const DATA_SCOPES = [
   { value: 1, label: '全部数据' },
   { value: 2, label: '本组织' },
@@ -86,6 +90,7 @@ function openCreate(): void {
   formVisible.value = true;
 }
 
+/** 回填整行:roleCode 只为让禁用态显示得出来,提交时不进 payload;status 取当前值给开关 */
 function openEdit(row: RoleVO): void {
   editingId.value = row.roleId;
   Object.assign(form, {
@@ -104,6 +109,7 @@ async function submitForm(): Promise<void> {
   if (!valid) return;
   saving.value = true;
   try {
+    // 两条契约不同形:新增带 roleCode、不带 status(建出来恒为正常);修改反过来
     if (editingId.value === null) {
       await createRole({
         roleName: form.roleName.trim(),
@@ -132,6 +138,7 @@ async function submitForm(): Promise<void> {
 
 /* --------------------------------- 启停 ----------------------------------- */
 
+/** 行内启停走独立的 status 接口,不顺带提交整份表单;成功后就地翻牌,省一次列表回查 */
 async function toggleStatus(row: RoleVO): Promise<void> {
   const next = row.status === 0 ? 1 : 0;
   await changeRoleStatus(row.roleId, next);
@@ -164,6 +171,7 @@ async function openAssignMenus(row: RoleVO): Promise<void> {
   menuTarget.value = row;
   menuTree.value = await fetchRoleMenus(row.roleId);
   menuVisible.value = true;
+  // 弹窗是 destroy-on-close:树实例要等打开后才存在,这步挪到 await 之前会拿到 undefined
   await nextTick();
   menuTreeRef.value?.setCheckedKeys(leafCheckedKeys(menuTree.value));
 }
@@ -172,6 +180,7 @@ async function submitAssignMenus(): Promise<void> {
   const target = menuTarget.value;
   const tree = menuTreeRef.value;
   if (!target || !tree) return;
+  // getCheckedKeys 不含半选的父目录,要单独取:授权是全量替换,漏了它们等于把容器行从授权表里删掉
   const checked = tree.getCheckedKeys();
   const half = tree.getHalfCheckedKeys();
   menuSaving.value = true;

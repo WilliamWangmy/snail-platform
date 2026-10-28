@@ -42,6 +42,10 @@ public class LoginLogService {
         this.loginLogMapper = loginLogMapper;
     }
 
+    /**
+     * 分页:谓词见 buildWrapper,按自增 ID 倒序——登录风暴里同毫秒的行也有确定次序。
+     * 没有详情端点:本表无大字段,列表行就是全行。
+     */
     public PageResult<LoginLogVO> page(LoginLogQuery query) {
         Page<SysLoginLog> page = PageAssembler.from(query);
         IPage<SysLoginLog> result = loginLogMapper.selectPage(page,
@@ -49,6 +53,7 @@ public class LoginLogService {
         return PageResult.of(result.getRecords().stream().map(LoginLogVO::of).toList(), result.getTotal());
     }
 
+    /** 导出:口径与操作日志导出一致——先数后取、超上限拒而不是截断,谓词与分页完全同构 */
     public void export(HttpServletResponse response, LoginLogQuery query) throws IOException {
         Long counted = loginLogMapper.selectCount(buildWrapper(query));
         if (counted > EXPORT_ROW_LIMIT) {
@@ -62,6 +67,11 @@ public class LoginLogService {
                 rows.stream().map(LoginLogExportRow::of).toList());
     }
 
+    /**
+     * 谓词单点(分页/计数/列表三处共用)。租户边界就地钉:平台侧认请求 tenantId(不传即跨租户全量,
+     * 传 0 专看"未定位到用户"那批),其余租户认自己的上下文——所以 tenant_id=0 的行在租户侧永远不可见。
+     * 用户名与 IP 走 like、结果走 eq、时间 [beginTime, endTime] 闭区间;空串条件不拼进 SQL。
+     */
     private LambdaQueryWrapper<SysLoginLog> buildWrapper(LoginLogQuery query) {
         Long pinned = isPlatform() ? query.tenantId() : TenantContextHolder.get();
         String username = query.username();

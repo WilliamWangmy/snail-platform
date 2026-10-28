@@ -79,6 +79,8 @@ public class MenuService {
     public List<MenuNodeVO> tree() {
         List<SysMenu> all = menuMapper.selectList(Wrappers.<SysMenu>lambdaQuery()
                 .orderByAsc(SysMenu::getSort).orderByAsc(SysMenu::getMenuId));
+        // 平台配置面要看全量:停用链不剪(剪了就没法在原地把它改回启用),按钮也照列,与 currentRoutes 的口径相反
+        // 两遍走:先摊平成 ID->节点,再挂 children,顺序直接继承查询的 sort 升序
         Map<Long, MenuNodeVO> nodes = new LinkedHashMap<>();
         for (SysMenu menu : all) {
             nodes.put(menu.getMenuId(), MenuNodeVO.of(menu));
@@ -87,6 +89,7 @@ public class MenuService {
         for (SysMenu menu : all) {
             MenuNodeVO node = nodes.get(menu.getMenuId());
             MenuNodeVO parent = menu.getParentId() == null ? null : nodes.get(menu.getParentId());
+            // 取不到父的三种情形(本就无父 / 父已被删 / parentId 自指的脏数据)同按根层收口
             if (parent != null && !Objects.equals(parent.menuId(), node.menuId())) {
                 parent.children().add(node);
             } else {
@@ -96,6 +99,12 @@ public class MenuService {
         return roots;
     }
 
+    /**
+     * 新增:parentId 缺省即根(记 0),先过父约束再判形态——面与展示端能不能这么挂,只有拿到父才知道。
+     * path/component/permCode/icon/remark 一律 trimToNull 落库:库里只留 null 与有值两种形态,
+     * validateShape 的必填判定和唯一键的空值语义才都对得上。
+     * status 与 is_system 不进契约:建出来恒为正常、恒为非内置,内置标记只有种子能置。
+     */
     @Transactional
     @CacheEvict(cacheNames = {"menuTree", "userPerms"}, allEntries = true)
     public Long create(MenuCreateRequest request) {
@@ -133,6 +142,14 @@ public class MenuService {
         return menu.getMenuId();
     }
 
+    /**
+     * 修改:三元组与 perm_code 不在契约里,validateShape 用节点现值的三元组去配新 path/component,
+     * 于是"不改类型就不许改成类型不允许的形态"。
+     * "没传"有两副面孔:sort/visible/status 不传沿用现值,path/component/icon/remark 不传即清空——
+     * 管理页本来就是整份回填后提交,清空是唯一说得通的语义。
+     * 按钮的 visible 恒压回 0:它不入导航树,给了也没人消费。
+     * 停用闸只在这条路拦(内置节点不可停用);停一个节点等于整棵子树撤出导航与权限解析,故 userPerms 一并全清。
+     */
     @Transactional
     @CacheEvict(cacheNames = {"menuTree", "userPerms"}, allEntries = true)
     public void update(Long menuId, MenuUpdateRequest request) {
@@ -162,6 +179,12 @@ public class MenuService {
                 .eq(SysMenu::getMenuId, menuId));
     }
 
+    /**
+     * 删除:内置拒;有下级拒——不做连坐删子树,一次点击抹掉一整片导航的代价不该由一个删除按钮承担。
+     * 已被角色授权并不拦:同事务物理清掉 sys_role_menu 的引用行,菜单都没了,留着授权就是悬空引用。
+     * 逻辑删后 perm_code 仍占全局唯一键 uk_menu_perm_code(不含 deleted),同码重开会被数据库拦下;
+     * 目录与外链的码为 NULL,不受该键约束,可以无限个不配码。
+     */
     @Transactional
     @CacheEvict(cacheNames = {"menuTree", "userPerms"}, allEntries = true)
     public void delete(Long menuId) {
@@ -178,6 +201,7 @@ public class MenuService {
         menuMapper.deleteById(menuId);
     }
 
+    /** 存在性闸:菜单是全局表(无租户列、不在租户拦截范围内),查不到就是真不存在 */
     private SysMenu requireMenu(Long menuId) {
         SysMenu menu = menuMapper.selectById(menuId);
         if (menu == null) {
