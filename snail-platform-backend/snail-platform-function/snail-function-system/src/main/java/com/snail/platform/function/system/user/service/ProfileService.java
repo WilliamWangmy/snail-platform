@@ -12,11 +12,13 @@ import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.dto.ChangePasswordRequest;
+import com.snail.platform.function.system.user.dto.ForceChangePasswordRequest;
 import com.snail.platform.function.system.user.dto.ProfileVO;
 import com.snail.platform.function.system.user.dto.UpdateProfileRequest;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -102,6 +104,26 @@ public class ProfileService {
         rateGuard.clear(guardKey);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(request.newPassword()))
+                .set(SysUser::getPasswordModifyTime, LocalDateTime.now())
+                .setSql("token_version = token_version + 1")
+                .eq(SysUser::getUserId, userId));
+        cacheEvictor.evict("userSession", CacheEvictor.tenantKey(TenantContextHolder.get(), userId));
+    }
+
+    /** 强制改密:仅待改密标记用户可用,成功即清标记并吊销全部存量令牌,客户端须重新登录 */
+    @Transactional
+    public void forceChangePassword(Long userId, ForceChangePasswordRequest request) {
+        SysUser user = requireSelf(userId);
+        if (user.getPasswordModifyTime() != null) {
+            throw BizException.forbidden("无权限访问");
+        }
+        PasswordPolicy.validate(request.newPassword());
+        if (BCrypt.checkpw(request.newPassword(), user.getPassword())) {
+            throw BizException.badRequest("新密码不能与当前密码相同");
+        }
+        userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
+                .set(SysUser::getPassword, BCrypt.hashpw(request.newPassword()))
+                .set(SysUser::getPasswordModifyTime, LocalDateTime.now())
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
         cacheEvictor.evict("userSession", CacheEvictor.tenantKey(TenantContextHolder.get(), userId));

@@ -113,7 +113,8 @@ public class AuthService {
             writeLoginLog(http, user.getTenantId(), username, user.getUserId(), 1, "登录成功");
             return new LoginSuccessVO(token, "Bearer", jwtTokenService.expiresInSeconds(),
                     user.getUserId(), user.getUsername(), user.getNickname(),
-                    user.getTenantId(), tenant.getName());
+                    user.getTenantId(), tenant.getName(),
+                    user.getPasswordModifyTime() == null);
         } catch (BizException e) {
             // 登录在租户上下文建立之前就被拒(验证码/查无此人/锁定),此处只有查到的用户能给出租户;
             // 查不到的一律记 0=归属不明,这批行只有持跨租户码的平台侧看得见

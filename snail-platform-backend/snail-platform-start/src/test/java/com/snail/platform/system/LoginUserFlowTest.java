@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -41,6 +43,10 @@ class LoginUserFlowTest {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    /** V7 后新建账号生而待改密,演示租户管理员登录前垫掉标记 */
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final Pattern DATA_ID = Pattern.compile("\"data\":(\\d+)");
     private static final Pattern TOKEN = Pattern.compile("\"token\":\"([^\"]+)\"");
     private static final Pattern CODE = Pattern.compile("\"code\":(\\d+)");
@@ -56,6 +62,7 @@ class LoginUserFlowTest {
 
         long tenantId = provisionTenant(suffix, platformToken);
         String username = "sessadmin" + suffix;
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String tenantToken = login(username, "Admin@1234");
 
         String me = getMe(tenantToken);

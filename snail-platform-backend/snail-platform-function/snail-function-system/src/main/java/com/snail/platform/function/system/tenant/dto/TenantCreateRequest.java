@@ -56,6 +56,6 @@ public record TenantCreateRequest(
 
         @Schema(description = "首任管理员初始口令,服务端 BCrypt 落库", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入管理员初始密码")
-        @Size(min = 8, max = 64, message = "密码长度 8-64")
+        @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
         String adminPassword) {
 }

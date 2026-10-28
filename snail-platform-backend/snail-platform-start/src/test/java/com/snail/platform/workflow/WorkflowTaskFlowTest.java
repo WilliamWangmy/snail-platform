@@ -88,13 +88,13 @@ class WorkflowTaskFlowTest {
         /** 命中真实角色的办理人:未签收时按候选组放行 */
         LoginUser approver() {
             return new LoginUser(userId, TENANT_A, "任务租户", username, nickname,
-                    1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")));
+                    1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")), false);
         }
 
         /** 同租户但与流程无关的人:既不在候选组也不是办理人 */
         LoginUser outsider() {
             return new LoginUser(outsiderId, TENANT_A, "任务租户", username + "_out", "局外人",
-                    1L, "总部", 1L, List.of());
+                    1L, "总部", 1L, List.of(), false);
         }
     }
 
@@ -280,7 +280,7 @@ class WorkflowTaskFlowTest {
     /** 种子超管的登录快照:发起人与转办目标都用真实存在的人,通知展开才落得到收件箱 */
     private static LoginUser initiator() {
         return new LoginUser(REAL_USER_ID, TENANT_A, "默认租户", "admin", "超级管理员",
-                1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")));
+                1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")), false);
     }
 
     private String businessKey(Actor actor) {

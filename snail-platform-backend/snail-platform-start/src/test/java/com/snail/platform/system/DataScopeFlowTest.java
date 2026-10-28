@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -78,6 +79,7 @@ class DataScopeFlowTest {
         createUser(u3, orgX, "[" + r3 + "]", adminToken);
         long uid4 = createUser(u4, 1L, "[" + r4 + "]", adminToken);
         createUser(u5, orgZ, "[]", adminToken);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
 
         String token2 = login(u2, PASSWORD);
         String token3 = login(u3, PASSWORD);

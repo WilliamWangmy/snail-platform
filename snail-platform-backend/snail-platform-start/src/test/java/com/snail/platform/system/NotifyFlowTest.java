@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -63,6 +64,7 @@ class NotifyFlowTest {
         long roleId = createRoleWithNotify(suffix, adminToken);
         String username = "notifyU" + suffix;
         createUser(username, roleId, adminToken);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String userToken = login(username, PASSWORD);
 
         assertEquals(0, unreadCount(userToken), "新用户收件箱应为空: ");

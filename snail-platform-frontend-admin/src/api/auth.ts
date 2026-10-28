@@ -22,6 +22,7 @@ export interface LoginResult {
   nickname: string;
   tenantId: number;
   tenantName: string;
+  passwordChangeRequired: boolean;
 }
 
 export interface RoleBrief {
@@ -41,6 +42,7 @@ export interface LoginUser {
   orgName: string | null;
   roles: RoleBrief[];
   permissions: string[];
+  passwordChangeRequired: boolean;
 }
 
 export function fetchCaptcha(): Promise<Captcha> {

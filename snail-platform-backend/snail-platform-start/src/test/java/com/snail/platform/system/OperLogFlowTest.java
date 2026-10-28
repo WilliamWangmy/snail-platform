@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.snail.platform.framework.log.SensitiveDataMasker;
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -21,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -43,6 +45,10 @@ class OperLogFlowTest {
     /** 与业务同一套 Redis 客户端,用于预置验证码答案 */
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    /** V7 后新建账号生而待改密,演示租户管理员登录前垫掉标记 */
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final Pattern DATA_ID = Pattern.compile("\"data\":(\\d+)");
     private static final Pattern TOKEN = Pattern.compile("\"token\":\"([^\"]+)\"");
@@ -68,6 +74,7 @@ class OperLogFlowTest {
 
         long demoTenantId = provisionTenant(suffix, adminToken);
         assertTrue(demoTenantId > 0);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String demoToken = login("olTadmin" + suffix, "Admin@123");
         exerciseDemoTenantWrite(suffix, demoToken);
         proveTenantPinAndPlatformCross(suffix, adminToken, demoToken);

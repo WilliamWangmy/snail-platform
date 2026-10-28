@@ -60,13 +60,13 @@ class WorkflowGatewayFlowTest {
         /** 办理人快照:带候选角色 */
         LoginUser approver() {
             return new LoginUser(userId, TENANT_A, "验收租户", "gw_approver_" + key, "流程验收员",
-                    null, null, 1L, List.of(new LoginUser.RoleInfo(roleId, "auditor", "审核员")));
+                    null, null, 1L, List.of(new LoginUser.RoleInfo(roleId, "auditor", "审核员")), false);
         }
 
         /** 与流程对象毫无关系的同租户登录人,用于越权断言 */
         LoginUser outsider() {
             return new LoginUser(outsiderId, TENANT_A, "验收租户", "gw_outsider_" + key, "局外人",
-                    null, null, 1L, List.of());
+                    null, null, 1L, List.of(), false);
         }
     }
 

@@ -5,6 +5,7 @@ import com.snail.platform.framework.security.authority.UserAuthorityProvider;
 import com.snail.platform.framework.security.login.LoginUserProvider;
 import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import com.snail.platform.framework.security.token.JwtTokenService;
+import com.snail.platform.framework.security.web.ForcePasswordChangeFilter;
 import com.snail.platform.framework.security.web.SnailAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
@@ -71,6 +72,7 @@ public class SnailSecurityConfig {
                         .anyRequest().authenticated())
                 .addFilterBefore(new SnailAuthFilter(jwtTokenService, authorityProviders, loginUserProviders, heartbeats),
                         UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new ForcePasswordChangeFilter(), SnailAuthFilter.class)
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, ex) ->
                                 writeJson(response, 401, "未认证或登录已过期"))

@@ -273,13 +273,17 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
   `SETEX` 会话键（30 分钟滑动，首见时间跨心跳保留，否则算不出会话时长）+ Lua 原子 `SADD`/`EXPIRE` 租户索引；
   异常全吞、告警每 100 次限频一条——Redis 抖动不阻断业务请求。列表按索引取人、内存分页，索引里残留的过期成员当不在线过滤掉。
   **强制下线 = `token_version` 自增（真正的吊销）+ 会话键清理（列表即时消失）**，双保险。
-- **`PasswordPolicy`**：口令强度的服务端单点口径——长度 8-64、至少命中两类字符、拒绝常见弱口令黑名单。
-  新增用户、重置口令、自助改密、租户开通四条写路径共用。上限 64 的理由：BCrypt 只在 72 字节内可靠生效，
-  更长口令会被静默截断，与其让用户以为设了长口令，不如在入口拒掉。DTO 的 `@Size` 只做同区间兜底。
-- **`ProfileService`**：本人档案、自助改资料（只改白名单字段）、自助改密、下线自己。
+- **`PasswordPolicy`**：口令强度的服务端单点口径——长度 8-20、四类字符（大写、小写、数字、特殊符号）全含、
+  拒绝空白字符与常见弱口令黑名单，校验顺序为长度 → 空白 → 黑名单 → 字符类。
+  新增用户、重置口令、自助改密、强制改密、租户开通五条写路径共用，前端 `validatePassword` 同序同文案。
+  DTO 的 `@Size` 只做同区间兜底（报文带 `password:` 前缀）。
+- **`ProfileService`**：本人档案、自助改资料（只改白名单字段）、自助改密、强制改密、下线自己。
   改密防爆破：原密码错按用户计数锁定（5 次 / 10 分钟，`SnailRateGuard` 原子计数）；
-  改密成功 = 口令更新 + `token_version` 自增同语句 + `userSession` 失效，全部存量令牌下一次请求即 401。
+  改密成功 = 口令更新 + `password_modify_time` 落当前时间 + `token_version` 自增同语句 + `userSession` 失效，全部存量令牌下一次请求即 401。
   自助是本人操作，不走数据权限闸（自己的行恒可见）。
+  **强制改密**：`password_modify_time IS NULL` 即视为待改密，登录快照带出 `passwordChangeRequired`，
+  framework-security 的 `ForcePasswordChangeFilter` 对所有非白名单请求（仅放行强制改密、登出、`/me`）一律 403"请先完成强制改密"；
+  强制改密端点对非待改密用户 403"无权限访问"。重置口令会把 `password_modify_time` 置回 NULL，被重置者下次登录重新进入改密流程。
 - **`UserBriefService`**：`UserBriefPort` 的唯一实现，见[跨模块契约](#跨模块契约)。
 
 ### role — 角色、授权与权限解析

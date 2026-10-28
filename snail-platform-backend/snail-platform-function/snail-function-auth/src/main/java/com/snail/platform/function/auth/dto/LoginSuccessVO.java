@@ -31,5 +31,8 @@ public record LoginSuccessVO(
         Long tenantId,
 
         @Schema(description = "租户名称")
-        String tenantName) {
+        String tenantName,
+
+        @Schema(description = "是否待强制改密:true=本次登录后须先完成强制改密")
+        boolean passwordChangeRequired) {
 }

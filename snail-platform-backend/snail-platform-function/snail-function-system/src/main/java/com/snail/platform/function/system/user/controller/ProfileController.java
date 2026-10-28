@@ -5,6 +5,7 @@ import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
 import com.snail.platform.function.system.user.dto.ChangePasswordRequest;
+import com.snail.platform.function.system.user.dto.ForceChangePasswordRequest;
 import com.snail.platform.function.system.user.dto.ProfileVO;
 import com.snail.platform.function.system.user.dto.UpdateProfileRequest;
 import com.snail.platform.function.system.user.service.ProfileService;
@@ -58,6 +59,15 @@ public class ProfileController {
     @PostMapping("/password")
     public R<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         profileService.changePassword(LoginUserContextHolder.userId(), request);
+        return R.ok(null);
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "强制修改口令(首次登录待改密时专用,成功后重新登录)")
+    @OperLog(module = "个人中心", businessType = BusinessType.UPDATE)
+    @PostMapping("/password/force-change")
+    public R<Void> forceChangePassword(@Valid @RequestBody ForceChangePasswordRequest request) {
+        profileService.forceChangePassword(LoginUserContextHolder.userId(), request);
         return R.ok(null);
     }
 

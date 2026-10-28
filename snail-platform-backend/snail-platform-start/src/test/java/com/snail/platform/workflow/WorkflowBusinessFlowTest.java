@@ -381,14 +381,14 @@ class WorkflowBusinessFlowTest {
         /** 命中真实角色的审批人:候选组按 roleId 匹配 */
         LoginUser approver() {
             return new LoginUser(approverId, TENANT_A, "示例租户", approverUsername, approverNickname,
-                    1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")));
+                    1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")), false);
         }
     }
 
     /** 种子超管的登录快照:发起人必须是真实存在的人 */
     private static LoginUser initiator() {
         return new LoginUser(REAL_USER_ID, TENANT_A, "默认租户", "admin", "超级管理员",
-                1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")));
+                1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")), false);
     }
 
     private Fixture fixture(String prefix) {

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { fetchLoginUser, login as loginRequest, logout as logoutRequest, type LoginPayload, type LoginUser } from '@/api/auth';
+import { fetchLoginUser, login as loginRequest, logout as logoutRequest, type LoginPayload, type LoginResult, type LoginUser } from '@/api/auth';
 import { fetchCurrentMenus, type MenuRoute } from '@/api/menu';
 import { clearToken, getToken, setToken } from '@/utils/token';
 
@@ -9,6 +9,8 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(getToken());
   const user = ref<LoginUser | null>(null);
   const menus = ref<MenuRoute[]>([]);
+  /** 登录响应带来的一次性跳转信号;刷新恢复会话后以 user.passwordChangeRequired 为准 */
+  const pendingPasswordChange = ref(false);
 
   const loaded = computed(() => user.value !== null);
   const permissionSet = computed(() => new Set(user.value?.permissions ?? []));
@@ -23,10 +25,12 @@ export const useAuthStore = defineStore('auth', () => {
     return codes.some((item) => permissionSet.value.has(item));
   }
 
-  async function signIn(payload: LoginPayload): Promise<void> {
+  async function signIn(payload: LoginPayload): Promise<LoginResult> {
     const result = await loginRequest(payload);
     token.value = result.token;
     setToken(result.token);
+    pendingPasswordChange.value = result.passwordChangeRequired;
+    return result;
   }
 
   async function loadSession(): Promise<void> {
@@ -41,6 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = '';
     user.value = null;
     menus.value = [];
+    pendingPasswordChange.value = false;
     clearToken();
   }
 
@@ -59,6 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     user,
     menus,
+    pendingPasswordChange,
     loaded,
     roleNames,
     has,

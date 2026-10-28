@@ -37,7 +37,10 @@ public record LoginUserVO(
         List<RoleInfo> roles,
 
         @Schema(description = "生效权限码,字典序")
-        List<String> permissions) {
+        List<String> permissions,
+
+        @Schema(description = "是否待强制改密:true=须先完成强制改密才能使用业务功能")
+        boolean passwordChangeRequired) {
 
     @Schema(description = "角色摘要")
     public record RoleInfo(
@@ -58,6 +61,7 @@ public record LoginUserVO(
                 user.roles().stream()
                         .map(role -> new RoleInfo(role.roleId(), role.roleCode(), role.roleName()))
                         .toList(),
-                permissions.stream().sorted().toList());
+                permissions.stream().sorted().toList(),
+                user.passwordChangeRequired());
     }
 }

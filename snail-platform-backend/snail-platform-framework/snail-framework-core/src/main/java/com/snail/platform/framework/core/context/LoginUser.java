@@ -28,7 +28,9 @@ public record LoginUser(
         /** 令牌版本,改密/重置/停用/强制下线时自增;最小快照为 null */
         Long tokenVersion,
         /** 生效角色,按 sort/roleId 升序 */
-        List<RoleInfo> roles) {
+        List<RoleInfo> roles,
+        /** 是否待强制改密:由 sys_user.password_modify_time IS NULL 派生;最小快照恒为 false */
+        boolean passwordChangeRequired) {
 
     /** 角色摘要:roleCode 供前端判角,roleName 供展示 */
     public record RoleInfo(
@@ -46,6 +48,6 @@ public record LoginUser(
 
     /** 仅有令牌身份的最小快照:用户已不存在或解析端口缺省时的兜底 */
     public static LoginUser minimal(Long userId, Long tenantId, String username, Long orgId) {
-        return new LoginUser(userId, tenantId, null, username, null, orgId, null, null, List.of());
+        return new LoginUser(userId, tenantId, null, username, null, orgId, null, null, List.of(), false);
     }
 }

@@ -13,6 +13,6 @@ public record ResetPasswordRequest(
 
         @Schema(description = "新口令明文,服务端 BCrypt 落库,不落任何日志;强度口径见 PasswordPolicy", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入新密码")
-        @Size(min = 8, max = 64, message = "密码长度 8-64")
+        @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
         String password) {
 }

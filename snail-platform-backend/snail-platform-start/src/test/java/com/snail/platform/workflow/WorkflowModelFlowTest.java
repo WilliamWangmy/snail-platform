@@ -68,7 +68,7 @@ class WorkflowModelFlowTest {
 
         LoginUser approver() {
             return new LoginUser(userId, TENANT_A, "验收租户", "wf_approver_" + key, "流程验收员",
-                    null, null, 1L, List.of(new LoginUser.RoleInfo(roleId, "auditor", "审核员")));
+                    null, null, 1L, List.of(new LoginUser.RoleInfo(roleId, "auditor", "审核员")), false);
         }
     }
 
