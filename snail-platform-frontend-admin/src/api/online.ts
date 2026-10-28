@@ -5,6 +5,8 @@ import type { PageParams, PageResult } from './types';
 export interface OnlineSession {
   userId: number;
   username: string | null;
+  /** 心跳当时从登录人快照带出的显示名,改名后等下一次心跳才刷新 */
+  nickname: string | null;
   ip: string | null;
   userAgent: string | null;
   firstSeen: string | null;
@@ -12,7 +14,7 @@ export interface OnlineSession {
 }
 
 export interface OnlineQuery extends PageParams {
-  /** 后端只对登录名做包含匹配(不查显示名),内存裁剪因此支持不了复杂条件 */
+  /** 后端对登录名与显示名都做包含匹配,内存裁剪因此支持不了复杂条件 */
   keyword?: string;
 }
 

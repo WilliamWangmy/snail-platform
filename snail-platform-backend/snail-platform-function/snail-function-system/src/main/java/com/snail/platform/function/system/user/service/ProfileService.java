@@ -2,11 +2,13 @@ package com.snail.platform.function.system.user.service;
 
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.redis.SnailRateGuard;
 import com.snail.platform.framework.redis.SnailRedisKeys;
 import com.snail.platform.function.system.org.entity.SysOrg;
 import com.snail.platform.function.system.org.mapper.SysOrgMapper;
+import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.dto.ChangePasswordRequest;
@@ -15,7 +17,6 @@ import com.snail.platform.function.system.user.dto.UpdateProfileRequest;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.time.Duration;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,13 +51,17 @@ public class ProfileService {
     /** 强制下线复用用户域单点 */
     private final UserService userService;
 
+    /** 本人快照缓存的点清出口 */
+    private final CacheEvictor cacheEvictor;
+
     public ProfileService(SysUserMapper userMapper, SysOrgMapper orgMapper, SysTenantMapper tenantMapper,
-                          SnailRateGuard rateGuard, UserService userService) {
+                          SnailRateGuard rateGuard, UserService userService, CacheEvictor cacheEvictor) {
         this.userMapper = userMapper;
         this.orgMapper = orgMapper;
         this.tenantMapper = tenantMapper;
         this.rateGuard = rateGuard;
         this.userService = userService;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /** 本人档案:租户拦截器圈定 + user_id 自证,读不到即异常 */
@@ -71,7 +76,6 @@ public class ProfileService {
 
     /** 自助改资料:只动 nickname/email/phone;昵称变化让登录人快照失效 */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void update(Long userId, UpdateProfileRequest request) {
         requireSelf(userId);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
@@ -79,11 +83,11 @@ public class ProfileService {
                 .set(SysUser::getEmail, request.email())
                 .set(SysUser::getPhone, request.phone())
                 .eq(SysUser::getUserId, userId));
+        cacheEvictor.evict("userSession", CacheEvictor.tenantKey(TenantContextHolder.get(), userId));
     }
 
     /** 自助改密:原密码计数防爆破,成功即令牌版本自增,全部设备重新登录 */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void changePassword(Long userId, ChangePasswordRequest request) {
         SysUser user = requireSelf(userId);
         String guardKey = SnailRedisKeys.PROFILE_PWD_FAIL + userId;
@@ -100,6 +104,7 @@ public class ProfileService {
                 .set(SysUser::getPassword, BCrypt.hashpw(request.newPassword()))
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
+        cacheEvictor.evict("userSession", CacheEvictor.tenantKey(TenantContextHolder.get(), userId));
     }
 
     /** 强制下线自己的全部会话(丢手机/离开公用机场景),复用用户域单点 */

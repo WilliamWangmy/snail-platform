@@ -23,10 +23,11 @@ import org.springframework.stereotype.Service;
 
 /**
  * 职责:登录人富快照的唯一解析实现——人员在 sys_user,组织名在 sys_org,租户名在 sys_tenant,
- * 角色取启用角色并按 sort/roleId 升序;整体按用户 ID 缓存,常用字段不必每请求回查数据库。
+ * 角色取启用角色并按 sort/roleId 升序;整体按 (租户, 用户) 缓存,常用字段不必每请求回查数据库。
  * 口径:停用角色不进快照;用户已不存在/已停用、租户不存在/已停用/已到期,一律返回令牌身份最小快照。
  * 最小快照没有 tokenVersion,认证过滤器据此判定会话无效——停用/到期不必等令牌自然过期。
- * 失效:userSession 由 user/role/org/tenant 的写路径按需失效,口径见各服务注解与 docs §11。
+ * 失效:user 域写路径按单个用户点清;租户停用/到期/改名按该租户的用户逐个点清,不波及其它租户;
+ * 键里的租户段取自令牌身份而非上下文,失效端由 CacheEvictor.tenantKey 拼出同一个字面量。
  * 上游:SnailAuthFilter 经 LoginUserProvider 端口调用;下游:sys_user/sys_org/sys_tenant/sys_user_role/sys_role 读。
  */
 @Service
@@ -63,7 +64,7 @@ public class UserSessionService implements LoginUserProvider {
     }
 
     @Override
-    @Cacheable(cacheNames = "userSession", key = "#p0.userId()")
+    @Cacheable(cacheNames = "userSession", key = "#p0.tenantId() + ':' + #p0.userId()")
     public LoginUser load(SnailPrincipal principal) {
         SysUser user = userMapper.selectById(principal.userId());
         if (user == null || !Integer.valueOf(STATUS_ACTIVE).equals(user.getStatus())) {

@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import {
+  changeDictTypeStatus,
   createDictData,
   createDictType,
   deleteDictData,
@@ -30,7 +31,7 @@ const typeFormVisible = ref(false);
 const typeFormRef = ref<FormInstance>();
 const typeEditingId = ref<number | null>(null);
 const typeSaving = ref(false);
-const typeForm = reactive({ dictName: '', dictType: '', status: 0, remark: '' });
+const typeForm = reactive({ dictName: '', dictType: '', remark: '' });
 
 /** 与 DictTypeCreateRequest 同口径:标识建后不可改,格式限小写字母开头的下划线串。 */
 const typeRules: FormRules<typeof typeForm> = {
@@ -46,10 +47,10 @@ const typeRules: FormRules<typeof typeForm> = {
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 };
 
-/** 新增与修改共用一张表单:标识列只在新增态可填,状态开关只在修改态渲染。 */
+/** 新增与修改共用一张表单:标识列只在新增态可填,状态不在表单里——启停是行操作。 */
 function openTypeCreate(): void {
   typeEditingId.value = null;
-  Object.assign(typeForm, { dictName: '', dictType: '', status: 0, remark: '' });
+  Object.assign(typeForm, { dictName: '', dictType: '', remark: '' });
   typeFormVisible.value = true;
 }
 
@@ -58,7 +59,6 @@ function openTypeEdit(row: DictTypeVO): void {
   Object.assign(typeForm, {
     dictName: row.dictName,
     dictType: row.dictType,
-    status: row.status,
     remark: row.remark ?? '',
   });
   typeFormVisible.value = true;
@@ -70,7 +70,7 @@ async function submitType(): Promise<void> {
   typeSaving.value = true;
   try {
     if (typeEditingId.value === null) {
-      // 新增载荷不带 status:后端恒建为正常,开关本来也只在修改态渲染
+      // 新增不带 status:后端恒建为正常
       await createDictType({
         dictName: typeForm.dictName.trim(),
         dictType: typeForm.dictType.trim(),
@@ -78,10 +78,10 @@ async function submitType(): Promise<void> {
       });
       ElMessage.success('已新增字典类型');
     } else {
+      // 修改不带 status:停用只能走行操作,和改名字各自留一条日志。
       // 空备注折成 null 再提交:后端 remark 是无条件 set,把清空表达成 null 而不是空串
       await updateDictType(typeEditingId.value, {
         dictName: typeForm.dictName.trim(),
-        status: typeForm.status,
         remark: typeForm.remark.trim() || null,
       });
       ElMessage.success('已保存修改');
@@ -91,6 +91,27 @@ async function submitType(): Promise<void> {
   } finally {
     typeSaving.value = false;
   }
+}
+
+/**
+ * 启停走独立端点,弹窗里没有第二条通路,停用必然过这道确认;确认后就地翻牌,不重拉整页。
+ * 后端同状态会提前返回,重复点不会多刷一次 dictItem 缓存。
+ */
+async function toggleTypeStatus(row: DictTypeVO): Promise<void> {
+  const next = row.status === 0 ? 1 : 0;
+  if (next === 1) {
+    const confirmed = await ElMessageBox.confirm(
+      `停用字典类型 ${row.dictName}(${row.dictType})?业务页面按该类型取的下拉会立即取不到并报错;类型下的字典项与已落库的历史值都不受影响。`,
+      '停用确认',
+      { type: 'warning', confirmButtonText: '停用', cancelButtonText: '取消' },
+    )
+      .then(() => true)
+      .catch(() => false);
+    if (!confirmed) return;
+  }
+  await changeDictTypeStatus(row.dictId, next);
+  row.status = next;
+  ElMessage.success(next === 0 ? '已启用' : '已停用');
 }
 
 async function removeType(row: DictTypeVO): Promise<void> {
@@ -324,7 +345,7 @@ onMounted(typeList.refresh);
             </ElTableColumn>
             <ElTableColumn
               label="操作"
-              width="120"
+              width="168"
               align="center"
               fixed="right"
             >
@@ -336,6 +357,14 @@ onMounted(typeList.refresh);
                   @click="openTypeEdit(row as DictTypeVO)"
                 >
                   修改
+                </ElButton>
+                <ElButton
+                  v-if="auth.has('system:dict:update')"
+                  link
+                  type="primary"
+                  @click="toggleTypeStatus(row as DictTypeVO)"
+                >
+                  {{ row.status === 0 ? '停用' : '启用' }}
                 </ElButton>
                 <ElButton
                   v-if="auth.has('system:dict:delete')"
@@ -534,20 +563,6 @@ onMounted(typeList.refresh);
             :disabled="typeEditingId !== null"
             :placeholder="typeEditingId === null ? '如 sys_notice_type' : '建后不可修改'"
           />
-        </ElFormItem>
-        <ElFormItem
-          v-if="typeEditingId !== null"
-          label="状态"
-        >
-          <ElSwitch
-            v-model="typeForm.status"
-            :active-value="0"
-            :inactive-value="1"
-            inline-prompt
-            active-text="正常"
-            inactive-text="停用"
-          />
-          <span>停用只挡业务侧按类型取字典项,本页列表与已有数据不受影响。</span>
         </ElFormItem>
         <ElFormItem
           label="备注"

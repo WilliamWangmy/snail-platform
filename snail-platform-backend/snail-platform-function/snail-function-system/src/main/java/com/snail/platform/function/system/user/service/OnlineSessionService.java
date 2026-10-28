@@ -1,6 +1,7 @@
 package com.snail.platform.function.system.user.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.snail.platform.framework.core.context.LoginUser;
 import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
@@ -66,8 +67,8 @@ public class OnlineSessionService implements SessionHeartbeatPort {
         this.userService = userService;
     }
 
-    /** 会话快照,首见时间定格,其余随心跳刷新;username 取自令牌身份,免回查档案 */
-    private record OnlineSession(String username, String ip, String userAgent,
+    /** 会话快照,首见时间定格,其余随心跳刷新;username 取自令牌身份、nickname 取自同请求已装配的登录人快照,都免回查档案 */
+    private record OnlineSession(String username, String nickname, String ip, String userAgent,
                                  LocalDateTime firstSeen, LocalDateTime lastActive) {
     }
 
@@ -78,7 +79,10 @@ public class OnlineSessionService implements SessionHeartbeatPort {
             LocalDateTime now = LocalDateTime.now();
             // 首见时间跨心跳保留:整键覆盖写会把"上线时刻"漂成"最近一次请求",在线列表就再也读不出会话时长
             OnlineSession previous = parseQuietly(redisTemplate.opsForValue().get(key));
-            OnlineSession session = new OnlineSession(principal.username(), ip, userAgent,
+            // 显示名取自过滤器刚写入的登录人快照(它排在心跳之前),不在这里多查一次档案
+            LoginUser snapshot = LoginUserContextHolder.get();
+            OnlineSession session = new OnlineSession(principal.username(),
+                    snapshot == null ? null : snapshot.nickname(), ip, userAgent,
                     previous == null ? now : previous.firstSeen(), now);
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(session), ONLINE_TTL);
             redisTemplate.execute(INDEX_SCRIPT,
@@ -102,7 +106,8 @@ public class OnlineSessionService implements SessionHeartbeatPort {
                 .map(userId -> read(tenantId, userId))
                 // 索引里可能残留会话键已过期的成员,读不到快照就当不在线,不让列表出空行
                 .filter(Objects::nonNull)
-                .filter(vo -> keyword.isEmpty() || (vo.username() != null && vo.username().contains(keyword)))
+                .filter(vo -> keyword.isEmpty()
+                        || contains(vo.username(), keyword) || contains(vo.nickname(), keyword))
                 .sorted(Comparator.comparing(OnlineSessionVO::lastActive).reversed())
                 .toList();
         int from = (query.pageNum() - 1) * query.pageSize();
@@ -127,13 +132,18 @@ public class OnlineSessionService implements SessionHeartbeatPort {
         }
     }
 
+    /** 关键字按包含匹配;null 出现在最小快照与加字段之前写入的旧会话键上,空值不匹配 */
+    private static boolean contains(String value, String keyword) {
+        return value != null && value.contains(keyword);
+    }
+
     private OnlineSessionVO read(Long tenantId, Long userId) {
         OnlineSession session = parseQuietly(redisTemplate.opsForValue().get(SnailRedisKeys.online(tenantId, userId)));
         if (session == null) {
             return null;
         }
-        return new OnlineSessionVO(userId, session.username(), session.ip(), session.userAgent(),
-                session.firstSeen(), session.lastActive());
+        return new OnlineSessionVO(userId, session.username(), session.nickname(), session.ip(),
+                session.userAgent(), session.firstSeen(), session.lastActive());
     }
 
     /** 会话 JSON 解码;空值与结构漂移(Jackson 不认 record)一律按"无会话"处理,不让列表整页报错 */

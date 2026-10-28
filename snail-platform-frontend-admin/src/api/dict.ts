@@ -27,10 +27,9 @@ export interface DictTypeCreatePayload {
   remark?: string | null;
 }
 
-/** dictType 建后不可改;停用类型不会级联停用其数据项。 */
+/** dictType 建后不可改、status 不在契约里:启停走 changeDictTypeStatus 独立接口,单独留痕。 */
 export interface DictTypeUpdatePayload {
   dictName: string;
-  status?: number;
   remark?: string | null;
 }
 
@@ -90,9 +89,14 @@ export function createDictType(payload: DictTypeCreatePayload): Promise<number> 
   return post<number>('/system/dict/type', payload);
 }
 
-/** 修改类型:整表单提交,备注留空即清空。 */
+/** 修改类型:只改名称与备注,备注留空即清空。 */
 export function updateDictType(dictId: number, payload: DictTypeUpdatePayload): Promise<void> {
   return put<void>(`/system/dict/type/${dictId}`, payload);
+}
+
+/** 停用/启用类型:status 走查询串而非请求体;同状态后端幂等返回;停用只挡业务侧按类型取字典项 */
+export function changeDictTypeStatus(dictId: number, status: number): Promise<void> {
+  return put<void>(`/system/dict/type/${dictId}/status`, undefined, { status });
 }
 
 /** 删除类型:同事务逻辑删其全部数据项;历史业务行保留原值不回写,标识终身占用不可重建。 */

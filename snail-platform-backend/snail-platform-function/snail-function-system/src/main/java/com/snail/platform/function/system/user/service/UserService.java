@@ -18,6 +18,8 @@ import com.snail.platform.function.system.role.entity.SysUserRole;
 import com.snail.platform.function.system.role.mapper.SysRoleMapper;
 import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
 import com.snail.platform.function.system.role.service.DataScopeService;
+import com.snail.platform.function.system.role.service.UserPermissionService;
+import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.dto.UserCreateRequest;
@@ -28,7 +30,6 @@ import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -39,7 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 关键口径:username 全表唯一且建后不可改,查重走无租户窄窗口(全表口径),撞库提示"登录名已存在";
  * 新增受租户 accountLimit 约束(锁 sys_tenant 行后计数,只拦新增不追认存量);
  * 删除同事务物理清 sys_user_role——人不在了授权就该空;
- * 自我保护:不允许停用或删除当前登录者自己,防管理员把自己锁在门外。
+ * 自我保护:不允许停用或删除当前登录者自己,防管理员把自己锁在门外;
+ * 也不允许停用或删除本租户最后一个启用的管理员——个人自锁只是自己进不来,整租户失去管理员就没人能授权、能把人加回来。
  * 数据权限:列表查询按当前登录者 data_scope 开窗过滤;详情、档案修改、停用、删除、重置口令、强制下线、
  * 分配角色七类定点操作必须过 requireUserInScope 闸(目标用户在可见集内);建号与调岗还需目标组织可授权。
  * 分配的角色档位不得宽于操作者自身最宽档(resolveGrantable),防纵向提权。
@@ -67,15 +69,19 @@ public class UserService {
     /** 列表查询的当前登录者 data_scope 判定 */
     private final DataScopeService dataScopeService;
 
+    /** 缓存点清出口:只在写真的发生之后、事务提交之后清 */
+    private final CacheEvictor cacheEvictor;
+
     public UserService(SysUserMapper userMapper, SysOrgMapper orgMapper, SysRoleMapper roleMapper,
                        SysUserRoleMapper userRoleMapper, SysTenantMapper tenantMapper,
-                       DataScopeService dataScopeService) {
+                       DataScopeService dataScopeService, CacheEvictor cacheEvictor) {
         this.userMapper = userMapper;
         this.orgMapper = orgMapper;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.tenantMapper = tenantMapper;
         this.dataScopeService = dataScopeService;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /**
@@ -152,7 +158,6 @@ public class UserService {
      * 前推 token_version 与清 userPerms 都不必——资料变更既不影响会话资格,也不影响授权集。
      */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void update(Long userId, UserUpdateRequest request) {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
@@ -165,6 +170,7 @@ public class UserService {
                 .set(SysUser::getOrgId, request.orgId())
                 .set(SysUser::getRemark, request.remark())
                 .eq(SysUser::getUserId, user.getUserId()));
+        cacheEvictor.evict("userSession", sessionKey(userId));
     }
 
     /**
@@ -173,7 +179,6 @@ public class UserService {
      * 不清 userPerms:重置口令不动授权。
      */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void resetPassword(Long userId, String rawPassword) {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
@@ -182,17 +187,18 @@ public class UserService {
                 .set(SysUser::getPassword, BCrypt.hashpw(rawPassword))
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, user.getUserId()));
+        cacheEvictor.evict("userSession", sessionKey(userId));
     }
 
     /** 强制下线:令牌版本自增 + 快照失效,该用户存量令牌下一次请求即 401;不判自我,由调用方决定 */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void forceLogout(Long userId) {
         requireUser(userId);
         requireUserInScope(userId);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
+        cacheEvictor.evict("userSession", sessionKey(userId));
     }
 
     /**
@@ -200,10 +206,10 @@ public class UserService {
      * 自我停用只能在这里显式拦:本人恒在可见集内( requireUserInScope 对自己放行),权限闸挡不住"停自己"。
      * 同状态提前返回,省掉一次无谓的写与令牌前推——否则重复点同一个状态会白踢人下线;
      * 它刻意排在可见闸之后,不可见的目标不能被"本来就是这状态"顺带放过。
+     * 最后一个启用管理员的判断排在短路之后:已经是停用态再点停用,既无写入也无损失,不该被守卫拦成报错。
      * userPerms 与 delete/assignRoles 同面清掉:状态翻转后的鉴权一律重读授权集,不靠上一次的缓存。
      */
     @Transactional
-    @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void changeStatus(Long userId, int status) {
         SysUser user = requireUser(userId);
         if (status == 1 && Objects.equals(LoginUserContextHolder.userId(), userId)) {
@@ -213,36 +219,47 @@ public class UserService {
         if (Objects.equals(user.getStatus(), status)) {
             return;
         }
+        if (status == 1) {
+            requireNotLastEnabledAdmin(user, "停用");
+        }
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getStatus, status)
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
+        cacheEvictor.evict("userPerms", userId);
+        cacheEvictor.evict("userSession", sessionKey(userId));
     }
 
-    /** 逻辑删用户 + 物理清授权同事务:授权关系不是历史 */
+    /**
+     * 逻辑删用户 + 物理清授权同事务:授权关系不是历史。
+     * 自己删自己与"删到只剩零个管理员"都在写之前拦:删完再校验没有回滚以外的退路。
+     */
     @Transactional
-    @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void delete(Long userId) {
-        requireUser(userId);
+        SysUser user = requireUser(userId);
         if (Objects.equals(LoginUserContextHolder.userId(), userId)) {
             throw BizException.badRequest("不能删除自己的账号");
         }
         requireUserInScope(userId);
+        requireNotLastEnabledAdmin(user, "删除");
         // 逻辑删后旧令牌仍可能落在其他节点缓存里,版本前推让最小快照之外的残留也失去会话资格
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
         userMapper.deleteById(userId);
         userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, userId));
+        cacheEvictor.evict("userPerms", userId);
+        cacheEvictor.evict("userSession", sessionKey(userId));
     }
 
     /** 全量覆盖:先删该用户全部授权再按新集插入,提交集即最终态 */
     @Transactional
-    @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void assignRoles(Long userId, List<Long> roleIds) {
         requireUser(userId);
         requireUserInScope(userId);
         replaceRoles(userId, resolveGrantable(roleIds));
+        cacheEvictor.evict("userPerms", userId);
+        cacheEvictor.evict("userSession", sessionKey(userId));
     }
 
     /**
@@ -288,6 +305,48 @@ public class UserService {
                 Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUserId, userId)));
         if (visible == null || visible == 0) {
             throw BizException.forbidden("目标用户不在当前数据权限范围内");
+        }
+    }
+
+    /**
+     * 最后一个启用的管理员不许删/停:丢掉的不是一个账号,而是整租户的管理入口——再没人能分配角色,
+     * 也没人能把人加回来,只能改库。
+     * 判定沿用语义 A 那把尺(isSuperAdmin)加"本人启用";别人的启用状态每次现查,不信缓存。
+     * 数之前先锁租户行(与 checkAccountLimit 同一把锁):两个管理员同时互相停用时,不锁会各自数到
+     * "还有一个"而双双放行,结果整租户零管理员。
+     */
+    private void requireNotLastEnabledAdmin(SysUser target, String action) {
+        if (!Integer.valueOf(0).equals(target.getStatus())) {
+            return;
+        }
+        // 先只看目标自己的角色:绝大多数删号/停号与管理员无关,不必为此把整张角色表读一遍
+        List<Long> targetRoleIds = roleIdsOf(target.getUserId());
+        if (targetRoleIds.isEmpty()) {
+            return;
+        }
+        List<Long> adminRoleIds = roleMapper.selectBatchIds(targetRoleIds).stream()
+                .filter(UserPermissionService::isSuperAdmin)
+                .map(SysRole::getRoleId)
+                .toList();
+        if (adminRoleIds.isEmpty()) {
+            return;
+        }
+        Long tenantId = TenantContextHolder.get();
+        if (tenantId != null) {
+            tenantMapper.selectOne(Wrappers.<SysTenant>lambdaQuery()
+                    .eq(SysTenant::getTenantId, tenantId)
+                    .last("FOR UPDATE"));
+        }
+        List<Long> others = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
+                        .in(SysUserRole::getRoleId, adminRoleIds))
+                .stream().map(SysUserRole::getUserId)
+                .filter(id -> !id.equals(target.getUserId()))
+                .distinct()
+                .toList();
+        if (others.isEmpty() || userMapper.selectCount(Wrappers.<SysUser>lambdaQuery()
+                .in(SysUser::getUserId, others)
+                .eq(SysUser::getStatus, 0)) == 0) {
+            throw BizException.badRequest("不能" + action + "最后一个启用的管理员");
         }
     }
 
@@ -360,6 +419,11 @@ public class UserService {
         if (current >= tenant.getAccountLimit()) {
             throw BizException.badRequest("账号数已达租户上限");
         }
+    }
+
+    /** 快照键:(租户, 用户),与 UserSessionService 的 @Cacheable 同拼法;租户取自请求上下文,即目标用户所在租户 */
+    private static String sessionKey(Long userId) {
+        return CacheEvictor.tenantKey(TenantContextHolder.get(), userId);
     }
 
     /** 空白与 null 同义,都不参与拼句——否则一个空格会被当成真实的 like 条件 */

@@ -3,6 +3,7 @@ package com.snail.platform.function.system.role.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
@@ -16,8 +17,9 @@ import com.snail.platform.function.system.role.entity.SysRole;
 import com.snail.platform.function.system.role.entity.SysUserRole;
 import com.snail.platform.function.system.role.mapper.SysRoleMapper;
 import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
+import com.snail.platform.function.system.support.CacheEvictor;
+import java.util.List;
 import java.util.Objects;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 守护口径:role_code 建后不可改(接口契约里干脆没有它);is_system=1 内置角色对管理端只读,
  * 修改/停用/删除一律拒绝;被 sys_user_role 引用的角色不可删;逻辑删除后 role_code 终身占用不释放。
  * 数据档位:新增或维护后的档位不得宽于操作者自身最宽档,防"窄档管理员"造出宽档角色。
- * 角色状态/资料变更后 userPerms 与 userSession 整体失效:按角色反查用户不如全清便宜,且不会漏。
+ * 角色资料/状态变更只点该角色的持有人:快照里的角色名与权限码只对这批复盘,别的人与别的租户不受牵连。
  * 上游:RoleController;下游:sys_role 读写(拦截器圈定本租户)、sys_user_role 引用计数、sys_role_menu 随删清理。
  */
 @Service
@@ -45,12 +47,17 @@ public class RoleService {
     /** 操作者最宽数据档位判定 */
     private final DataScopeService dataScopeService;
 
+    /** 持有人权限码与快照缓存的点清出口 */
+    private final CacheEvictor cacheEvictor;
+
     public RoleService(SysRoleMapper roleMapper, SysUserRoleMapper userRoleMapper,
-                       SysRoleMenuMapper roleMenuMapper, DataScopeService dataScopeService) {
+                       SysRoleMenuMapper roleMenuMapper, DataScopeService dataScopeService,
+                       CacheEvictor cacheEvictor) {
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMenuMapper = roleMenuMapper;
         this.dataScopeService = dataScopeService;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /**
@@ -106,7 +113,6 @@ public class RoleService {
      * 否则改名就成了窄档管理员接管宽档角色的侧门。内置角色在这之前已被 requireBuiltinReadOnly 挡下。
      */
     @Transactional
-    @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void update(Long roleId, RoleUpdateRequest request) {
         SysRole role = requireRole(roleId);
         requireBuiltinReadOnly(role);
@@ -118,15 +124,15 @@ public class RoleService {
                 .set(request.status() != null, SysRole::getStatus, request.status())
                 .set(SysRole::getRemark, request.remark())
                 .eq(SysRole::getRoleId, role.getRoleId()));
+        evictHolders(roleId);
     }
 
     /**
      * 停用/启用:与 update 同一把档位尺,比你宽的角色的状态开关你也按不动。
-     * 同状态提前返回只省掉那次写;@CacheEvict 在方法正常返回后照常执行一次全清,幂等无害。
+     * 同状态提前返回只省掉那次写,也省掉一次点清——状态没变,持有人的权限码与快照就不变。
      * 停用让该角色的权限码在下次鉴权时整体消失(见 UserPermissionService 对停用角色的剔除)。
      */
     @Transactional
-    @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void changeStatus(Long roleId, int status) {
         SysRole role = requireRole(roleId);
         requireBuiltinReadOnly(role);
@@ -137,6 +143,7 @@ public class RoleService {
         roleMapper.update(new SysRole(), Wrappers.<SysRole>lambdaUpdate()
                 .set(SysRole::getStatus, status)
                 .eq(SysRole::getRoleId, roleId));
+        evictHolders(roleId);
     }
 
     /**
@@ -146,7 +153,6 @@ public class RoleService {
      * 逻辑删后 (tenant_id, role_code) 唯一键仍占位,同码重开会被拒,见 create 的兜底分支。
      */
     @Transactional
-    @CacheEvict(cacheNames = {"userPerms", "userSession"}, allEntries = true)
     public void delete(Long roleId) {
         SysRole role = requireRole(roleId);
         if (Objects.equals(role.getIsSystem(), 1)) {
@@ -160,6 +166,20 @@ public class RoleService {
         roleMenuMapper.delete(Wrappers.<SysRoleMenu>lambdaQuery()
                 .eq(SysRoleMenu::getRoleId, roleId));
         roleMapper.deleteById(roleId);
+        // 不点缓存:上面第三道闸已确认没有任何持有人,没人快照/权限码引用了这个角色
+    }
+
+    /**
+     * 只点这个角色的持有人:权限码键是 userId,会话快照键是 租户:userId。
+     * 角色名、档位、状态都进了快照和权限码,所以两者都要清;同租户的其他人与他租户一概不碰。
+     */
+    private void evictHolders(Long roleId) {
+        List<Long> holders = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
+                        .eq(SysUserRole::getRoleId, roleId))
+                .stream().map(SysUserRole::getUserId).distinct().toList();
+        cacheEvictor.evictEach("userPerms", holders);
+        cacheEvictor.evictEach("userSession", holders.stream()
+                .map(id -> CacheEvictor.tenantKey(TenantContextHolder.get(), id)).toList());
     }
 
     /** 内置角色由开通模板维护,管理端只读;放开改档/停用会让租户把自己锁在门外 */

@@ -1,5 +1,6 @@
 package com.snail.platform.function.system.org.service;
 
+import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.db.datascope.DataScopeContextHolder;
 import com.snail.platform.framework.db.datascope.DataScopeFilter;
@@ -9,6 +10,7 @@ import com.snail.platform.function.system.org.dto.OrgUpdateRequest;
 import com.snail.platform.function.system.org.entity.SysOrg;
 import com.snail.platform.function.system.org.mapper.SysOrgMapper;
 import com.snail.platform.function.system.role.service.DataScopeService;
+import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -51,12 +53,17 @@ public class OrgService {
     /** 数据权限判定:可见组织集来自当前登录者的多角色并集 */
     private final DataScopeService dataScopeService;
 
+    /** 登录快照缓存的点清出口 */
+    private final CacheEvictor cacheEvictor;
+
     public OrgService(SysOrgMapper orgMapper, SysUserMapper userMapper,
-                      OrgQueryService orgQueryService, DataScopeService dataScopeService) {
+                      OrgQueryService orgQueryService, DataScopeService dataScopeService,
+                      CacheEvictor cacheEvictor) {
         this.orgMapper = orgMapper;
         this.userMapper = userMapper;
         this.orgQueryService = orgQueryService;
         this.dataScopeService = dataScopeService;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /**
@@ -123,12 +130,11 @@ public class OrgService {
     /**
      * 改属性:只点改 name/sort/status/remark,父级与 ancestors 一律不碰——换父是 move 的活,代价不同量级。
      * 停用只拦后续把它选作父级,已挂在树下的用户与子节点不受影响(口径见 OrgUpdateRequest)。
-     * 失效只清 userSession:登录快照缓存了组织名称,改名后必须重取,否则界面继续显示旧名;
-     * 按组织反查受影响用户不如全清便宜,与角色域同口径。orgSubtree 无需清——它只存 ID,集合成员没变。
+     * 失效只清 userSession,且只在名字真的变了时清:登录快照里存的是组织名,其余三列快照都不带。
+     * 按组织反查受影响用户点清,不波及其它组织与租户;orgSubtree 无需清——它只存 ID,集合成员没变。
      * 传空实体只为走 update(entity, wrapper) 重载,列的取值全在 wrapper 里,顺带让审计列自动填充。
      */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void update(Long orgId, OrgUpdateRequest request) {
         SysOrg org = orgQueryService.requireOrg(orgId);
         requireOrgInScope(org.getOrgId());
@@ -139,6 +145,9 @@ public class OrgService {
                 .set(request.status() != null, SysOrg::getStatus, request.status())
                 .set(SysOrg::getRemark, request.remark())
                 .eq(SysOrg::getOrgId, org.getOrgId()));
+        if (!Objects.equals(org.getName(), request.name().trim())) {
+            cacheEvictor.evictEach("userSession", sessionKeysOfOrg(org.getOrgId()));
+        }
     }
 
     /**
@@ -230,5 +239,15 @@ public class OrgService {
                 .filter(s -> !s.isEmpty() && s.chars().allMatch(Character::isDigit))
                 .map(Long::valueOf)
                 .collect(Collectors.toSet());
+    }
+
+    /** 组织下全部用户的快照键 (租户, 用户);只在改名时用一次,组织下的用户查询同样由租户拦截器圈定 */
+    private List<String> sessionKeysOfOrg(Long orgId) {
+        return userMapper.selectList(Wrappers.<SysUser>lambdaQuery()
+                        .select(SysUser::getUserId)
+                        .eq(SysUser::getOrgId, orgId))
+                .stream()
+                .map(user -> CacheEvictor.tenantKey(TenantContextHolder.get(), user.getUserId()))
+                .toList();
     }
 }

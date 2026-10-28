@@ -17,8 +17,11 @@ import com.snail.platform.function.system.dict.service.DictService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,14 +29,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 职责:租户字典管理入口——类型与数据两套 CRUD,外加任意登录用户可取的字典项解析。
+ * 职责:租户字典管理入口——类型与数据两套 CRUD(类型的启停是独立端点,不夹在修改里),
+ * 外加任意登录用户可取的字典项解析。
  * 管理端点全挂 system:dict:* 权限码;items 只要求登录,因为下拉项是业务页面的通用渲染依赖。
  * 上游:字典管理页面与各业务页面;下游:DictService。
  */
 @Tag(name = "字典管理")
+@Validated
 @RestController
 @RequestMapping("/system/dict")
 public class DictController {
@@ -61,12 +67,23 @@ public class DictController {
     }
 
     @PreAuthorize("hasAuthority('system:dict:update')")
-    @Operation(summary = "修改字典类型(类型标识不可改)")
+    @Operation(summary = "修改字典类型(标识与状态不可改)")
     @OperLog(module = "字典管理", businessType = BusinessType.UPDATE)
     @PutMapping("/type/{dictId}")
     public R<Void> updateType(@PathVariable Long dictId,
                               @Valid @RequestBody DictTypeUpdateRequest request) {
         dictService.updateType(dictId, request);
+        return R.ok(null);
+    }
+
+    @PreAuthorize("hasAuthority('system:dict:update')")
+    @Operation(summary = "停用/启用字典类型")
+    @OperLog(module = "字典管理", businessType = BusinessType.UPDATE)
+    @PutMapping("/type/{dictId}/status")
+    public R<Void> changeTypeStatus(@PathVariable Long dictId,
+                                    @RequestParam @Min(value = 0, message = "状态取值 0/1")
+                                    @Max(value = 1, message = "状态取值 0/1") int status) {
+        dictService.changeTypeStatus(dictId, status);
         return R.ok(null);
     }
 

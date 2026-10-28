@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
@@ -20,18 +21,20 @@ import com.snail.platform.function.system.dict.entity.SysDictData;
 import com.snail.platform.function.system.dict.entity.SysDictType;
 import com.snail.platform.function.system.dict.mapper.SysDictDataMapper;
 import com.snail.platform.function.system.dict.mapper.SysDictTypeMapper;
+import com.snail.platform.function.system.support.CacheEvictor;
 import java.util.List;
-import org.springframework.cache.annotation.CacheEvict;
+import java.util.Objects;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 职责:租户字典管理的全部写入与读取——类型分页/新增/修改/删除(删类型级联逻辑删数据)、
+ * 职责:租户字典管理的全部写入与读取——类型分页/新增/修改/启停/删除(删类型级联逻辑删数据)、
  * 数据分页/新增/修改/删除,以及给任意登录用户的下拉项解析。
  * 守护口径:dict_type 建后不可改、租户内唯一含已删记录;dict_value 建后不可改、同类型内唯一含已删记录;
- * 停用类型或停用数据项都不进入下拉解析。dictItem 缓存键含租户,任何字典写操作全量失效。
+ * 停用类型或停用数据项都不进入下拉解析。dictItem 的键是 (租户, 类型标识),写操作只点清受影响的那一个键,
+ * 别的租户、别的类型都留着。
  * 上游:DictController;下游:sys_dict_type/sys_dict_data 读写(租户拦截器圈定本租户)。
  */
 @Service
@@ -49,9 +52,13 @@ public class DictService {
     /** 字典数据读写 */
     private final SysDictDataMapper dataMapper;
 
-    public DictService(SysDictTypeMapper typeMapper, SysDictDataMapper dataMapper) {
+    /** 下拉项缓存的点清出口 */
+    private final CacheEvictor cacheEvictor;
+
+    public DictService(SysDictTypeMapper typeMapper, SysDictDataMapper dataMapper, CacheEvictor cacheEvictor) {
         this.typeMapper = typeMapper;
         this.dataMapper = dataMapper;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /**
@@ -74,9 +81,9 @@ public class DictService {
     /**
      * 新增类型:status 一律建为正常,契约里没有这一列,先建后停是修改的事;dictType 只在新增出现,建后不可改。
      * 不做应用层查重:uk_dict_type(tenant_id, dict_type) 不含 deleted,并发重名由数据库拦下再转业务拒绝。
+     * 不点缓存:标识终身占用唯一键,新的 dictType 不可能已有缓存条目。
      */
     @Transactional
-    @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public Long createType(DictTypeCreateRequest request) {
         SysDictType type = new SysDictType();
         type.setDictName(request.dictName().trim());
@@ -93,20 +100,36 @@ public class DictService {
     }
 
     /**
-     * 修改类型:契约不含 dict_type,改不动。remark 无条件 set 即"不传就清空",status 不传沿用现值——
-     * 管理页整表单回填后提交,所以清空只在用户真删了备注时发生。
-     * 停用类型不级联停用数据项:解析只看类型状态,数据行各自的停用位要跨这次开关活下来。
+     * 修改类型:契约不含 dict_type 与 status——标识建后不可改,启停归独立端点。
+     * 状态从这份契约里摘掉,是因为"改个名字"和"停用整组字典"在审计日志里不能长同一张脸:
+     * 走 update 翻状态只留一条修改记录,谁关的下拉没人看得见。
+     * remark 无条件 set 即"不传就清空":管理页整表单回填后提交,所以清空只在用户真删了备注时发生。
      */
     @Transactional
-    @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void updateType(Long dictId, DictTypeUpdateRequest request) {
         SysDictType type = requireType(dictId);
-        int status = request.status() == null ? type.getStatus() : request.status();
         typeMapper.update(new SysDictType(), Wrappers.<SysDictType>lambdaUpdate()
                 .set(SysDictType::getDictName, request.dictName().trim())
-                .set(SysDictType::getStatus, status)
                 .set(SysDictType::getRemark, trimToNull(request.remark()))
                 .eq(SysDictType::getDictId, dictId));
+        cacheEvictor.evict("dictItem", dictItemKey(type));
+    }
+
+    /**
+     * 停用/启用类型:同状态提前返回只省掉那次写,也省掉一次点清——状态没变,下拉内容就不变。
+     * 停用只挡业务侧 items 解析:不级联停用数据项(数据行各自的停用位要跨这次开关活下来),
+     * 管理页列表、历史业务行落库的原始 dictValue 都不受影响。
+     */
+    @Transactional
+    public void changeTypeStatus(Long dictId, int status) {
+        SysDictType type = requireType(dictId);
+        if (Objects.equals(type.getStatus(), status)) {
+            return;
+        }
+        typeMapper.update(new SysDictType(), Wrappers.<SysDictType>lambdaUpdate()
+                .set(SysDictType::getStatus, status)
+                .eq(SysDictType::getDictId, dictId));
+        cacheEvictor.evict("dictItem", dictItemKey(type));
     }
 
     /**
@@ -115,11 +138,11 @@ public class DictService {
      * 类型标识终身占用唯一键(uk_dict_type 不含 deleted),同标识重建必被数据库拦下,只能另起一个码。
      */
     @Transactional
-    @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void deleteType(Long dictId) {
-        requireType(dictId);
+        SysDictType type = requireType(dictId);
         dataMapper.delete(Wrappers.<SysDictData>lambdaQuery().eq(SysDictData::getDictId, dictId));
         typeMapper.deleteById(dictId);
+        cacheEvictor.evict("dictItem", dictItemKey(type));
     }
 
     /**
@@ -144,9 +167,8 @@ public class DictService {
      * 唯一键是 (tenant_id, dict_id, dict_value)——同类型内值不许重,跨类型同值合法,查重交给数据库。
      */
     @Transactional
-    @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public Long createData(DictDataCreateRequest request) {
-        requireType(request.dictId());
+        SysDictType type = requireType(request.dictId());
         SysDictData data = new SysDictData();
         data.setDictId(request.dictId());
         data.setDictLabel(request.dictLabel().trim());
@@ -159,6 +181,7 @@ public class DictService {
         } catch (DuplicateKeyException e) {
             throw BizException.badRequest("该字典下值已存在");
         }
+        cacheEvictor.evict("dictItem", dictItemKey(type));
         return data.getDictDataId();
     }
 
@@ -167,16 +190,15 @@ public class DictService {
      * label 必传,status 与 sort 不传即沿用现值,remark 不传即清空。
      */
     @Transactional
-    @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void updateData(Long dictDataId, DictDataUpdateRequest request) {
         SysDictData data = requireData(dictDataId);
-        int status = request.status() == null ? data.getStatus() : request.status();
         dataMapper.update(new SysDictData(), Wrappers.<SysDictData>lambdaUpdate()
                 .set(SysDictData::getDictLabel, request.dictLabel().trim())
                 .set(SysDictData::getSort, request.sort() == null ? data.getSort() : request.sort())
-                .set(SysDictData::getStatus, status)
+                .set(SysDictData::getStatus, request.status() == null ? data.getStatus() : request.status())
                 .set(SysDictData::getRemark, trimToNull(request.remark()))
                 .eq(SysDictData::getDictDataId, dictDataId));
+        cacheEvictor.evict("dictItem", dictItemKey(requireType(data.getDictId())));
     }
 
     /**
@@ -184,15 +206,16 @@ public class DictService {
      * 删掉的值在同类型下不能原样重建——与"值建后不可改"是同一条终身口径。
      */
     @Transactional
-    @CacheEvict(cacheNames = "dictItem", allEntries = true)
     public void deleteData(Long dictDataId) {
-        requireData(dictDataId);
+        SysDictData data = requireData(dictDataId);
         dataMapper.deleteById(dictDataId);
+        cacheEvictor.evict("dictItem", dictItemKey(requireType(data.getDictId())));
     }
 
     /**
      * 下拉项解析:类型必须存在且启用,只返回启用数据项,按 sort 升序。
-     * 缓存键为 (租户, 类型标识) 双段——dictType 只在租户内唯一,单段键会让租户间串数据。
+     * 缓存键为 (租户, 类型标识) 双段——dictType 只在租户内唯一,单段键会让租户间串数据;
+     * 本类型的任何写操作都只点清这一个键,别的租户、别的类型不受牵连。
      * 取不到类型走业务拒绝而不是回空列表:空列表意味着"这组字典配置项确实为空",静默会让业务页把配置缺失
      * 当成没数据,两类问题混成一次空白下拉。
      */
@@ -221,6 +244,11 @@ public class DictService {
             throw BizException.badRequest("字典类型不存在");
         }
         return type;
+    }
+
+    /** 与 items 的 @Cacheable 键同拼法:(租户, 类型标识);写操作拿它点清受影响的那一个下拉缓存 */
+    private static String dictItemKey(SysDictType type) {
+        return CacheEvictor.tenantKey(TenantContextHolder.get(), type.getDictType());
     }
 
     private SysDictData requireData(Long dictDataId) {

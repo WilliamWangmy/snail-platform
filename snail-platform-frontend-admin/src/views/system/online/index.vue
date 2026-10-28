@@ -56,7 +56,7 @@ async function kick(row: OnlineSession): Promise<void> {
         :model="query"
         @submit.prevent="search"
       >
-        <ElFormItem label="登录名">
+        <ElFormItem label="登录名/显示名">
           <ElInput
             v-model="query.keyword"
             clearable
@@ -109,6 +109,12 @@ async function kick(row: OnlineSession): Promise<void> {
         <ElTableColumn
           prop="username"
           label="登录名"
+          min-width="150"
+          show-overflow-tooltip
+        />
+        <ElTableColumn
+          prop="nickname"
+          label="显示名"
           min-width="150"
           show-overflow-tooltip
         />

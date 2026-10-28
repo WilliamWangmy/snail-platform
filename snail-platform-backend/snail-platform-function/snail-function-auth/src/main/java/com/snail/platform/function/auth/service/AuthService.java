@@ -13,6 +13,7 @@ import com.snail.platform.function.auth.dto.LoginRequest;
 import com.snail.platform.function.auth.dto.LoginSuccessVO;
 import com.snail.platform.function.system.log.entity.SysLoginLog;
 import com.snail.platform.function.system.log.mapper.SysLoginLogMapper;
+import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.entity.SysUser;
@@ -20,7 +21,6 @@ import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Objects;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,14 +58,19 @@ public class AuthService {
     /** 令牌签发 */
     private final JwtTokenService jwtTokenService;
 
+    /** 登出时的快照点清出口 */
+    private final CacheEvictor cacheEvictor;
+
     public AuthService(SysUserMapper userMapper, SysTenantMapper tenantMapper, SysLoginLogMapper loginLogMapper,
-                       CaptchaService captchaService, LoginFailGuard failGuard, JwtTokenService jwtTokenService) {
+                       CaptchaService captchaService, LoginFailGuard failGuard, JwtTokenService jwtTokenService,
+                       CacheEvictor cacheEvictor) {
         this.userMapper = userMapper;
         this.tenantMapper = tenantMapper;
         this.loginLogMapper = loginLogMapper;
         this.captchaService = captchaService;
         this.failGuard = failGuard;
         this.jwtTokenService = jwtTokenService;
+        this.cacheEvictor = cacheEvictor;
     }
 
     public LoginSuccessVO login(LoginRequest request, HttpServletRequest http) {
@@ -123,15 +128,18 @@ public class AuthService {
     }
 
     /**
-     * 登出:令牌版本自增,该用户全部设备立即失效;userSession 必须同事务清掉,
+     * 登出:令牌版本自增,该用户全部设备立即失效;userSession 必须清掉,
      * 否则下次登录读到旧版本快照,新令牌会被过滤器判成已吊销。
+     * 键里的租户段与 UserSessionService 的生产端同拼法(租户:用户);这里用上下文取租户,
+     * 因为登出请求的租户上下文已由过滤器从同一枚令牌装好。
+     * 点清排在事务提交之后,免得提交前的并发读把旧版本快照回填进来。
      */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void logout(Long userId) {
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
+        cacheEvictor.evict("userSession", CacheEvictor.tenantKey(TenantContextHolder.get(), userId));
     }
 
     /** 留痕写失败不许反过来影响登录响应——库都挂了的场景没有一致性问题可言 */

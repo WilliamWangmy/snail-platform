@@ -14,6 +14,7 @@ import com.snail.platform.function.system.role.entity.SysRole;
 import com.snail.platform.function.system.role.entity.SysUserRole;
 import com.snail.platform.function.system.role.mapper.SysRoleMapper;
 import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
+import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.dto.TenantCreateRequest;
 import com.snail.platform.function.system.tenant.dto.TenantQuery;
 import com.snail.platform.function.system.tenant.dto.TenantUpdateRequest;
@@ -24,8 +25,8 @@ import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import com.snail.platform.function.system.user.service.PasswordPolicy;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,13 +59,18 @@ public class TenantService {
     /** 开通模板:管理员-角色绑定 */
     private final SysUserRoleMapper userRoleMapper;
 
+    /** 本租户登录快照的点清出口 */
+    private final CacheEvictor cacheEvictor;
+
     public TenantService(SysTenantMapper tenantMapper, SysOrgMapper orgMapper, SysRoleMapper roleMapper,
-                         SysUserMapper userMapper, SysUserRoleMapper userRoleMapper) {
+                         SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
+                         CacheEvictor cacheEvictor) {
         this.tenantMapper = tenantMapper;
         this.orgMapper = orgMapper;
         this.roleMapper = roleMapper;
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /**
@@ -156,11 +162,10 @@ public class TenantService {
     /**
      * 修改资料:整份覆盖。六个业务字段无条件 set,表单留空即清空;status 是唯一"不传即不动"的字段,
      * 停用/启用的正路仍是 changeStatus 端点(带幂等短路)。
-     * userSession 以用户 ID 为键,租户维度没有可点清的那一点,注解只能 allEntries 全清(每次修改都清,
-     * 与下面是否作废令牌是两件事);令牌前推只在"正常转停用"或"到期时间变更"时做,改名字备注不摘登录态。
+     * 失效只点这一户:登录快照里带租户名,改名要刷;停用与到期时间变更是资格问题,同 invalidateTenantSessions
+     * 一起作废。只改联系人/上限/备注不碰任何人的登录态,也不波及别的租户。
      */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void update(Long tenantId, TenantUpdateRequest request) {
         SysTenant existing = requireTenant(tenantId);
         // disabling 判的是"变更进入停用态"而非"目标是停用":整表单重复提交同一个停用状态不再推一遍版本号
@@ -168,6 +173,8 @@ public class TenantService {
                 && !Integer.valueOf(1).equals(existing.getStatus());
         // 到期时间一变就推版本号:往回收口时,已登录的存量令牌要当场作废,不能等它自然过期
         boolean expireChanged = !Objects.equals(existing.getExpireTime(), request.expireTime());
+        // 租户名进了登录快照(顶栏显示),改名后必须让该租户的会话重取一次
+        boolean nameChanged = !Objects.equals(existing.getName(), request.name().trim());
         // 收口只能收到未来:把到期时间写成过去,等于绕开停用端点做一次无留痕的软下线。
         // 判的是"变更",存量已过期的租户原样回传现值不算改,不然它连备注都改不动
         if (expireChanged && request.expireTime() != null
@@ -187,15 +194,17 @@ public class TenantService {
         if (disabling || expireChanged) {
             invalidateTenantSessions(tenantId);
         }
+        if (nameChanged || disabling || expireChanged) {
+            evictTenantSessions(tenantId);
+        }
     }
 
     /**
-     * 停用/启用:状态未变直接返回,幂等短路省掉一次写,但方法上的 @CacheEvict 在正常返回时同样执行,
-     * 那次短路请求仍会把 userSession 整体清掉。
-     * 只有停用推 token_version;启用不回填,停用期间被作废的令牌不会因为重新启用而复活,该租户用户需重新登录。
+     * 停用/启用:状态未变直接返回,幂等短路连缓存也不碰——状态没变,该租户的会话内容与资格都没变。
+     * 只有停用推 token_version 并点清该租户的快照;启用不回填,停用期间被作废的令牌不会因为重新启用而复活,
+     * 该租户用户需重新登录。
      */
     @Transactional
-    @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void changeStatus(Long tenantId, int status) {
         SysTenant tenant = requireTenant(tenantId);
         if (Objects.equals(tenant.getStatus(), status)) {
@@ -206,6 +215,7 @@ public class TenantService {
                 .eq(SysTenant::getTenantId, tenantId));
         if (status == 1) {
             invalidateTenantSessions(tenantId);
+            evictTenantSessions(tenantId);
         }
     }
 
@@ -219,6 +229,20 @@ public class TenantService {
                 Wrappers.<SysUser>lambdaUpdate()
                         .setSql("token_version = token_version + 1")
                         .eq(SysUser::getTenantId, tenantId)));
+    }
+
+    /**
+     * 该租户全部用户的登录快照点清:键是 (租户, 用户),先在这个租户的窗口里把用户 ID 取出来逐个点。
+     * 只点这一户、这一批用户,而不是把全站缓存清空——改一个租户的备注不该让别的租户全部回源。
+     * 已缓存但本次没登录过的用户本来就没有条目,点清是空操作;TTL 10 分钟仍是最坏情况的兜底。
+     */
+    private void evictTenantSessions(Long tenantId) {
+        List<String> keys = TenantContextHolder.asTenant(tenantId, () -> userMapper.selectList(
+                        Wrappers.<SysUser>lambdaQuery().select(SysUser::getUserId))
+                .stream()
+                .map(user -> CacheEvictor.tenantKey(tenantId, user.getUserId()))
+                .toList());
+        cacheEvictor.evictEach("userSession", keys);
     }
 
     private SysTenant requireTenant(Long tenantId) {

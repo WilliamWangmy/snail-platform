@@ -125,9 +125,10 @@ public class UserPermissionService implements UserAuthorityProvider {
 
     /**
      * 内置超管的唯一判定源:码对且必须 is_system=1。
-     * 语义 A 的权限码侧与 RoleMenuService 的导航侧都走这把尺,避免两处口径各自漂移。
+     * 语义 A 的权限码侧、RoleMenuService 的导航侧、UserService 的"最后一个管理员"守卫都走这把尺,
+     * 避免三处口径各自漂移。
      */
-    static boolean isSuperAdmin(SysRole role) {
+    public static boolean isSuperAdmin(SysRole role) {
         return ADMIN_ROLE_CODE.equals(role.getRoleCode()) && Integer.valueOf(1).equals(role.getIsSystem());
     }
 
