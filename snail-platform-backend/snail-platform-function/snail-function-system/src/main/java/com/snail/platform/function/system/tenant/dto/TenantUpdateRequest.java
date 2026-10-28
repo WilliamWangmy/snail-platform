@@ -29,7 +29,7 @@ public record TenantUpdateRequest(
         @Size(max = 20, message = "联系电话过长")
         String contactPhone,
 
-        @Schema(description = "到期时间,null 为不限")
+        @Schema(description = "到期时间,null 为不限;改到过去由服务端拦下,原样回传现值不算改")
         LocalDateTime expireTime,
 
         @Schema(description = "账号数上限,null 为不限")

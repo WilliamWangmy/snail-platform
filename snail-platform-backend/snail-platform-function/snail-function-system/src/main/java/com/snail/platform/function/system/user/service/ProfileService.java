@@ -15,7 +15,6 @@ import com.snail.platform.function.system.user.dto.UpdateProfileRequest;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import java.time.Duration;
-import java.util.Objects;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,12 +107,10 @@ public class ProfileService {
         userService.forceLogout(userId);
     }
 
+    /** 取本人行:userId 恒由控制器从登录上下文传入,查不到就是数据异常,不给越权留可走通的分支 */
     private SysUser requireSelf(Long userId) {
         SysUser user = userMapper.selectById(userId);
         if (user == null) {
-            throw BizException.badRequest("用户不存在");
-        }
-        if (!Objects.equals(user.getUserId(), userId)) {
             throw BizException.badRequest("用户不存在");
         }
         return user;

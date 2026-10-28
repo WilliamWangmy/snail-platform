@@ -28,7 +28,10 @@ const tenantInput = ref('');
 
 function tenantIdOf(): number | null {
   const raw = tenantInput.value.trim();
-  return raw === '' ? null : Number(raw);
+  if (raw === '') return null;
+  const value = Number(raw);
+  // 非数字折成 null:NaN 进查询串就是 tenantId=NaN,后端按无效参数处理,列表平白空一片
+  return Number.isFinite(value) ? value : null;
 }
 
 const { rows, total, loading, pageNum, pageSize, refresh, search } = usePageList<LoginLogVO>(
@@ -56,6 +59,7 @@ function reset(): void {
 
 const exporting = ref(false);
 
+/** 条件在列表回调与这里各拼一遍,两处同形:加筛选项必须同时改,否则下载件与页面所见不是同一集合。 */
 async function exportLogs(): Promise<void> {
   exporting.value = true;
   try {

@@ -46,6 +46,7 @@ const typeRules: FormRules<typeof typeForm> = {
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 };
 
+/** 新增与修改共用一张表单:标识列只在新增态可填,状态开关只在修改态渲染。 */
 function openTypeCreate(): void {
   typeEditingId.value = null;
   Object.assign(typeForm, { dictName: '', dictType: '', status: 0, remark: '' });
@@ -69,6 +70,7 @@ async function submitType(): Promise<void> {
   typeSaving.value = true;
   try {
     if (typeEditingId.value === null) {
+      // 新增载荷不带 status:后端恒建为正常,开关本来也只在修改态渲染
       await createDictType({
         dictName: typeForm.dictName.trim(),
         dictType: typeForm.dictType.trim(),
@@ -76,6 +78,7 @@ async function submitType(): Promise<void> {
       });
       ElMessage.success('已新增字典类型');
     } else {
+      // 空备注折成 null 再提交:后端 remark 是无条件 set,把清空表达成 null 而不是空串
       await updateDictType(typeEditingId.value, {
         dictName: typeForm.dictName.trim(),
         status: typeForm.status,
@@ -92,7 +95,7 @@ async function submitType(): Promise<void> {
 
 async function removeType(row: DictTypeVO): Promise<void> {
   const confirmed = await ElMessageBox.confirm(
-    `删除字典类型 ${row.dictName}(${row.dictType})?该类型下的字典项会被一并校验。`,
+    `删除字典类型 ${row.dictName}(${row.dictType})?该类型下的字典项一并删除,类型标识此后终身占用、不能同码重建。`,
     '删除确认',
     { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
   )
@@ -100,6 +103,7 @@ async function removeType(row: DictTypeVO): Promise<void> {
     .catch(() => false);
   if (!confirmed) return;
   await deleteDictType(row.dictId);
+  // 删的正是右栏当前选中的类型:先把选中态与残留行清掉,否则表头还挂着已删类型的名字
   if (activeType.value?.dictId === row.dictId) {
     activeType.value = null;
     dataList.rows.value = [];
@@ -121,6 +125,7 @@ function selectType(row: DictTypeVO | null): void {
 /* -------------------------------- 字典数据 -------------------------------- */
 
 const dataQuery = reactive<Omit<DictDataQuery, 'dictId'>>({ dictLabel: '', status: null });
+// dictId 从选中行现取,不进 query:类型没选中时直接回空页,不发请求
 const dataList = usePageList<DictDataVO>((page) => {
   if (!activeType.value) return Promise.resolve({ rows: [], total: 0 });
   return pageDictData({ dictId: activeType.value.dictId, ...dataQuery, ...page });
@@ -144,6 +149,7 @@ const dataRules: FormRules<typeof dataForm> = {
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 };
 
+/** 未选中类型时按钮已禁用,这里再判一次:提交路径上 dictId 是必填项,不能靠界面兜。 */
 function openDataCreate(): void {
   if (!activeType.value) {
     ElMessage.warning('请先选择字典类型');
@@ -182,6 +188,7 @@ async function submitData(): Promise<void> {
       });
       ElMessage.success('已新增字典项');
     } else {
+      // 修改载荷不带 dictValue 与 dictId:表单里那格只读,值和归属一样不给改的路径
       await updateDictData(dataEditingId.value, {
         dictLabel: dataForm.dictLabel.trim(),
         sort: dataForm.sort,
@@ -540,6 +547,7 @@ onMounted(typeList.refresh);
             active-text="正常"
             inactive-text="停用"
           />
+          <span>停用只挡业务侧按类型取字典项,本页列表与已有数据不受影响。</span>
         </ElFormItem>
         <ElFormItem
           label="备注"

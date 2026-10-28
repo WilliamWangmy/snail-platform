@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
 import {
   changeTenantStatus,
@@ -35,7 +35,6 @@ interface TenantForm {
   contactPhone: string;
   expireTime: string;
   accountLimit: number | null;
-  status: number;
   remark: string;
   adminUsername: string;
   adminPassword: string;
@@ -48,7 +47,6 @@ const emptyForm: TenantForm = {
   contactPhone: '',
   expireTime: '',
   accountLimit: null,
-  status: 0,
   remark: '',
   adminUsername: '',
   adminPassword: '',
@@ -94,6 +92,7 @@ function openCreate(): void {
   formVisible.value = true;
 }
 
+/** 编辑回填:租户标识只读展示(后端修改载荷里没有它),管理员两栏清空——同一段模板只在开通态渲染。 */
 function openEdit(row: TenantVO): void {
   editingId.value = row.tenantId;
   Object.assign(form, {
@@ -103,7 +102,6 @@ function openEdit(row: TenantVO): void {
     contactPhone: row.contactPhone ?? '',
     expireTime: row.expireTime ?? '',
     accountLimit: row.accountLimit,
-    status: row.status,
     remark: row.remark ?? '',
     adminUsername: '',
     adminPassword: '',
@@ -116,6 +114,7 @@ async function submitForm(): Promise<void> {
   if (!valid) return;
   saving.value = true;
   try {
+    // 空输入折成 null:后端把 null 读成"清空/不限",空串会被原样存进联系人这类可空列
     const text = (value: string): string | null => value.trim() || null;
     const common = {
       name: form.name.trim(),
@@ -134,7 +133,9 @@ async function submitForm(): Promise<void> {
       });
       ElMessage.success('租户已开通');
     } else {
-      await updateTenant(editingId.value, { status: form.status, ...common });
+      // 修改是整份提交:表单回填了现值,所以"留空即清空"在这里只在用户真删了内容时发生
+      // status 不在载荷里:启停只走独立端点,弹窗里放开关等于给高危动作开第二条无确认的通路
+      await updateTenant(editingId.value, common);
       ElMessage.success('已保存修改');
     }
     formVisible.value = false;
@@ -144,10 +145,32 @@ async function submitForm(): Promise<void> {
   }
 }
 
+/** 开通态只许选未来到期时间:整天过去的日期在这里就点不亮,分钟级仍由后端 @Future 兜住。
+ *  修改态不限制——把到期时间改成过去是让租户即刻失效的正路。 */
+function isPastDay(date: Date): boolean {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return date.getTime() < startOfToday.getTime();
+}
+
 /* --------------------------------- 启停 ----------------------------------- */
 
+/**
+ * 启停走独立端点,弹窗里没有第二条通路,停用必然过这道确认。
+ * 成功后就地翻牌,不重拉整页:列表按租户 ID 倒序,一次启停不改排序,省掉一次请求与表格闪动。
+ */
 async function toggleStatus(row: TenantVO): Promise<void> {
   const next = row.status === 0 ? 1 : 0;
+  if (next === 1) {
+    const confirmed = await ElMessageBox.confirm(
+      `停用租户 ${row.name}?该租户下全部账号立即下线;重新启用也不会复活旧令牌,各自需重新登录。`,
+      '停用确认',
+      { type: 'warning', confirmButtonText: '停用', cancelButtonText: '取消' },
+    )
+      .then(() => true)
+      .catch(() => false);
+    if (!confirmed) return;
+  }
   await changeTenantStatus(row.tenantId, next);
   row.status = next;
   ElMessage.success(next === 0 ? '已启用' : '已停用');
@@ -412,10 +435,12 @@ async function toggleStatus(row: TenantVO): Promise<void> {
           label="到期时间"
           prop="expireTime"
         >
+          <!-- value-format 给的是 ISO 本地时间串,后端 LocalDateTime 直接绑定;清空即提交 null=不限期 -->
           <ElDatePicker
             v-model="form.expireTime"
             type="datetime"
             value-format="YYYY-MM-DDTHH:mm:ss"
+            :disabled-date="editingId === null ? isPastDay : undefined"
             placeholder="留空不限"
             class="full"
           />
@@ -424,25 +449,13 @@ async function toggleStatus(row: TenantVO): Promise<void> {
           label="账号上限"
           prop="accountLimit"
         >
+          <!-- min=1 是有意的:后端只认 null 为不限,0 会被当成"一个账号都不许建" -->
           <ElInputNumber
             v-model="form.accountLimit"
             :min="1"
             :precision="0"
             controls-position="right"
             placeholder="留空不限"
-          />
-        </ElFormItem>
-        <ElFormItem
-          v-if="editingId !== null"
-          label="状态"
-        >
-          <ElSwitch
-            v-model="form.status"
-            :active-value="0"
-            :inactive-value="1"
-            inline-prompt
-            active-text="正常"
-            inactive-text="停用"
           />
         </ElFormItem>
         <ElFormItem

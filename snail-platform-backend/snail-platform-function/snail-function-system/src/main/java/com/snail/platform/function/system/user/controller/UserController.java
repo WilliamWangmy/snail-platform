@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.Objects;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -104,7 +105,7 @@ public class UserController {
     @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
     @PostMapping("/{userId}/force-logout")
     public R<Void> forceLogout(@PathVariable Long userId) {
-        if (java.util.Objects.equals(LoginUserContextHolder.userId(), userId)) {
+        if (Objects.equals(LoginUserContextHolder.userId(), userId)) {
             throw BizException.badRequest("不能强制下线自己");
         }
         userService.forceLogout(userId);

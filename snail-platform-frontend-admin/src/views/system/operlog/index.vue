@@ -31,14 +31,20 @@ function businessLabel(value: number): string {
 }
 
 const query = reactive<OperLogQuery>({ module: '', operator: '', businessType: null, status: null });
+/** datetimerange 是一个数组,提交前才拆成 beginTime/endTime 两个 ISO 参数。 */
 const range = ref<string[]>([]);
+/** 租户 ID 输入框只对持 platform:operlog:all 者渲染(见模板 v-if),其余租户由后端钉死本租户。 */
 const tenantInput = ref('');
 
 function tenantIdOf(): number | null {
   const raw = tenantInput.value.trim();
-  return raw === '' ? null : Number(raw);
+  if (raw === '') return null;
+  const value = Number(raw);
+  // 非数字折成 null:NaN 进查询串就是 tenantId=NaN,后端按无效参数处理,列表与导出件一起空
+  return Number.isFinite(value) ? value : null;
 }
 
+/** 条件汇总成一份:分页与导出共用,保证下载件与页面所见同集合。 */
 function currentQuery(): OperLogQuery {
   return {
     ...query,
@@ -67,6 +73,7 @@ function reset(): void {
 
 const exporting = ref(false);
 
+/** 超 5 万行时后端整体拒绝,download 会把返回的 JSON 信封当错误抛出,这里只负责转成"开始下载"提示。 */
 async function exportLogs(): Promise<void> {
   exporting.value = true;
   try {
@@ -83,6 +90,7 @@ const drawerVisible = ref(false);
 const detail = ref<OperLogDetailVO | null>(null);
 const detailLoading = ref(false);
 
+/** 抽屉先开再取数:param/result 是 TEXT 全文,按行现取而不是随列表下发。 */
 async function openDetail(row: OperLogListVO): Promise<void> {
   drawerVisible.value = true;
   detailLoading.value = true;
@@ -386,6 +394,7 @@ async function openDetail(row: OperLogListVO): Promise<void> {
           </ElDescriptionsItem>
         </ElDescriptions>
 
+        <!-- 入参/出参原样铺:敏感键在落库前已由后端 SensitiveDataMasker 替成 ******,前端不再二次处理 -->
         <div class="payload">
           <div class="payload-title">
             请求参数

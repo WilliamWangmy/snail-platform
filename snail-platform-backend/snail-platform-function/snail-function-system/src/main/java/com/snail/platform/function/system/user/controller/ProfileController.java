@@ -63,6 +63,7 @@ public class ProfileController {
 
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "强制下线自己的全部会话")
+    @OperLog(module = "个人中心", businessType = BusinessType.UPDATE)
     @PostMapping("/force-logout")
     public R<Void> forceLogout() {
         profileService.forceLogout(LoginUserContextHolder.userId());

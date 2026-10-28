@@ -14,6 +14,7 @@ import RowActions, { type RowAction } from '@/components/RowActions.vue';
 
 const auth = useAuthStore();
 
+/** 三张表的 value 与 sys_menu 的列注释同码(界面文案可不同);表单可选项由它们彼此推导,不是自由输入。 */
 const MENU_TYPES = [
   { value: 1, label: '目录' },
   { value: 2, label: '菜单' },
@@ -114,6 +115,10 @@ const typeOptions = computed(() => {
   return MENU_TYPES.filter((item) => item.value === 2 || item.value === 3);
 });
 
+/**
+ * 展示端可选项:按钮恒站内(后端只收站内按钮,且必须带权限码);父在大屏树里就只能继续大屏,
+ * 父在站内树里可选站内或外链;根层只给站内与大屏——外链不做根,它不能挂下级,而空目录会被导航剪掉。
+ */
 const targetOptions = computed(() => {
   const p = parent.value;
   if (form.menuType === 3) return TARGETS.filter((item) => item.value === 1);
@@ -132,6 +137,7 @@ const parentLabel = computed(() =>
   parent.value ? parent.value.menuName : (parentId.value === 0 ? '根节点' : (names.value.get(parentId.value) ?? '—')),
 );
 
+/** 字段显隐与必填完全由三元组推出来,口径抄 MenuService.validateShape:目录不配码与组件,菜单两者都配,外链两者都不配。 */
 const isDir = computed(() => currentType.value === 1);
 const isButton = computed(() => currentType.value === 3);
 const isExternal = computed(() => currentTarget.value === 3);
@@ -172,6 +178,7 @@ const rules = computed<FormRules<MenuForm>>(() => ({
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 }));
 
+/** 从行内"新增下级"进来时带上父:面直接继承,展示端与类型也按父给一个合法默认(页面下最常见的下一步是按钮)。 */
 function openCreate(root?: MenuNode): void {
   editingId.value = null;
   editingSystem.value = false;
@@ -186,6 +193,10 @@ function openCreate(root?: MenuNode): void {
   formVisible.value = true;
 }
 
+/**
+ * 修改态不换父,所以 parent 留空、只留 parentId 供"上级"一栏按 names 反查名称;
+ * 四项不可改的值另存 immutable,供只读展示与表单推导用(按钮的 visible 直接压回 0)。
+ */
 function openEdit(row: MenuNode): void {
   editingId.value = row.menuId;
   editingSystem.value = row.isSystem === 1;
@@ -214,6 +225,7 @@ async function submitForm(): Promise<void> {
   if (!valid) return;
   saving.value = true;
   try {
+    // 空串转 null:后端把 null 当"未配置",清空字段就是这么传出去的(整表单提交,不存在"不传即不改")
     const text = (value: string): string | null => value.trim() || null;
     const shape = {
       menuName: form.menuName.trim(),
@@ -231,6 +243,7 @@ async function submitForm(): Promise<void> {
         target: form.target,
         scope: form.scope,
         permCode: text(form.permCode),
+        // 按钮表单里不显示"侧栏显示",这一项可能留着上一次的 1,提交前压回 0 免得撞后端校验
         visible: form.menuType === 3 ? 0 : form.visible,
       });
       ElMessage.success('已新增菜单');
@@ -249,13 +262,14 @@ async function submitForm(): Promise<void> {
   }
 }
 
+/** 按钮与外链不给"新增下级":后端 validateParent 直接拒,这里提前收掉入口 */
 function canHaveChild(node: MenuNode): boolean {
   return node.menuType !== 3 && node.target !== 3;
 }
 
 async function remove(row: MenuNode): Promise<void> {
   const confirmed = await ElMessageBox.confirm(
-    `删除菜单 ${row.menuName}?存在下级或已被角色授权时会被拒绝。`,
+    `删除菜单 ${row.menuName}?内置菜单或存在下级时会被拒绝,该菜单的角色授权记录一并清除。`,
     '删除确认',
     { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
   )

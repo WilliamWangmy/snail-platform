@@ -78,6 +78,10 @@ public class UserService {
         this.dataScopeService = dataScopeService;
     }
 
+    /**
+     * 分页检索:四个筛选条件都是"没传即不限",按 userId 倒序让新建的在前。
+     * 列表投影的 roleIds 恒传 null——授权集逐行回查就是 N+1,要看在详情里看。
+     */
     public PageResult<UserVO> page(UserQuery query) {
         Page<SysUser> page = PageAssembler.from(query);
         DataScopeFilter scope = dataScopeService.currentFilterOrNull();
@@ -92,11 +96,20 @@ public class UserService {
                 result.getTotal());
     }
 
+    /** 详情比列表多带授权角色集:存在闸在前、可见闸在后,与写入口同序;回查后要拿到最终态 */
     public UserVO detail(Long userId) {
+        SysUser user = requireUser(userId);
         requireUserInScope(userId);
-        return UserVO.of(requireUser(userId), roleIdsOf(userId));
+        return UserVO.of(user, roleIdsOf(userId));
     }
 
+    /**
+     * 建号即授权:口令与角色的校验都排在写库之前,失败不留半截用户行。
+     * 查重刻意走无租户窄窗口——登录名全表唯一(登录不选租户的代价),本租户查不出他租的占用。
+     * 两道组织闸分工不同:requireUsableOrg 管"这个组织还在不在、开不开",
+     * requireAssignableOrg 管"操作者有没有资格把人挂进去";后者只对组织档及以下有意义。
+     * 明文口令只走到 BCrypt 这一行,之后任何地方都不再可逆;status 一律建为正常。
+     */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Long create(UserCreateRequest request) {
         String username = request.username().trim();
@@ -132,6 +145,12 @@ public class UserService {
         return user.getUserId();
     }
 
+    /**
+     * 改档案:五列点改,username/password/status 不在射程——口令走重置、状态走 changeStatus,各有独立权限码。
+     * 调岗同样过两道组织闸,与建号同口径。
+     * 失效只按该用户一点清 userSession:登录快照里带着 nickname 与 orgName,不改这两样前端就会显示旧值;
+     * 前推 token_version 与清 userPerms 都不必——资料变更既不影响会话资格,也不影响授权集。
+     */
     @Transactional
     @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void update(Long userId, UserUpdateRequest request) {
@@ -148,6 +167,11 @@ public class UserService {
                 .eq(SysUser::getUserId, user.getUserId()));
     }
 
+    /**
+     * 管理员重置口令:与自助改密的差别只在"不验原密码",强度口径仍由 PasswordPolicy 单点把。
+     * 前推 token_version 是刻意的——重置等于把该用户全部存量令牌一次作废,新口令只在新登录里生效。
+     * 不清 userPerms:重置口令不动授权。
+     */
     @Transactional
     @CacheEvict(cacheNames = "userSession", key = "#userId")
     public void resetPassword(Long userId, String rawPassword) {
@@ -171,6 +195,13 @@ public class UserService {
                 .eq(SysUser::getUserId, userId));
     }
 
+    /**
+     * 停用/启用:状态翻转必然前推令牌版本,停用即刻切断存量会话,不等令牌自然过期。
+     * 自我停用只能在这里显式拦:本人恒在可见集内( requireUserInScope 对自己放行),权限闸挡不住"停自己"。
+     * 同状态提前返回,省掉一次无谓的写与令牌前推——否则重复点同一个状态会白踢人下线;
+     * 它刻意排在可见闸之后,不可见的目标不能被"本来就是这状态"顺带放过。
+     * userPerms 与 delete/assignRoles 同面清掉:状态翻转后的鉴权一律重读授权集,不靠上一次的缓存。
+     */
     @Transactional
     @CacheEvict(cacheNames = {"userPerms", "userSession"}, key = "#userId")
     public void changeStatus(Long userId, int status) {
@@ -178,10 +209,10 @@ public class UserService {
         if (status == 1 && Objects.equals(LoginUserContextHolder.userId(), userId)) {
             throw BizException.badRequest("不能停用自己的账号");
         }
+        requireUserInScope(userId);
         if (Objects.equals(user.getStatus(), status)) {
             return;
         }
-        requireUserInScope(userId);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getStatus, status)
                 .setSql("token_version = token_version + 1")
@@ -267,6 +298,11 @@ public class UserService {
         }
     }
 
+    /**
+     * 授权全量覆盖:先删干净再逐行插,单事务里完成,不会留下"删了没插"的空档。
+     * 逐行 insert 而非批量:一个用户的角色是个位数,BaseMapper 也没有批量入口,不值得为此多开一层。
+     * 入参必须已过 resolveGrantable,这里不再判租户与档位。
+     */
     private void replaceRoles(Long userId, List<SysRole> roles) {
         userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, userId));
         for (SysRole role : roles) {
@@ -277,12 +313,14 @@ public class UserService {
         }
     }
 
+    /** 只回查角色 ID 集(UserVO 的 roleIds),名称由前端按角色字典映射,免得为展示再联表 */
     private List<Long> roleIdsOf(Long userId) {
         return userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
                         .eq(SysUserRole::getUserId, userId))
                 .stream().map(SysUserRole::getRoleId).toList();
     }
 
+    /** 存在性闸:每个定点入口的第一道,不存在即业务拒绝(跨租户的行本就查不到) */
     private SysUser requireUser(Long userId) {
         SysUser user = userMapper.selectById(userId);
         if (user == null) {
@@ -291,6 +329,7 @@ public class UserService {
         return user;
     }
 
+    /** 归属闸:组织要存在且启用;他租户的组织在租户窗口里查不到,统一按"组织不存在"拒 */
     private void requireUsableOrg(Long orgId) {
         SysOrg org = orgMapper.selectById(orgId);
         if (org == null) {
@@ -323,6 +362,7 @@ public class UserService {
         }
     }
 
+    /** 空白与 null 同义,都不参与拼句——否则一个空格会被当成真实的 like 条件 */
     private boolean notBlank(String s) {
         return s != null && !s.isBlank();
     }

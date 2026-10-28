@@ -32,7 +32,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class UserPermissionService implements UserAuthorityProvider {
 
-    /** 租户内超级管理员的角色标识,与 V2 种子和租户开通模板同口径 */
+    /** 租户内超级管理员的角色标识,与 V4 种子和租户开通模板同口径 */
     private static final String ADMIN_ROLE_CODE = "admin";
 
     /** 角色与菜单通用启用状态:0 正常 */
@@ -87,6 +87,7 @@ public class UserPermissionService implements UserAuthorityProvider {
             return Set.of();
         }
 
+        // 菜单目录整表取回一次:生效链要逐层上溯祖先,按节点回查库会把一次解析变成一串查询
         List<SysMenu> menus = menuMapper.selectList(null);
         Map<Long, SysMenu> menuById = menus.stream()
                 .collect(Collectors.toMap(SysMenu::getMenuId, Function.identity()));
@@ -96,7 +97,8 @@ public class UserPermissionService implements UserAuthorityProvider {
                 .collect(Collectors.toSet());
 
         Set<String> authorities = new LinkedHashSet<>();
-        if (activeRoles.stream().anyMatch(this::isSuperAdmin)) {
+        // 语义 A 的落点:超管吞掉租户面所有带码菜单,平台面(scope=1)仍要靠下面的显式授权行
+        if (activeRoles.stream().anyMatch(UserPermissionService::isSuperAdmin)) {
             menus.stream()
                     .filter(menu -> activeMenuIds.contains(menu.getMenuId()))
                     .filter(menu -> Integer.valueOf(SCOPE_TENANT).equals(menu.getScope()))
@@ -109,6 +111,7 @@ public class UserPermissionService implements UserAuthorityProvider {
         List<SysRoleMenu> grants = roleMenuMapper.selectList(Wrappers.<SysRoleMenu>lambdaQuery()
                 .in(SysRoleMenu::getRoleId, activeRoleIds));
         for (SysRoleMenu grant : grants) {
+            // 授权行指向停用链上或已消失的菜单:静默作废,不为脏数据把整次解析掀翻
             if (!activeMenuIds.contains(grant.getMenuId())) {
                 continue;
             }
@@ -120,8 +123,11 @@ public class UserPermissionService implements UserAuthorityProvider {
         return Set.copyOf(authorities);
     }
 
-    /** 租户内超管:内置 admin 角色;停用角色在进入本方法前已剔除 */
-    private boolean isSuperAdmin(SysRole role) {
+    /**
+     * 内置超管的唯一判定源:码对且必须 is_system=1。
+     * 语义 A 的权限码侧与 RoleMenuService 的导航侧都走这把尺,避免两处口径各自漂移。
+     */
+    static boolean isSuperAdmin(SysRole role) {
         return ADMIN_ROLE_CODE.equals(role.getRoleCode()) && Integer.valueOf(1).equals(role.getIsSystem());
     }
 

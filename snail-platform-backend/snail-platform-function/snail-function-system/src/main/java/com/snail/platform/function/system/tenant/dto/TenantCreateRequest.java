@@ -1,6 +1,7 @@
 package com.snail.platform.function.system.tenant.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -8,7 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 /**
- * 职责:新建租户契约。租户资料 + 首任管理员账号一并提交,服务端同事务复制 V2 种子模板。
+ * 职责:新建租户契约。租户资料 + 首任管理员账号一并提交,服务端同事务复制 V4 种子模板。
  * 上游:平台管理端表单;下游:TenantService.provision。
  * 口径:expireTime/accountLimit 为 null 表示不设限,0 不是不限。
  */
@@ -35,7 +36,8 @@ public record TenantCreateRequest(
         @Size(max = 20, message = "联系电话过长")
         String contactPhone,
 
-        @Schema(description = "到期时间,null 为不限")
+        @Schema(description = "到期时间,null 为不限;开通即送的场景只接受未来时间,过去时间建出来就是已到期")
+        @Future(message = "到期时间必须晚于当前时间")
         LocalDateTime expireTime,
 
         @Schema(description = "账号数上限,null 为不限")

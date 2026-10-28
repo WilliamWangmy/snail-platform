@@ -115,12 +115,13 @@ public class RoleMenuService {
             granted.add(grant.getMenuId());
         }
 
-        boolean superAdmin = activeRoles.stream().anyMatch(this::isSuperAdmin);
+        boolean superAdmin = activeRoles.stream().anyMatch(UserPermissionService::isSuperAdmin);
         Set<Long> selected = new LinkedHashSet<>();
         for (SysMenu menu : all) {
             if (!activeIds.contains(menu.getMenuId())) {
                 continue;
             }
+            // 语义 A 的导航侧落点:超管吞掉租户面全部菜单,平台面仍只认下面的显式授权行
             boolean eligible = superAdmin && Integer.valueOf(SCOPE_TENANT).equals(menu.getScope());
             if (eligible || granted.contains(menu.getMenuId())) {
                 selected.add(menu.getMenuId());
@@ -135,9 +136,11 @@ public class RoleMenuService {
                 continue;
             }
             kept.add(menuId);
+            // 逐层补父:授权的叶子必须有目录当容器才算"可见",父本身没授权也要补进来
             Long parentId = menu.getParentId();
             while (parentId != null && parentId != 0L) {
                 SysMenu parent = menuById.get(parentId);
+                // 父链断在停用链或另一个展示端上:就地收口,剩下的半截父级不如不要
                 if (parent == null || !activeIds.contains(parentId)
                         || !planeMatches(parent.getTarget(), target)) {
                     break;
@@ -149,6 +152,7 @@ public class RoleMenuService {
             }
         }
 
+        // 两遍走:先按 kept 摊平成 ID->节点,再挂 children,顺序直接继承查询的 sort 升序
         Map<Long, MenuRouteVO> nodes = new LinkedHashMap<>();
         for (SysMenu menu : all) {
             if (kept.contains(menu.getMenuId())) {
@@ -158,12 +162,14 @@ public class RoleMenuService {
         List<MenuRouteVO> roots = new ArrayList<>();
         for (MenuRouteVO node : nodes.values()) {
             MenuRouteVO parent = node.parentId() == null ? null : nodes.get(node.parentId());
+            // 找不到父的三种情形(本就无父 / 父未入 kept / parentId 自指的脏数据)同按根层收口
             if (parent != null && !Objects.equals(parent.menuId(), node.menuId())) {
                 parent.children().add(node);
             } else {
                 roots.add(node);
             }
         }
+        // prune 边剪边答:返回 false 的枝连同其整棵子树在下钻时被摘掉
         roots.removeIf(node -> !prune(node));
         return roots;
     }
@@ -181,6 +187,7 @@ public class RoleMenuService {
                 .orderByAsc(SysMenu::getSort).orderByAsc(SysMenu::getMenuId));
         Map<Long, RoleMenuNodeVO> nodes = new LinkedHashMap<>();
         for (SysMenu menu : all) {
+            // 无平台码时平台面菜单连节点都不建:授权树不显示,也就无从勾选
             if (!platformVisible && Integer.valueOf(SCOPE_PLATFORM).equals(menu.getScope())) {
                 continue;
             }
@@ -193,6 +200,7 @@ public class RoleMenuService {
                 continue;
             }
             RoleMenuNodeVO parent = menu.getParentId() == null ? null : nodes.get(menu.getParentId());
+            // 父级被上面筛掉时子菜单升为根层:树少一层目录,但租户面菜单仍授得出去
             if (parent != null && !Objects.equals(parent.menuId(), node.menuId())) {
                 parent.children().add(node);
             } else {
@@ -212,6 +220,7 @@ public class RoleMenuService {
         requireRole(roleId);
         Set<Long> distinct = new LinkedHashSet<>(menuIds);
         List<SysMenu> menus = distinct.isEmpty() ? List.of() : menuMapper.selectBatchIds(distinct);
+        // 数量对不上说明提交的 ID 里有已删或不存在的菜单:整包拒,不悄悄丢掉那几个
         if (menus.size() != distinct.size()) {
             throw BizException.badRequest("菜单不存在");
         }
@@ -233,11 +242,13 @@ public class RoleMenuService {
                 roleMenuMapper.delete(Wrappers.<SysRoleMenu>lambdaQuery()
                         .eq(SysRoleMenu::getRoleId, roleId));
             } else {
+                // notIn 平台面 = 只清租户面既有授权,让别的入口授出去的平台行原样留着
                 roleMenuMapper.delete(Wrappers.<SysRoleMenu>lambdaQuery()
                         .eq(SysRoleMenu::getRoleId, roleId)
                         .notIn(SysRoleMenu::getMenuId, platformMenuIds));
             }
         }
+        // 逐行插:sys_role_menu 是纯关系表,BaseMapper 没有批量口;提交集最多就是整棵菜单树,量级不用优化
         for (Long menuId : distinct) {
             SysRoleMenu grant = new SysRoleMenu();
             grant.setRoleId(roleId);
@@ -246,16 +257,13 @@ public class RoleMenuService {
         }
     }
 
+    /** 存在性闸:经租户窗口查不到即拒(他租户角色与不存在的 ID 同形,不额外区分) */
     private SysRole requireRole(Long roleId) {
         SysRole role = roleMapper.selectById(roleId);
         if (role == null) {
             throw BizException.badRequest("角色不存在");
         }
         return role;
-    }
-
-    private boolean isSuperAdmin(SysRole role) {
-        return "admin".equals(role.getRoleCode()) && Integer.valueOf(1).equals(role.getIsSystem());
     }
 
     /** 站内端要站内(1)与外链(3),数据大屏端只要大屏(2) */

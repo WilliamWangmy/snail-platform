@@ -23,6 +23,7 @@ import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import com.snail.platform.function.system.user.service.PasswordPolicy;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DuplicateKeyException;
@@ -66,6 +67,11 @@ public class TenantService {
         this.userRoleMapper = userRoleMapper;
     }
 
+    /**
+     * 分页检索:sys_tenant 在拦截器 ignore 清单,本查询天然覆盖全平台租户,无需额外摘条件。
+     * 按 tenantId 倒序,新开通的租户排在最前。
+     * name 判空要连 blank 一起收:管理页清空输入框传的是空串而非 null,放过它就拼出 LIKE '%%' 全表命中。
+     */
     public PageResult<TenantVO> page(TenantQuery query) {
         Page<SysTenant> page = PageAssembler.from(query);
         IPage<SysTenant> result = tenantMapper.selectPage(page, Wrappers.<SysTenant>lambdaQuery()
@@ -76,8 +82,10 @@ public class TenantService {
     }
 
     /**
-     * 开通租户:同事务落租户行,再以新租户身份复制 V2 种子模板(根组织 + admin/common 内置角色 + 管理员并绑定)。
+     * 开通租户:同事务落租户行,再以新租户身份复制 V4 种子模板(根组织 + admin/common 内置角色 + 管理员并绑定)。
+     * 租户行必须先 insert 拿到自增 tenantId,才能进 asTenant 窗口——后续每条 insert 的 tenant_id 由拦截器从这个上下文里取。
      * 管理员登录名先在全局口径下查重——username 全表唯一是"登录不选租户"的代价。
+     * 模板不复制 sys_role_menu:新租户开箱没有任何角色授权记录,见 insertBuiltinRole 的口径。
      */
     @Transactional
     public Long provision(TenantCreateRequest request) {
@@ -89,6 +97,8 @@ public class TenantService {
                 .eq(SysTenant::getTenantCode, tenantCode)) > 0) {
             throw BizException.badRequest("租户标识已存在");
         }
+        // sys_user 是租户管理表,不摘条件的话 selectCount 只圈在当前平台管理员自己的租户里,
+        // 别的租户已占用的登录名看不见;username 的唯一键是全表口径,查重必须同口径
         Long usernameTaken = TenantContextHolder.withoutTenant(() -> userMapper.selectCount(
                 Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, adminUsername)));
         if (usernameTaken > 0) {
@@ -112,7 +122,9 @@ public class TenantService {
         }
 
         Long newTenantId = tenant.getTenantId();
+        // 窗口内每条 insert 由拦截器补 tenant_id,org_id/role_id/user_id 的回填才落得对新租户
         TenantContextHolder.asTenant(newTenantId, () -> {
+            // 根组织名直接沿用租户名:新租户还没有任何组织结构,根即租户本身;parentId=0 与 ancestors="0" 是顶级节点的两个标记,与组织域同口径
             SysOrg root = new SysOrg();
             root.setParentId(0L);
             root.setName(tenant.getName());
@@ -141,13 +153,27 @@ public class TenantService {
         return newTenantId;
     }
 
+    /**
+     * 修改资料:整份覆盖。六个业务字段无条件 set,表单留空即清空;status 是唯一"不传即不动"的字段,
+     * 停用/启用的正路仍是 changeStatus 端点(带幂等短路)。
+     * userSession 以用户 ID 为键,租户维度没有可点清的那一点,注解只能 allEntries 全清(每次修改都清,
+     * 与下面是否作废令牌是两件事);令牌前推只在"正常转停用"或"到期时间变更"时做,改名字备注不摘登录态。
+     */
     @Transactional
     @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void update(Long tenantId, TenantUpdateRequest request) {
         SysTenant existing = requireTenant(tenantId);
+        // disabling 判的是"变更进入停用态"而非"目标是停用":整表单重复提交同一个停用状态不再推一遍版本号
         boolean disabling = Integer.valueOf(1).equals(request.status())
                 && !Integer.valueOf(1).equals(existing.getStatus());
+        // 到期时间一变就推版本号:往回收口时,已登录的存量令牌要当场作废,不能等它自然过期
         boolean expireChanged = !Objects.equals(existing.getExpireTime(), request.expireTime());
+        // 收口只能收到未来:把到期时间写成过去,等于绕开停用端点做一次无留痕的软下线。
+        // 判的是"变更",存量已过期的租户原样回传现值不算改,不然它连备注都改不动
+        if (expireChanged && request.expireTime() != null
+                && request.expireTime().isBefore(LocalDateTime.now())) {
+            throw BizException.badRequest("到期时间必须晚于当前时间");
+        }
         // updateById 会跳过 null,而"清空到期时间/账号上限"恰是合法意图,故逐字段显式 set
         tenantMapper.update(new SysTenant(), Wrappers.<SysTenant>lambdaUpdate()
                 .set(SysTenant::getName, request.name().trim())
@@ -163,6 +189,11 @@ public class TenantService {
         }
     }
 
+    /**
+     * 停用/启用:状态未变直接返回,幂等短路省掉一次写,但方法上的 @CacheEvict 在正常返回时同样执行,
+     * 那次短路请求仍会把 userSession 整体清掉。
+     * 只有停用推 token_version;启用不回填,停用期间被作废的令牌不会因为重新启用而复活,该租户用户需重新登录。
+     */
     @Transactional
     @CacheEvict(cacheNames = "userSession", allEntries = true)
     public void changeStatus(Long tenantId, int status) {
@@ -180,7 +211,8 @@ public class TenantService {
 
     /**
      * 租户级会话失效:停用/到期变更时把该租户全部用户的令牌版本前推,旧令牌即使缓存未及时失效也过不了版本比对。
-     * 用 asTenant 把拦截器圈到目标租户,平台管理员自身的租户上下文在窗口结束后恢复。
+     * 用 asTenant 把拦截器圈到目标租户,平台管理员自身的租户上下文在窗口结束后恢复;
+     * 语句里的显式 eq 与拦截器注入的是同一个条件,两处都写是让"只动这一户"在眼前就可确认。
      */
     private void invalidateTenantSessions(Long tenantId) {
         TenantContextHolder.asTenant(tenantId, () -> userMapper.update(new SysUser(),
@@ -197,6 +229,12 @@ public class TenantService {
         return tenant;
     }
 
+    /**
+     * 复制内置角色,取值与 V4 种子逐列对齐(admin data_scope=1/sort=1,common data_scope=4/sort=2)。
+     * is_system 恒为 1:内置角色只有种子与本处能造,RoleService 的写接口连这个字段都收不到。
+     * 只落角色行、不配 sys_role_menu——新租户管理员靠语义 A(admin 且 is_system=1)隐式持有全部 scope=2 权限,
+     * 平台面(scope=1)菜单本就不归租户管理员;common 能看什么,由新租户管理员自己勾。
+     */
     private SysRole insertBuiltinRole(String roleName, String roleCode, int dataScope, int sort) {
         SysRole role = new SysRole();
         role.setRoleName(roleName);

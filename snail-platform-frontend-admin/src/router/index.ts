@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import DefaultLayout from '@/layouts/DefaultLayout.vue';
 import { useAuthStore } from '@/stores/auth';
-import { installMenuRoutes, WORKSPACE } from './menuRoutes';
+import { installMenuRoutes, resetMenuRoutes, WORKSPACE } from './menuRoutes';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -64,6 +64,8 @@ router.beforeEach(async (to) => {
     await auth.loadSession();
     await auth.loadMenus();
   } catch {
+    // 半途失败也要清:上一次成功注册的业务路由还挂在实例上,不清就是"换个账号仍能直达上一页"
+    resetMenuRoutes(router);
     auth.signOut();
     return { path: '/login', query: { redirect: to.fullPath } };
   }
