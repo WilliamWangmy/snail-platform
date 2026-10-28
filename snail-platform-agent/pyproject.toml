@@ -1,0 +1,54 @@
+# 项目定义(≈ pom.xml 的 <project> 段)
+[project]
+name = "snail-agent"              # ≈ groupId/artifactId 语义;本项目不发布,仅标识用
+version = "0.1.0"                   # ≈ version
+requires-python = ">=3.12"          # Python 版本硬约束:装依赖时就拦截,不满足直接报错
+
+dependencies = [                    # ≈ <dependencies>;没有 scope 概念,一视同仁
+    # Web 层
+    "fastapi>=0.150.0,<1.0",            # Web 框架:路由/请求校验/Swagger
+    "uvicorn[standard]>=0.54.0,<1.0",  # ASGI 服务器;[standard] 是 extras 功能组(≈ classifier 聚合依赖)
+    "pydantic-settings>=2.16.0,<3.0",  # 配置绑定(≈ @ConfigurationProperties)
+    "httpx>=0.28.1,<1.0",              # 异步 HTTP 客户端(调 Java 接口用,不用 requests)
+    "python-dotenv>=1.2.4,<2.0",      # .env 文件读取支持
+    "python-multipart>=0.0.32,<1.0",  # 表单/文件上传解析;FastAPI 收 multipart 必需
+    "sse-starlette>=3.6.0,<4.0",      # SSE 流式输出(前端逐字渲染 Agent 回复)
+
+    # Agent 编排与模型接入
+    "langchain>=1.4.0,<2.0",          # Agent 框架:消息、Tool、LCEL、create_agent
+    "langgraph>=1.2.0,<1.3",          # 状态图运行时:多步/循环/人工介入(≈ 状态机)
+    "langchain-openai>=1.7.0,<2.0",   # OpenAI 兼容协议接入;DeepSeek/千问同走此前
+
+    # 持久化
+    "sqlalchemy[asyncio]>=2.1.0,<3.0",  # ORM 与异步会话(≈ MyBatis-Plus)
+    "alembic>=1.20.0,<2.0",             # 数据库迁移(≈ Flyway)
+    "asyncmy>=0.2.17,<1.0",             # MySQL 异步驱动(≈ mysql-connector)
+
+    # 基础设施与可靠性
+    "redis>=8.1.0,<9.0",              # 缓存/限流/短期会话状态(≈ Lettuce)
+    "tenacity>=9.2.0,<10.0",          # 重试与退避(调 Java 接口、模型调用)
+    "tiktoken>=0.14.0,<1.0",          # token 计数(上下文预算与截断)
+]
+
+# 构建配置(≈ 打包插件声明)
+[build-system]
+requires = ["hatchling"]            # 构建工具本体,pip 会先装它再打包本项目
+build-backend = "hatchling.build"   # 构建入口(协议约定写法)
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]                  # 源码包 app 就在项目根(扁平布局);包名即目录名
+
+
+[project.optional-dependencies]  # 开发/测试依赖,运行时不需要
+dev = [                          # pip install -e ".[dev]" 启用
+    "pytest>=8.0,<10.0",         # 测试框架
+    "pytest-asyncio>=1.0,<2.0",  # 异步测试与异步 fixture 支持
+    "pytest-mock>=3.17.0,<4.0",  # mock 夹具(减少 monkeypatch 样板)
+    "respx>=0.23.0,<1.0",        # httpx 请求桩,测 Java 接口调用
+    "ruff>=0.17.0,<1.0",         # lint + 格式化
+    "mypy>=2.4.0,<3.0",          # 静态类型检查
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"      # async def 测试函数无需逐个加 marker
+testpaths = ["tests"]      # 默认只在这些目录收集用例
