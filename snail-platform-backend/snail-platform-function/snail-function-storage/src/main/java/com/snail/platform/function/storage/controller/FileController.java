@@ -123,6 +123,7 @@ public class FileController {
                 + UriUtils.encode(fileName, StandardCharsets.UTF_8);
     }
 
+    /** 响应类型只认服务端扩展名映射:沿用上传声明会让 text/html 的附件被浏览器当页面渲染 */
     private static String contentTypeOf(String fileName) {
         int dot = fileName.lastIndexOf(EXT_SEPARATOR);
         if (dot < 0) {

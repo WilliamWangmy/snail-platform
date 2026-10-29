@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class DefaultFileAccessPolicy implements FileAccessPolicy {
 
-    /** 文件管理权限码:视为可读全租户文件的标记 */
+    /** 文件管理权限码:视为可读全租户文件的标记;种子只给了 list/upload/download/delete 四把码,没有独立的读码 */
     private static final String FILE_MANAGE = "system:file:delete";
 
     /** 内置租户管理员的角色标识 */
@@ -32,6 +32,7 @@ public class DefaultFileAccessPolicy implements FileAccessPolicy {
         return isTenantAdmin(user) || AuthorityChecker.has(FILE_MANAGE);
     }
 
+    /** 只比 roleCode,不比 is_system:比 UserPermissionService.isSuperAdmin 宽一档,改内置超管口径时两处要一起看 */
     private boolean isTenantAdmin(LoginUser user) {
         return user.roles().stream().anyMatch(role -> TENANT_ADMIN.equals(role.roleCode()));
     }

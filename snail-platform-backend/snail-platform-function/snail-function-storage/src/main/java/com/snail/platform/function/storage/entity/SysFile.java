@@ -10,7 +10,7 @@ import lombok.Setter;
 /**
  * 职责:sys_file 表 PO。文件元数据,租户托管;对象内容不在库里,经 storage_key 到 StoragePort 取。
  * 上游:framework-db 的 TenantAuditedEntity;下游:storage 模块的 service 与 mapper。
- * 口径:MVP 不算内容摘要(无 sha256 列),文件名是清洗后的原始名,上传人显示名发送时快照落库。
+ * 口径:MVP 不算内容摘要(无 sha256 列),文件名是清洗后的原始名,上传人显示名上传时快照落库。
  */
 @Getter
 @Setter

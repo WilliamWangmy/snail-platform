@@ -137,6 +137,7 @@ public class FileStorageService {
         try (InputStream in = file.getInputStream()) {
             port.put(storageKey, in, size, file.getContentType());
         } catch (Exception e) {
+            // 写对象失败是存储侧故障,不按业务拒绝包装:参数问题才归 400,后端挂了要让调用方看见
             throw new IllegalStateException("文件写入存储失败: " + e.getMessage(), e);
         }
 
@@ -146,6 +147,7 @@ public class FileStorageService {
         row.setContentType(file.getContentType());
         row.setSize(size);
         row.setStorageKey(storageKey);
+        // 这一列是历史对象的路由依据:日后换写入后端,老文件仍按行内类型取端口读
         row.setStorageType(storageRegistry.activeType());
         row.setBizType(trimToNull(bizType));
         row.setBizId(bizId);
@@ -198,6 +200,7 @@ public class FileStorageService {
     public record StorageDownload(SysFile file, InputStream content) {
     }
 
+    /** 两个分页面共用同一谓词,差别只在调用方套不套 withoutTenant 窗口 */
     private PageResult<FileVO> doPage(FileQuery query) {
         Page<SysFile> page = PageAssembler.from(query);
         String fileName = trimToNull(query.fileName());
@@ -220,6 +223,7 @@ public class FileStorageService {
                 () -> BizException.badRequest(BACKEND_NOT_CONFIGURED + file.getStorageType()));
     }
 
+    /** 不存在、已逻辑删、属他租户三种情况在这一句里同口径——租户拦截器已把它们都读成空 */
     private SysFile requireFile(Long fileId) {
         SysFile file = fileMapper.selectById(fileId);
         if (file == null) {
