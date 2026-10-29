@@ -7,6 +7,7 @@ import { pageRoles, type RoleVO } from '@/api/role';
 import {
   assignUserRoles,
   changeUserStatus,
+  checkUsername,
   createUser,
   deleteUser,
   forceLogoutUser,
@@ -19,7 +20,7 @@ import {
 } from '@/api/user';
 import { usePageList } from '@/composables/usePageList';
 import { useAuthStore } from '@/stores/auth';
-import { copyText, generatePassword, validatePassword } from '@/utils/password';
+import { copyText } from '@/utils/password';
 import RowActions, { type RowAction } from '@/components/RowActions.vue';
 
 const auth = useAuthStore();
@@ -77,7 +78,6 @@ function reset(): void {
 
 interface UserForm {
   username: string;
-  password: string;
   nickname: string;
   email: string;
   phone: string;
@@ -88,7 +88,6 @@ interface UserForm {
 
 const emptyForm: UserForm = {
   username: '',
-  password: '',
   nickname: '',
   email: '',
   phone: '',
@@ -103,16 +102,8 @@ const editingId = ref<number | null>(null);
 const form = reactive<UserForm>({ ...emptyForm });
 const saving = ref(false);
 
-/** 密码强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载 */
-function passwordValidator(_rule: unknown, value: string, callback: (error?: Error) => void): void {
-  const message = validatePassword(value);
-  callback(message ? new Error(message) : undefined);
-}
-
-/** 随机生成填入目标表单的 password 字段 */
-function generateInto(target: { password: string }): void {
-  target.password = generatePassword();
-}
+/** 与后端 UserCreateRequest 的 @Pattern 同口径;失焦占用查询前先过它,脏输入不打接口 */
+const USERNAME_PATTERN = /^[A-Za-z0-9_.@-]+$/;
 
 async function copyPassword(value: string): Promise<void> {
   if (!value) return;
@@ -123,21 +114,23 @@ async function copyPassword(value: string): Promise<void> {
   }
 }
 
-/** 与后端 UserCreateRequest / UserUpdateRequest 的注解同口径,超限在前端先拦住。 */
+/** 与后端 UserCreateRequest 的注解同口径,超限在前端先拦住;口令由服务端生成,不进表单 */
 const rules = computed<FormRules<UserForm>>(() => ({
   username:
     editingId.value === null
       ? [
           { required: true, message: '请输入登录名', trigger: 'blur' },
           { min: 3, max: 30, message: '登录名长度 3-30', trigger: 'blur' },
-          { pattern: /^[A-Za-z0-9_.@-]+$/, message: '登录名只允许字母、数字、下划线、点、@、连字符', trigger: 'blur' },
-        ]
-      : [],
-  password:
-    editingId.value === null
-      ? [
-          { required: true, message: '请输入初始密码', trigger: 'blur' },
-          { validator: passwordValidator, trigger: 'blur' },
+          { pattern: USERNAME_PATTERN, message: '登录名只允许字母、数字、下划线、点、@、连字符', trigger: 'blur' },
+          {
+            // 失焦即查占用(全表口径,含已删行);保存时后端仍会再拦一次,防两人同时提交同名
+            validator: async (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+              if (!value || !USERNAME_PATTERN.test(value)) return callback();
+              if (await checkUsername(value)) return callback(new Error('登录名已被占用'));
+              callback();
+            },
+            trigger: 'blur',
+          },
         ]
       : [],
   nickname: [
@@ -181,9 +174,8 @@ async function submitForm(): Promise<void> {
   try {
     const text = (value: string): string | null => value.trim() || null;
     if (editingId.value === null) {
-      await createUser({
+      const created = await createUser({
         username: form.username.trim(),
-        password: form.password,
         nickname: form.nickname.trim(),
         email: text(form.email),
         phone: text(form.phone),
@@ -192,6 +184,8 @@ async function submitForm(): Promise<void> {
         roleIds: form.roleIds,
       });
       ElMessage.success('已新增用户');
+      // 初始口令由服务端生成且仅此一次可见:结果弹窗展示+复制,转交本人
+      showPasswordResult(`新增用户 · ${form.nickname.trim()}`, created.password);
     } else {
       await updateUser(editingId.value, {
         nickname: form.nickname.trim(),
@@ -219,43 +213,40 @@ async function toggleStatus(row: UserVO): Promise<void> {
   ElMessage.success(next === 0 ? '已启用' : '已停用');
 }
 
-/* -------------------------------- 重置密码 -------------------------------- */
+/* ------------------------------ 口令结果展示 ------------------------------- */
 
-const pwdVisible = ref(false);
-const pwdRef = ref<FormInstance>();
-const pwdTarget = ref<UserVO | null>(null);
-const pwdForm = reactive({ password: '', confirm: '' });
-const pwdRules: FormRules<typeof pwdForm> = {
-  password: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { validator: passwordValidator, trigger: 'blur' },
-  ],
-  confirm: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
-    {
-      validator: (_rule, value: string, callback: (error?: Error) => void) =>
-        value === pwdForm.password ? callback() : callback(new Error('两次输入的密码不一致')),
-      trigger: 'blur',
-    },
-  ],
-};
+const resultVisible = ref(false);
+const resultTitle = ref('');
+const resultPassword = ref('');
 
-function openResetPassword(row: UserVO): void {
-  pwdTarget.value = row;
-  pwdForm.password = '';
-  pwdForm.confirm = '';
-  pwdVisible.value = true;
+/** 建号/重置共用的明文口令结果弹窗:明文仅服务端返回这一次,展示+复制后转交本人 */
+function showPasswordResult(title: string, password: string): void {
+  resultTitle.value = title;
+  resultPassword.value = password;
+  resultVisible.value = true;
 }
 
-/** 重置会前推令牌版本,该用户全部设备下一次请求即 401;列表字段没变,不重取 */
-async function submitResetPassword(): Promise<void> {
-  const target = pwdTarget.value;
-  if (!target) return;
-  const valid = await pwdRef.value?.validate().catch(() => false);
-  if (!valid) return;
-  await resetUserPassword(target.userId, pwdForm.password);
-  ElMessage.success(`已重置 ${target.username} 的密码`);
-  pwdVisible.value = false;
+/* -------------------------------- 重置密码 -------------------------------- */
+
+const resetting = ref(false);
+
+/** 重置 = 弹框确认 → 后端按 PasswordPolicy 随机生成并落库 → 明文仅返回一次,结果弹窗展示+复制 */
+async function openResetPassword(row: UserVO): Promise<void> {
+  const confirmed = await ElMessageBox.confirm(
+    `重置 ${row.nickname}(${row.username}) 的密码？将生成随机新密码，原密码与全部登录会话立即失效。`,
+    '重置密码确认',
+    { type: 'warning', confirmButtonText: '生成新密码', cancelButtonText: '取消' },
+  )
+    .then(() => true)
+    .catch(() => false);
+  if (!confirmed) return;
+  resetting.value = true;
+  try {
+    const password = await resetUserPassword(row.userId);
+    showPasswordResult(`重置密码 · ${row.nickname}`, password);
+  } finally {
+    resetting.value = false;
+  }
 }
 
 /* -------------------------------- 分配角色 -------------------------------- */
@@ -537,27 +528,6 @@ async function kickUser(row: UserVO): Promise<void> {
           />
         </ElFormItem>
         <ElFormItem
-          v-if="editingId === null"
-          label="初始密码"
-          prop="password"
-        >
-          <ElInput
-            v-model="form.password"
-            type="password"
-            show-password
-            placeholder="8-20 位,四类字符全含"
-          >
-            <template #append>
-              <ElButton @click="generateInto(form)">
-                生成
-              </ElButton>
-              <ElButton @click="copyPassword(form.password)">
-                复制
-              </ElButton>
-            </template>
-          </ElInput>
-        </ElFormItem>
-        <ElFormItem
           label="显示名"
           prop="nickname"
         >
@@ -635,56 +605,35 @@ async function kickUser(row: UserVO): Promise<void> {
     </ElDialog>
 
     <ElDialog
-      v-model="pwdVisible"
-      :title="`重置密码 · ${pwdTarget?.nickname ?? ''}`"
+      v-model="resultVisible"
+      :title="resultTitle"
       width="420px"
     >
-      <ElForm
-        ref="pwdRef"
-        :model="pwdForm"
-        :rules="pwdRules"
-        label-width="88px"
-      >
-        <ElFormItem
-          label="新密码"
-          prop="password"
-        >
-          <ElInput
-            v-model="pwdForm.password"
-            type="password"
-            show-password
-            placeholder="8-20 位,四类字符全含"
-          >
-            <template #append>
-              <ElButton @click="generateInto(pwdForm)">
-                生成
-              </ElButton>
-              <ElButton @click="copyPassword(pwdForm.password)">
-                复制
-              </ElButton>
-            </template>
-          </ElInput>
-        </ElFormItem>
-        <ElFormItem
-          label="确认密码"
-          prop="confirm"
-        >
-          <ElInput
-            v-model="pwdForm.confirm"
-            type="password"
-            show-password
-          />
-        </ElFormItem>
-      </ElForm>
-      <template #footer>
-        <ElButton @click="pwdVisible = false">
-          取消
-        </ElButton>
+      <ElAlert
+        type="warning"
+        :closable="false"
+        show-icon
+        title="密码明文仅展示这一次，关闭后不可再见，请立即复制并告知本人。"
+      />
+      <div class="reset-pwd-row">
+        <ElInput
+          :model-value="resultPassword"
+          readonly
+          size="large"
+        />
         <ElButton
           type="primary"
-          @click="submitResetPassword"
+          @click="copyPassword(resultPassword)"
         >
-          确定
+          复制
+        </ElButton>
+      </div>
+      <template #footer>
+        <ElButton
+          type="primary"
+          @click="resultVisible = false"
+        >
+          我已保存，关闭
         </ElButton>
       </template>
     </ElDialog>
@@ -725,5 +674,17 @@ async function kickUser(row: UserVO): Promise<void> {
 <style scoped>
 .full {
   width: 100%;
+}
+
+.reset-pwd-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.reset-pwd-row :deep(.el-input__inner) {
+  font-family: monospace;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 </style>

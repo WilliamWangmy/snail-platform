@@ -23,6 +23,7 @@ import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.dto.UserCreateRequest;
+import com.snail.platform.function.system.user.dto.UserCreatedVO;
 import com.snail.platform.function.system.user.dto.UserQuery;
 import com.snail.platform.function.system.user.dto.UserUpdateRequest;
 import com.snail.platform.function.system.user.dto.UserVO;
@@ -109,22 +110,28 @@ public class UserService {
         return UserVO.of(user, roleIdsOf(userId));
     }
 
+    /** 登录名占用查询:与建号查重同口径——withoutTenant 全表、deleted 行也算占用(唯一键终身占用);失焦即查的前端校验用 */
+    public boolean usernameExists(String username) {
+        return TenantContextHolder.withoutTenant(() -> userMapper.selectCount(
+                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username))) > 0;
+    }
+
     /**
      * 建号即授权:口令与角色的校验都排在写库之前,失败不留半截用户行。
      * 查重刻意走无租户窄窗口——登录名全表唯一(登录不选租户的代价),本租户查不出他租的占用。
      * 两道组织闸分工不同:requireUsableOrg 管"这个组织还在不在、开不开",
      * requireAssignableOrg 管"操作者有没有资格把人挂进去";后者只对组织档及以下有意义。
-     * 明文口令只走到 BCrypt 这一行,之后任何地方都不再可逆;status 一律建为正常。
+     * 口令不传即按 PasswordPolicy 随机生成,明文随响应返回一次、不落日志;
+     * 明文只走到 BCrypt 这一行,之后任何地方都不再可逆;status 一律建为正常。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public Long create(UserCreateRequest request) {
+    public UserCreatedVO create(UserCreateRequest request) {
         String username = request.username().trim();
-        Long taken = TenantContextHolder.withoutTenant(() -> userMapper.selectCount(
-                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username)));
-        if (taken > 0) {
+        if (usernameExists(username)) {
             throw BizException.badRequest("登录名已存在");
         }
-        PasswordPolicy.validate(request.password());
+        String rawPassword = request.password() != null ? request.password() : PasswordPolicy.generate();
+        PasswordPolicy.validate(rawPassword);
         requireUsableOrg(request.orgId());
         requireAssignableOrg(request.orgId());
         checkAccountLimit();
@@ -132,7 +139,7 @@ public class UserService {
         SysUser user = new SysUser();
         user.setUsername(username);
         user.setNickname(request.nickname().trim());
-        user.setPassword(BCrypt.hashpw(request.password()));
+        user.setPassword(BCrypt.hashpw(rawPassword));
         user.setEmail(request.email());
         user.setPhone(request.phone());
         user.setOrgId(request.orgId());
@@ -148,7 +155,7 @@ public class UserService {
         if (request.roleIds() != null && !request.roleIds().isEmpty()) {
             replaceRoles(user.getUserId(), resolveGrantable(request.roleIds()));
         }
-        return user.getUserId();
+        return new UserCreatedVO(user.getUserId(), rawPassword);
     }
 
     /**
@@ -174,21 +181,23 @@ public class UserService {
     }
 
     /**
-     * 管理员重置口令:与自助改密的差别只在"不验原密码",强度口径仍由 PasswordPolicy 单点把。
+     * 管理员重置口令:口令由服务端按 PasswordPolicy 随机生成,明文仅随本次响应返回一次,不落日志;
+     * 与自助改密的差别只在"不验原密码",强度口径仍由 PasswordPolicy 单点把。
      * 前推 token_version 是刻意的——重置等于把该用户全部存量令牌一次作废,新口令只在新登录里生效。
      * 不清 userPerms:重置口令不动授权。
      */
     @Transactional
-    public void resetPassword(Long userId, String rawPassword) {
+    public String resetPassword(Long userId) {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
-        PasswordPolicy.validate(rawPassword);
+        String rawPassword = PasswordPolicy.generate();
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(rawPassword))
                 .set(SysUser::getPasswordModifyTime, null)
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, user.getUserId()));
         cacheEvictor.evict("userSession", sessionKey(userId));
+        return rawPassword;
     }
 
     /** 强制下线:令牌版本自增 + 快照失效,该用户存量令牌下一次请求即 401;不判自我,由调用方决定 */

@@ -9,7 +9,8 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 /**
- * 职责:新建租户契约。租户资料 + 首任管理员账号一并提交,服务端同事务复制 V4 种子模板。
+ * 职责:新建租户契约。租户资料 + 首任管理员账号一并提交,服务端同事务复制 V4 种子模板;
+ * adminPassword 可空,不传由服务端随机生成。
  * 上游:平台管理端表单;下游:TenantService.provision。
  * 口径:expireTime/accountLimit 为 null 表示不设限,0 不是不限。
  */
@@ -54,8 +55,7 @@ public record TenantCreateRequest(
         @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
         String adminUsername,
 
-        @Schema(description = "首任管理员初始口令,服务端 BCrypt 落库", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入管理员初始密码")
+        @Schema(description = "首任管理员初始口令,可空——不传则由服务端按 PasswordPolicy 随机生成并随响应返回明文", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
         String adminPassword) {
 }

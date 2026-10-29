@@ -7,8 +7,8 @@ import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.function.system.user.dto.AssignRolesRequest;
-import com.snail.platform.function.system.user.dto.ResetPasswordRequest;
 import com.snail.platform.function.system.user.dto.UserCreateRequest;
+import com.snail.platform.function.system.user.dto.UserCreatedVO;
 import com.snail.platform.function.system.user.dto.UserQuery;
 import com.snail.platform.function.system.user.dto.UserUpdateRequest;
 import com.snail.platform.function.system.user.dto.UserVO;
@@ -18,6 +18,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -63,10 +67,20 @@ public class UserController {
     }
 
     @PreAuthorize("hasAuthority('system:user:create')")
-    @Operation(summary = "新增用户")
+    @Operation(summary = "登录名占用查询(全表口径,含已删行;失焦即查用,保存时服务端仍会再拦)")
+    @GetMapping("/username-exists")
+    public R<Boolean> usernameExists(@RequestParam @NotBlank(message = "请输入登录名")
+                                     @Size(min = 3, max = 30, message = "登录名长度 3-30")
+                                     @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
+                                     String username) {
+        return R.ok(userService.usernameExists(username));
+    }
+
+    @PreAuthorize("hasAuthority('system:user:create')")
+    @Operation(summary = "新增用户(口令可不传,服务端随机生成,明文仅本次响应可见)")
     @OperLog(module = "用户管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public R<Long> create(@Valid @RequestBody UserCreateRequest request) {
+    public R<UserCreatedVO> create(@Valid @RequestBody UserCreateRequest request) {
         return R.ok(userService.create(request));
     }
 
@@ -80,13 +94,13 @@ public class UserController {
     }
 
     @PreAuthorize("hasAuthority('system:user:reset-password')")
-    @Operation(summary = "重置密码")
+    @Operation(summary = "重置密码(服务端生成随机口令,明文仅本次响应可见)")
     @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{userId}/password")
-    public R<Void> resetPassword(@PathVariable Long userId,
-                                        @Valid @RequestBody ResetPasswordRequest request) {
-        userService.resetPassword(userId, request.password());
-        return R.ok(null);
+    public R<Map<String, String>> resetPassword(@PathVariable Long userId) {
+        // 明文包在 password 键下而非裸字符串:OperLog 落库走 SensitiveDataMasker 键级脱敏,
+        // data 键直挂字符串会绕过名单,明文就进 sys_oper_log.result 了
+        return R.ok(Map.of("password", userService.resetPassword(userId)));
     }
 
     @PreAuthorize("hasAuthority('system:user:update')")

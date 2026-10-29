@@ -73,6 +73,31 @@ export function validatePassword(password: string | null | undefined): string | 
   return null;
 }
 
+/** 改密表单实时清单的逐条判定结果 */
+export interface PasswordChecklist {
+  length: boolean;
+  upper: boolean;
+  lower: boolean;
+  digit: boolean;
+  symbol: boolean;
+  noWhitespace: boolean;
+  notBlacklisted: boolean;
+}
+
+/** 逐条判定口令满足项,判定口径与 validatePassword 同源;供改密表单渲染实时满足条件 */
+export function passwordChecklist(password: string): PasswordChecklist {
+  return {
+    length: password.length >= MIN_LENGTH && password.length <= MAX_LENGTH,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    digit: /\d/.test(password),
+    // 符号判定不含空白:空白由 WHITESPACE 规则单独拒绝,不在这里充当"特殊符号"
+    symbol: [...password].some((c) => !/[a-zA-Z0-9]/.test(c) && !/\s/.test(c)),
+    noWhitespace: password.length > 0 && !/\s/.test(password),
+    notBlacklisted: password.length > 0 && !PASSWORD_BLACKLIST.includes(password.toLowerCase()),
+  };
+}
+
 /** 随机生成 12 位口令:四类各至少 1、无空白、不命中黑名单,不合格即整条重生成 */
 export function generatePassword(): string {
   const pools = [LOWER, UPPER, DIGIT, SYMBOL];

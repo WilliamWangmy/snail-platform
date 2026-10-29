@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import AppIcon from '@/components/AppIcon.vue';
 import {
   changeTenantStatus,
+  checkAdminUsername,
   createTenant,
   pageTenants,
   updateTenant,
@@ -12,7 +13,7 @@ import {
 } from '@/api/tenant';
 import { usePageList } from '@/composables/usePageList';
 import { dateTime } from '@/utils/format';
-import { copyText, generatePassword, validatePassword } from '@/utils/password';
+import { copyText } from '@/utils/password';
 
 const query = reactive<TenantQuery>({ name: '', status: null });
 const { rows, total, loading, pageNum, pageSize, refresh, search } = usePageList<TenantVO>((page) =>
@@ -38,7 +39,6 @@ interface TenantForm {
   accountLimit: number | null;
   remark: string;
   adminUsername: string;
-  adminPassword: string;
 }
 
 const emptyForm: TenantForm = {
@@ -50,7 +50,6 @@ const emptyForm: TenantForm = {
   accountLimit: null,
   remark: '',
   adminUsername: '',
-  adminPassword: '',
 };
 
 const formVisible = ref(false);
@@ -59,19 +58,22 @@ const editingId = ref<number | null>(null);
 const form = reactive<TenantForm>({ ...emptyForm });
 const saving = ref(false);
 
-/** 密码强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载 */
-function passwordValidator(_rule: unknown, value: string, callback: (error?: Error) => void): void {
-  const message = validatePassword(value);
-  callback(message ? new Error(message) : undefined);
+/* ---------------------------- 管理员口令结果展示 ---------------------------- */
+
+const resultVisible = ref(false);
+const resultTitle = ref('');
+const resultPassword = ref('');
+
+/** 开通成功后弹管理员初始口令:明文仅服务端返回这一次,展示+复制后转交租户 */
+function showPasswordResult(title: string, password: string): void {
+  resultTitle.value = title;
+  resultPassword.value = password;
+  resultVisible.value = true;
 }
 
-function generateAdminPassword(): void {
-  form.adminPassword = generatePassword();
-}
-
-async function copyAdminPassword(): Promise<void> {
-  if (!form.adminPassword) return;
-  if (await copyText(form.adminPassword)) {
+async function copyPassword(value: string): Promise<void> {
+  if (!value) return;
+  if (await copyText(value)) {
     ElMessage.success('已复制到剪贴板');
   } else {
     ElMessage.error('复制失败,请手动复制');
@@ -98,10 +100,15 @@ const rules: FormRules<TenantForm> = {
     { required: true, message: '请输入管理员登录名', trigger: 'blur' },
     { min: 3, max: 30, message: '登录名长度 3-30', trigger: 'blur' },
     { pattern: /^[A-Za-z0-9_.@-]+$/, message: '登录名只允许字母、数字、下划线、点、@、连字符', trigger: 'blur' },
-  ],
-  adminPassword: [
-    { required: true, message: '请输入管理员初始密码', trigger: 'blur' },
-    { validator: passwordValidator, trigger: 'blur' },
+    {
+      // 失焦即查占用(全站口径,含已删行);保存时后端仍会再拦一次,防两人同时提交同名
+      validator: async (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+        if (!value || !/^[A-Za-z0-9_.@-]+$/.test(value)) return callback();
+        if (await checkAdminUsername(value)) return callback(new Error('管理员登录名已被占用'));
+        callback();
+      },
+      trigger: 'blur',
+    },
   ],
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 };
@@ -112,7 +119,7 @@ function openCreate(): void {
   formVisible.value = true;
 }
 
-/** 编辑回填:租户标识只读展示(后端修改载荷里没有它),管理员两栏清空——同一段模板只在开通态渲染。 */
+/** 编辑回填:租户标识只读展示(后端修改载荷里没有它),管理员登录名清空——同一段模板只在开通态渲染。 */
 function openEdit(row: TenantVO): void {
   editingId.value = row.tenantId;
   Object.assign(form, {
@@ -124,7 +131,6 @@ function openEdit(row: TenantVO): void {
     accountLimit: row.accountLimit,
     remark: row.remark ?? '',
     adminUsername: '',
-    adminPassword: '',
   });
   formVisible.value = true;
 }
@@ -145,13 +151,14 @@ async function submitForm(): Promise<void> {
       remark: text(form.remark),
     };
     if (editingId.value === null) {
-      await createTenant({
+      const created = await createTenant({
         tenantCode: form.tenantCode.trim(),
         adminUsername: form.adminUsername.trim(),
-        adminPassword: form.adminPassword,
         ...common,
       });
       ElMessage.success('租户已开通');
+      // 管理员初始口令由服务端生成且仅此一次可见:结果弹窗展示+复制,转交租户
+      showPasswordResult(`开通租户 · ${form.name.trim()}`, created.password);
     } else {
       // 修改是整份提交:表单回填了现值,所以"留空即清空"在这里只在用户真删了内容时发生
       // status 不在载荷里:启停只走独立端点,弹窗里放开关等于给高危动作开第二条无确认的通路
@@ -428,27 +435,6 @@ async function toggleStatus(row: TenantVO): Promise<void> {
           />
         </ElFormItem>
         <ElFormItem
-          v-if="editingId === null"
-          label="管理员密码"
-          prop="adminPassword"
-        >
-          <ElInput
-            v-model="form.adminPassword"
-            type="password"
-            show-password
-            placeholder="8-20 位,四类字符全含"
-          >
-            <template #append>
-              <ElButton @click="generateAdminPassword">
-                生成
-              </ElButton>
-              <ElButton @click="copyAdminPassword">
-                复制
-              </ElButton>
-            </template>
-          </ElInput>
-        </ElFormItem>
-        <ElFormItem
           label="联系人"
           prop="contactUser"
         >
@@ -512,11 +498,57 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         </ElButton>
       </template>
     </ElDialog>
+
+    <ElDialog
+      v-model="resultVisible"
+      :title="resultTitle"
+      width="420px"
+    >
+      <ElAlert
+        type="warning"
+        :closable="false"
+        show-icon
+        title="管理员初始密码明文仅展示这一次，关闭后不可再见，请立即复制并告知租户。"
+      />
+      <div class="reset-pwd-row">
+        <ElInput
+          :model-value="resultPassword"
+          readonly
+          size="large"
+        />
+        <ElButton
+          type="primary"
+          @click="copyPassword(resultPassword)"
+        >
+          复制
+        </ElButton>
+      </div>
+      <template #footer>
+        <ElButton
+          type="primary"
+          @click="resultVisible = false"
+        >
+          我已保存，关闭
+        </ElButton>
+      </template>
+    </ElDialog>
   </div>
 </template>
 
 <style scoped>
 .full {
   width: 100%;
+}
+
+.reset-pwd-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.reset-pwd-row :deep(.el-input__inner) {
+  font-family: monospace;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 </style>

@@ -16,6 +16,7 @@ import com.snail.platform.function.system.role.mapper.SysRoleMapper;
 import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
 import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.dto.TenantCreateRequest;
+import com.snail.platform.function.system.tenant.dto.TenantCreatedVO;
 import com.snail.platform.function.system.tenant.dto.TenantQuery;
 import com.snail.platform.function.system.tenant.dto.TenantUpdateRequest;
 import com.snail.platform.function.system.tenant.dto.TenantVO;
@@ -87,17 +88,25 @@ public class TenantService {
         return PageResult.of(result.getRecords().stream().map(TenantVO::from).toList(), result.getTotal());
     }
 
+    /** 管理员登录名占用查询:与开通查重同口径——withoutTenant 全表、deleted 行也算占用;失焦即查的前端校验用 */
+    public boolean adminUsernameExists(String username) {
+        return TenantContextHolder.withoutTenant(() -> userMapper.selectCount(
+                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username))) > 0;
+    }
+
     /**
      * 开通租户:同事务落租户行,再以新租户身份复制 V4 种子模板(根组织 + admin/common 内置角色 + 管理员并绑定)。
      * 租户行必须先 insert 拿到自增 tenantId,才能进 asTenant 窗口——后续每条 insert 的 tenant_id 由拦截器从这个上下文里取。
      * 管理员登录名先在全局口径下查重——username 全表唯一是"登录不选租户"的代价。
+     * 管理员口令不传即按 PasswordPolicy 随机生成,明文随响应返回一次、不落日志。
      * 模板不复制 sys_role_menu:新租户开箱没有任何角色授权记录,见 insertBuiltinRole 的口径。
      */
     @Transactional
-    public Long provision(TenantCreateRequest request) {
+    public TenantCreatedVO provision(TenantCreateRequest request) {
         String tenantCode = request.tenantCode().trim();
         String adminUsername = request.adminUsername().trim();
-        PasswordPolicy.validate(request.adminPassword());
+        String adminPassword = request.adminPassword() != null ? request.adminPassword() : PasswordPolicy.generate();
+        PasswordPolicy.validate(adminPassword);
 
         if (tenantMapper.selectCount(Wrappers.<SysTenant>lambdaQuery()
                 .eq(SysTenant::getTenantCode, tenantCode)) > 0) {
@@ -105,9 +114,7 @@ public class TenantService {
         }
         // sys_user 是租户管理表,不摘条件的话 selectCount 只圈在当前平台管理员自己的租户里,
         // 别的租户已占用的登录名看不见;username 的唯一键是全表口径,查重必须同口径
-        Long usernameTaken = TenantContextHolder.withoutTenant(() -> userMapper.selectCount(
-                Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, adminUsername)));
-        if (usernameTaken > 0) {
+        if (adminUsernameExists(adminUsername)) {
             throw BizException.badRequest("管理员登录名已存在");
         }
 
@@ -145,7 +152,7 @@ public class TenantService {
             SysUser admin = new SysUser();
             admin.setUsername(adminUsername);
             admin.setNickname("租户管理员");
-            admin.setPassword(BCrypt.hashpw(request.adminPassword()));
+            admin.setPassword(BCrypt.hashpw(adminPassword));
             admin.setOrgId(root.getOrgId());
             admin.setStatus(0);
             userMapper.insert(admin);
@@ -156,7 +163,7 @@ public class TenantService {
             userRoleMapper.insert(binding);
             return null;
         });
-        return newTenantId;
+        return new TenantCreatedVO(newTenantId, adminPassword);
     }
 
     /**

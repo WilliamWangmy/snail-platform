@@ -30,8 +30,6 @@ export interface UserQuery extends PageParams {
 export interface UserCreatePayload {
   /** 全表唯一(跨租户也算占用),建后不可改;查重由后端兜底 */
   username: string;
-  /** 初始口令明文,后端 BCrypt 落库 */
-  password: string;
   nickname: string;
   email?: string | null;
   phone?: string | null;
@@ -39,6 +37,12 @@ export interface UserCreatePayload {
   orgId?: number | null;
   remark?: string | null;
   roleIds?: number[];
+}
+
+/** 建号/重置口令出参:明文由服务端生成,仅本次响应可见,前端须展示+复制后转交本人 */
+export interface UserCreated {
+  userId: number;
+  password: string;
 }
 
 export interface UserUpdatePayload {
@@ -60,9 +64,14 @@ export function getUser(userId: number): Promise<UserVO> {
   return get<UserVO>(`/system/user/${userId}`);
 }
 
-/** roleIds 可空,提交即在建号同事务内完成授权;口令强度由后端 PasswordPolicy 单点判 */
-export function createUser(payload: UserCreatePayload): Promise<number> {
-  return post<number>('/system/user', payload);
+/** 登录名占用查询(全表口径,含已删行);失焦即查用,保存时后端仍会再拦一次防并发抢占 */
+export function checkUsername(username: string): Promise<boolean> {
+  return get<boolean>('/system/user/username-exists', { username });
+}
+
+/** 建号同事务完成授权;口令不传,由服务端按 PasswordPolicy 随机生成并随响应返回明文 */
+export function createUser(payload: UserCreatePayload): Promise<UserCreated> {
+  return post<UserCreated>('/system/user', payload);
 }
 
 /** 只改档案五列;username/password/status 不在契约里,改口令走 reset、改状态走 changeUserStatus */
@@ -70,9 +79,12 @@ export function updateUser(userId: number, payload: UserUpdatePayload): Promise<
   return put<void>(`/system/user/${userId}`, payload);
 }
 
-/** 重置同时前推令牌版本:该用户全部存量设备下一次请求即 401,需引导用新口令重登 */
-export function resetUserPassword(userId: number, password: string): Promise<void> {
-  return put<void>(`/system/user/${userId}/password`, { password });
+/** 重置由服务端按 PasswordPolicy 随机生成新口令并前推令牌版本,明文仅本次响应可见,前端展示+复制 */
+export function resetUserPassword(userId: number): Promise<string> {
+  // 明文包在 password 键下:后端审计落库走键级脱敏,裸字符串会被原样记进 sys_oper_log
+  return put<{ password: string }>(`/system/user/${userId}/password`, undefined).then(
+    (body) => body.password,
+  );
 }
 
 /** status 走 query 参数而非请求体;停用即刻失效存量会话,且不允许停用自己 */
