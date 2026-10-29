@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>snail-platform 数据大屏</title>
+    <!-- Cesium 静态资源地址（Workers/Assets/Widgets），必须在 Cesium 模块加载前设置。
+         路径与 vite.config.ts 中 viteStaticCopy 的实际产物位置保持一致。 -->
+    <script>
+      window.CESIUM_BASE_URL = '/cesium-assets/node_modules/cesium/Build/Cesium/';
+    </script>
   </head>
   <body>
     <div id="app"></div>

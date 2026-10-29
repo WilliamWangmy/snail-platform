@@ -1,7 +1,7 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import CesiumMap from '@/components/CesiumMap.vue';
+</script>
 
 <template>
-  <div class="app-shell"></div>
+  <CesiumMap />
 </template>
-
-<style scoped></style>

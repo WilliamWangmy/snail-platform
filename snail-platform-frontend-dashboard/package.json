@@ -15,6 +15,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "cesium": "^1.146.0",
     "vue": "3.5.44"
   },
   "devDependencies": {
@@ -23,9 +24,11 @@
     "@vitejs/plugin-vue": "6.0.10",
     "eslint": "10.13.0",
     "eslint-plugin-vue": "10.11.1",
+    "globals": "^17.13.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0",
     "vite": "8.3.5",
+    "vite-plugin-static-copy": "^4.1.1",
     "vue-eslint-parser": "10.4.1",
     "vue-tsc": "3.3.13"
   }
