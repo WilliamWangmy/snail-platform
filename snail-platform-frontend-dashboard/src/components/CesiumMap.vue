@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { Cartesian3, Viewer } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { MAP_CENTER, TIANDITU_KEY, createTiandituImagery } from '@/config/tianditu';
+import MapToolbar from '@/components/MapToolbar.vue';
 
 const containerRef = ref<HTMLDivElement>();
 const keyMissing = ref(false);
@@ -17,6 +18,11 @@ onMounted(() => {
     return;
   }
 
+  // 隐藏 Cesium 自带版权容器（左下角 "Cesium ion" 等文字），
+  // 天地图来源标注改由模板中的自定义角标展示
+  const hiddenCreditContainer = document.createElement('div');
+  hiddenCreditContainer.style.display = 'none';
+
   viewer = new Viewer(containerRef.value, {
     // 底图由天地图提供，禁用 Cesium Ion 相关控件（Ion 需要 token 且默认底图为国外服务）
     baseLayer: false,
@@ -30,6 +36,7 @@ onMounted(() => {
     fullscreenButton: false,
     infoBox: false,
     selectionIndicator: false,
+    creditContainer: hiddenCreditContainer,
     // 性能优化：无变化时不渲染
     requestRenderMode: true,
     maximumRenderTimeChange: Infinity,
@@ -57,6 +64,11 @@ onBeforeUnmount(() => {
       ref="containerRef"
       class="cesium-container"
     ></div>
+    <!-- 天地图版权标注（天地图服务条款要求展示，请勿删除） -->
+    <div class="map-credit">
+      © 国家地理信息公共服务平台 天地图
+    </div>
+    <MapToolbar />
     <div
       v-if="keyMissing"
       class="key-tip"
@@ -111,5 +123,21 @@ onBeforeUnmount(() => {
 
 .key-tip a {
   color: #1a6faa;
+}
+
+/* 自定义版权角标（替代 Cesium 默认 credit 容器） */
+.map-credit {
+  position: absolute;
+  bottom: 4px;
+  left: 8px;
+  z-index: 1;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: none;
 }
 </style>
