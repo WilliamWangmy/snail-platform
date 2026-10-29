@@ -16,8 +16,8 @@ public record ChangePasswordRequest(
         @NotBlank(message = "请输入原密码")
         String oldPassword,
 
-        @Schema(description = "新密码,长度 8-64,强度口径见 PasswordPolicy", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "新密码,长度 8-20,强度口径见 PasswordPolicy", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入新密码")
-        @Size(min = 8, max = 64, message = "密码长度 8-64")
+        @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
         String newPassword) {
 }

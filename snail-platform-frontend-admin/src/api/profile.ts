@@ -30,3 +30,8 @@ export function changePassword(payload: { oldPassword: string; newPassword: stri
 export function forceLogoutSelf(): Promise<void> {
   return post<void>('/system/profile/force-logout');
 }
+
+/** 首次登录强制改密:只录新密码,成功后当前会话一并失效,调用方必须引导重新登录 */
+export function forceChangePassword(payload: { newPassword: string }): Promise<void> {
+  return post<void>('/system/profile/password/force-change', payload);
+}

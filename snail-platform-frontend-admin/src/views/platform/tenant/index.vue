@@ -12,6 +12,7 @@ import {
 } from '@/api/tenant';
 import { usePageList } from '@/composables/usePageList';
 import { dateTime } from '@/utils/format';
+import { copyText, generatePassword, validatePassword } from '@/utils/password';
 
 const query = reactive<TenantQuery>({ name: '', status: null });
 const { rows, total, loading, pageNum, pageSize, refresh, search } = usePageList<TenantVO>((page) =>
@@ -58,6 +59,25 @@ const editingId = ref<number | null>(null);
 const form = reactive<TenantForm>({ ...emptyForm });
 const saving = ref(false);
 
+/** 密码强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载 */
+function passwordValidator(_rule: unknown, value: string, callback: (error?: Error) => void): void {
+  const message = validatePassword(value);
+  callback(message ? new Error(message) : undefined);
+}
+
+function generateAdminPassword(): void {
+  form.adminPassword = generatePassword();
+}
+
+async function copyAdminPassword(): Promise<void> {
+  if (!form.adminPassword) return;
+  if (await copyText(form.adminPassword)) {
+    ElMessage.success('已复制到剪贴板');
+  } else {
+    ElMessage.error('复制失败,请手动复制');
+  }
+}
+
 const rules: FormRules<TenantForm> = {
   tenantCode: [
     { required: true, message: '请输入租户标识', trigger: 'blur' },
@@ -81,7 +101,7 @@ const rules: FormRules<TenantForm> = {
   ],
   adminPassword: [
     { required: true, message: '请输入管理员初始密码', trigger: 'blur' },
-    { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
+    { validator: passwordValidator, trigger: 'blur' },
   ],
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 };
@@ -416,8 +436,17 @@ async function toggleStatus(row: TenantVO): Promise<void> {
             v-model="form.adminPassword"
             type="password"
             show-password
-            placeholder="8-64 位"
-          />
+            placeholder="8-20 位,四类字符全含"
+          >
+            <template #append>
+              <ElButton @click="generateAdminPassword">
+                生成
+              </ElButton>
+              <ElButton @click="copyAdminPassword">
+                复制
+              </ElButton>
+            </template>
+          </ElInput>
         </ElFormItem>
         <ElFormItem
           label="联系人"

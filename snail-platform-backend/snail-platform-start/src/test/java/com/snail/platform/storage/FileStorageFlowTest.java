@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.snail.platform.framework.storage.SftpTestServer;
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
@@ -281,6 +282,7 @@ class FileStorageFlowTest {
         String listUser = "aclList" + suffix;
         long downloadUserId = createUser(downloadUser, downloadRole, adminToken);
         long listUserId = createUser(listUser, listRole, adminToken);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String downloadToken = login(downloadUser, PASSWORD);
         String listToken = login(listUser, PASSWORD);
         try {

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.snail.platform.framework.db.entity.TenantAuditedEntity;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,6 +32,9 @@ public class SysUser extends TenantAuditedEntity {
 
     /** 令牌版本:改密/重置/停用/强制下线自增,进 JWT ver 声明实现吊销 */
     private Long tokenVersion;
+
+    /** 密码最近修改时间:NULL 待强制改密,非空为最近一次改密时间 */
+    private LocalDateTime passwordModifyTime;
 
     /** 邮箱 */
     private String email;

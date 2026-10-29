@@ -79,14 +79,19 @@ export function useLogin(formRef: Readonly<ShallowRef<FormInstance | null>>) {
     if (!valid || !captcha.value) return;
     loading.value = true;
     try {
-      await auth.signIn({
+      const result = await auth.signIn({
         username: form.username.trim(),
         password: form.password,
         captchaKey: captcha.value.captchaKey,
         captchaCode: form.captchaCode.trim(),
       });
       writeRememberedAccount(remember.value ? form.username.trim() : '');
-      await router.replace(redirectTarget());
+      // 待强制改密的会话进不了业务页,redirect 参数让位
+      if (result.passwordChangeRequired) {
+        await router.replace('/force-change-password');
+      } else {
+        await router.replace(redirectTarget());
+      }
     } catch {
       await refreshCaptcha();
     } finally {

@@ -10,6 +10,7 @@ import {
   type Profile,
 } from '@/api/profile';
 import { useAuthStore } from '@/stores/auth';
+import { copyText, generatePassword, validatePassword } from '@/utils/password';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -32,7 +33,14 @@ const pwdRules = {
   oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
+    {
+      // 密码强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载
+      validator: (_rule: unknown, value: string, callback: (error?: Error) => void): void => {
+        const message = validatePassword(value);
+        callback(message ? new Error(message) : undefined);
+      },
+      trigger: 'blur',
+    },
   ],
   confirmPassword: [
     { required: true, message: '请再次输入新密码', trigger: 'blur' },
@@ -73,6 +81,19 @@ async function submitProfile(): Promise<void> {
 }
 
 const changingPwd = ref(false);
+
+function generateNewPassword(): void {
+  pwdForm.newPassword = generatePassword();
+}
+
+async function copyNewPassword(): Promise<void> {
+  if (!pwdForm.newPassword) return;
+  if (await copyText(pwdForm.newPassword)) {
+    ElMessage.success('已复制到剪贴板');
+  } else {
+    ElMessage.error('复制失败,请手动复制');
+  }
+}
 
 /** 改密成功即令牌版本自增,当前令牌下一次请求就废,所以主动登出比等 401 再跳更干净 */
 async function submitPassword(): Promise<void> {
@@ -220,7 +241,17 @@ function signOutLocal(): void {
                 v-model="pwdForm.newPassword"
                 type="password"
                 show-password
-              />
+                placeholder="8-20 位,四类字符全含"
+              >
+                <template #append>
+                  <ElButton @click="generateNewPassword">
+                    生成
+                  </ElButton>
+                  <ElButton @click="copyNewPassword">
+                    复制
+                  </ElButton>
+                </template>
+              </ElInput>
             </ElFormItem>
             <ElFormItem
               label="确认新密码"

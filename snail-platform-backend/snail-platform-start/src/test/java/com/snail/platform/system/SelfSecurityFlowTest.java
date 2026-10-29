@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -19,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -40,6 +42,10 @@ class SelfSecurityFlowTest {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    /** V7 后新建账号与被重置账号生而待改密,登录前垫掉标记(改密端点属兜底闸拦截面,带标记会 403) */
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final Pattern DATA_ID = Pattern.compile("\"data\":(\\d+)");
     private static final Pattern TOKEN = Pattern.compile("\"token\":\"([^\"]+)\"");
 
@@ -55,6 +61,7 @@ class SelfSecurityFlowTest {
         // 爆破锁定用独立用户 A:5 次错误逐条计数,第 6 次命中锁定
         String userA = "selfA" + suffix;
         createUser(userA, adminToken);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String tokenA = login(userA, PASSWORD);
         for (int i = 0; i < 5; i++) {
             String wrong = postBody("/system/profile/password",
@@ -69,6 +76,7 @@ class SelfSecurityFlowTest {
         // 改密与吊销链用独立用户 B:正确改密 → 旧令牌(版本 0)下一次请求即 401
         String username = "selfU" + suffix;
         createUser(username, adminToken);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String token1 = login(username, PASSWORD);
         String profile = getBody("/system/profile", token1, 200);
         assertTrue(profile.contains(q(username)), "档案未含登录名: " + profile);
@@ -88,6 +96,7 @@ class SelfSecurityFlowTest {
                         .content("{\"password\":\"" + RESET_PASSWORD + "\"}"))
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertEquals(0, jsonCode(reset), "重置口令失败: " + reset);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         assertEquals(401, statusOf("/system/profile", token2), "重置后用户旧令牌应失效");
 
         String token3 = login(username, RESET_PASSWORD);

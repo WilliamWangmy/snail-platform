@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -67,6 +68,7 @@ class RoleMenuFlowTest {
         long roleId = createRole("授权角色" + suffix, "grant" + suffix, adminToken);
         String username = "grantU" + suffix;
         long userId = createUser(username, roleId, adminToken);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String userToken = login(username, "User@1234");
 
         assertDenied(userToken, "/system/user/page");
@@ -101,6 +103,7 @@ class RoleMenuFlowTest {
         grantMenuJdbc(role2, 110L);
         grantMenuJdbc(role2, 1104L);
         grantMenuJdbc(role2, 200L);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String user2Token = login(username2, "User@1234");
 
         String limitedTree = roleTree(role2, user2Token);

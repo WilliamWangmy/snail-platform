@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -62,6 +63,7 @@ class PermissionFlowTest {
         String username = "permU" + suffix;
         long userId = createUser(username, roleId, adminToken);
         grantMenu(roleId, 100L);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String userToken = login(username, "User@1234");
 
         assertAllowed(userToken, "/system/user/page", "授权后用户列表应放行");
@@ -92,6 +94,7 @@ class PermissionFlowTest {
         String created = postJson("/system/tenant", body, adminToken);
         assertTrue(created.contains("\"code\":0"), "开通租户失败: " + created);
 
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String tenantToken = login("permTadmin" + suffix, "Admin@123");
         assertAllowed(tenantToken, "/system/role/page", "新租户内置 admin 应隐式持有租户面权限");
         assertDenied(tenantToken, "/system/tenant/page", "新租户 admin 不得进入平台面");

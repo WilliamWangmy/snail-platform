@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.snail.platform.support.TestPasswordFlagSupport;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.regex.Matcher;
@@ -125,6 +126,7 @@ class DictManagementFlowTest {
         long roleId = createRole("字典只读角色", "dictr" + suffix, adminToken);
         String username = "dictU" + suffix;
         long userId = createUser(username, roleId, adminToken);
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String userToken = login(username, "User@1234");
 
         mockMvc.perform(get("/system/dict/type/page").header("Authorization", "Bearer " + userToken))
@@ -145,6 +147,7 @@ class DictManagementFlowTest {
                  "adminUsername":"dictTadmin%s","adminPassword":"Admin@123"}
                 """.formatted(suffix, suffix, suffix);
         assertOk(postJson("/system/tenant", adminToken, body), "开通租户失败");
+        TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         String tenantToken = login("dictTadmin" + suffix, "Admin@123");
 
         long tenantDictId = createType(dictType, "租户二字典" + suffix, tenantToken);

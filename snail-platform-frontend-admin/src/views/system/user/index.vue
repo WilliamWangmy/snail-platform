@@ -19,6 +19,7 @@ import {
 } from '@/api/user';
 import { usePageList } from '@/composables/usePageList';
 import { useAuthStore } from '@/stores/auth';
+import { copyText, generatePassword, validatePassword } from '@/utils/password';
 import RowActions, { type RowAction } from '@/components/RowActions.vue';
 
 const auth = useAuthStore();
@@ -102,6 +103,26 @@ const editingId = ref<number | null>(null);
 const form = reactive<UserForm>({ ...emptyForm });
 const saving = ref(false);
 
+/** 密码强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载 */
+function passwordValidator(_rule: unknown, value: string, callback: (error?: Error) => void): void {
+  const message = validatePassword(value);
+  callback(message ? new Error(message) : undefined);
+}
+
+/** 随机生成填入目标表单的 password 字段 */
+function generateInto(target: { password: string }): void {
+  target.password = generatePassword();
+}
+
+async function copyPassword(value: string): Promise<void> {
+  if (!value) return;
+  if (await copyText(value)) {
+    ElMessage.success('已复制到剪贴板');
+  } else {
+    ElMessage.error('复制失败,请手动复制');
+  }
+}
+
 /** 与后端 UserCreateRequest / UserUpdateRequest 的注解同口径,超限在前端先拦住。 */
 const rules = computed<FormRules<UserForm>>(() => ({
   username:
@@ -116,7 +137,7 @@ const rules = computed<FormRules<UserForm>>(() => ({
     editingId.value === null
       ? [
           { required: true, message: '请输入初始密码', trigger: 'blur' },
-          { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
+          { validator: passwordValidator, trigger: 'blur' },
         ]
       : [],
   nickname: [
@@ -207,7 +228,7 @@ const pwdForm = reactive({ password: '', confirm: '' });
 const pwdRules: FormRules<typeof pwdForm> = {
   password: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, max: 64, message: '密码长度 8-64', trigger: 'blur' },
+    { validator: passwordValidator, trigger: 'blur' },
   ],
   confirm: [
     { required: true, message: '请再次输入新密码', trigger: 'blur' },
@@ -524,8 +545,17 @@ async function kickUser(row: UserVO): Promise<void> {
             v-model="form.password"
             type="password"
             show-password
-            placeholder="8-64 位"
-          />
+            placeholder="8-20 位,四类字符全含"
+          >
+            <template #append>
+              <ElButton @click="generateInto(form)">
+                生成
+              </ElButton>
+              <ElButton @click="copyPassword(form.password)">
+                复制
+              </ElButton>
+            </template>
+          </ElInput>
         </ElFormItem>
         <ElFormItem
           label="显示名"
@@ -623,8 +653,17 @@ async function kickUser(row: UserVO): Promise<void> {
             v-model="pwdForm.password"
             type="password"
             show-password
-            placeholder="8-64 位"
-          />
+            placeholder="8-20 位,四类字符全含"
+          >
+            <template #append>
+              <ElButton @click="generateInto(pwdForm)">
+                生成
+              </ElButton>
+              <ElButton @click="copyPassword(pwdForm.password)">
+                复制
+              </ElButton>
+            </template>
+          </ElInput>
         </ElFormItem>
         <ElFormItem
           label="确认密码"

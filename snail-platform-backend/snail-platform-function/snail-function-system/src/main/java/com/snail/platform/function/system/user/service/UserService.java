@@ -185,6 +185,7 @@ public class UserService {
         PasswordPolicy.validate(rawPassword);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(rawPassword))
+                .set(SysUser::getPasswordModifyTime, null)
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, user.getUserId()));
         cacheEvictor.evict("userSession", sessionKey(userId));

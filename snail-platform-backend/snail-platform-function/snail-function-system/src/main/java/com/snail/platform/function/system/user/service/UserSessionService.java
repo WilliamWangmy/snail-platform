@@ -80,7 +80,8 @@ public class UserSessionService implements LoginUserProvider {
         SysOrg org = user.getOrgId() == null ? null : orgMapper.selectById(user.getOrgId());
         return new LoginUser(user.getUserId(), user.getTenantId(), tenant.getName(),
                 user.getUsername(), user.getNickname(), user.getOrgId(), org == null ? null : org.getName(),
-                Long.valueOf(user.getTokenVersion()), rolesOf(user.getUserId()));
+                Long.valueOf(user.getTokenVersion()), rolesOf(user.getUserId()),
+                user.getPasswordModifyTime() == null);
     }
 
     /** 只收启用角色;sort 升序、空值垫底,同序按 roleId 稳定排列 */
