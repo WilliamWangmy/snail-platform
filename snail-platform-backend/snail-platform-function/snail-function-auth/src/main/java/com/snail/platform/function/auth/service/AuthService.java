@@ -26,12 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 职责:登录校验链的唯一实现——锁定检查 → 验证码 → 定位用户(无租户旁路窄窗口)→ 租户状态 → 用户状态 → BCrypt。
- * 每步拒绝的文案即口径;凡进入本服务必落一条登录日志,成败皆记,用户不存在的失败归属记 tenant_id=0。
+ * 每步拒绝的文案即口径;业务拒绝与成功必落一条登录日志,用户定位前的失败归属记 tenant_id=0
+ * (基础设施故障走 500,不落登录日志,由应用日志排障)。
  * 上游:AuthController;下游:sys_user/sys_tenant 读、sys_login_log 写、JWT 签发。
  * 防账号枚举:用户不存在与口令错误回同一文案。
  * 计数口径:失败按类型分流(LoginRejects)——只有凭证失败累加 IP+登录名锁定,
  * 验证码失败由 CaptchaService 按 IP 自计,租户/账号停用属运营状态不计数;
- * 锁定分支自身不再累加,否则锁定期间每次重试都在延长计数窗口。
+ * 锁定分支自身不再累加:计数已过阈值,继续累加没有意义,窗口仍从首次失败起算。
  * 来源 IP 取 Hutool getClientIP(信任转发头),代理层必须负责归一化,否则计数可被伪造头绕开。
  */
 @Service
@@ -55,7 +56,7 @@ public class AuthService {
     /** 暴力计数 */
     private final LoginFailGuard failGuard;
 
-    /** 令牌签发 */
+    /** 令牌签发,签出的 ver 取自用户当前版本供过滤器比对 */
     private final JwtTokenService jwtTokenService;
 
     /** 登出时的快照点清出口 */
@@ -73,7 +74,12 @@ public class AuthService {
         this.cacheEvictor = cacheEvictor;
     }
 
+    /**
+     * 执行完整登录链并签发令牌;失败按 LoginRejects 分类决定是否计数。
+     * 出参是登录时刻的身份与租户快照,后续资料变更以 /me 为准。
+     */
     public LoginSuccessVO login(LoginRequest request, HttpServletRequest http) {
+        // 先去空白:锁定键与用户定位必须用同一字面量,否则 "admin " 会分裂成另一个计数桶
         String username = request.username().trim();
         String ip = JakartaServletUtil.getClientIP(http);
         if (failGuard.isCredentialLocked(ip, username)) {
@@ -84,6 +90,7 @@ public class AuthService {
         try {
             captchaService.verify(ip, request.captchaKey(), request.captchaCode());
 
+            // 登录时还没有租户上下文:按全表唯一的登录名定位用户,旁路窗口只覆盖这一条查询
             user = TenantContextHolder.withoutTenant(() -> userMapper.selectOne(
                     Wrappers.<SysUser>lambdaQuery().eq(SysUser::getUsername, username)));
             if (user == null) {
@@ -92,6 +99,7 @@ public class AuthService {
 
             // 按 user.tenantId 定点取租户:sys_tenant 在拦截器 ignore 清单,这里不需要摘租户条件也查得到别的租户
             // 租户行缺失(销户/数据被清)与显式停用同口径报"租户已停用",登录方不需要分辨是哪种
+            // 状态位:0 正常、1 停用,与 sys_user.status 同口径
             SysTenant tenant = tenantMapper.selectById(user.getTenantId());
             if (tenant == null || Objects.equals(tenant.getStatus(), 1)) {
                 throw new LoginRejects.Access("租户已停用");
@@ -102,6 +110,7 @@ public class AuthService {
             if (Objects.equals(user.getStatus(), 1)) {
                 throw new LoginRejects.Access("账号已停用");
             }
+            // 口令比对放在状态检查之后:前置步骤都不需要哈希,停用账号在这一步之前就被拒
             if (!BCrypt.checkpw(request.password(), user.getPassword())) {
                 throw new LoginRejects.Credential("账号或密码错误");
             }
@@ -159,7 +168,7 @@ public class AuthService {
         try {
             loginLogMapper.insert(log);
         } catch (RuntimeException ignored) {
-            // 登录留痕失败不阻断响应;排障看应用日志
+            // 留痕失败直接忽略,不阻断登录响应;此处不另行记录
         }
     }
 }

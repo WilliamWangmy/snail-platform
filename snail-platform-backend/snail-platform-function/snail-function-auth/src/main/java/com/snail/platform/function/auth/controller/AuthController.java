@@ -1,7 +1,8 @@
 package com.snail.platform.function.auth.controller;
 
 import cn.hutool.extra.servlet.JakartaServletUtil;
-import com.snail.platform.framework.core.context.LoginUser;import com.snail.platform.framework.core.context.LoginUserContextHolder;
+import com.snail.platform.framework.core.context.LoginUser;
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.security.authority.UserAuthorityProvider;
@@ -75,6 +76,7 @@ public class AuthController {
     @GetMapping("/me")
     public R<LoginUserVO> me() {
         LoginUser loginUser = LoginUserContextHolder.get();
+        // 防御分支:认证通过的请求过滤器必已注入快照,这里兜住端口装配缺失等异常态
         if (loginUser == null) {
             throw BizException.unauthorized("未认证");
         }

@@ -46,6 +46,7 @@ public class LoginFailGuard {
         rateGuard.clear(key(ip, username));
     }
 
+    /** 组合键:来源 + 登录名;来源取不到时归一到 unknown,避免拼出键头为空的歧义键 */
     private static String key(String ip, String username) {
         return KEY_PREFIX + (ip == null ? "unknown" : ip) + ":" + username;
     }

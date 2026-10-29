@@ -42,7 +42,7 @@ public class CaptchaService {
     private static final Duration FAIL_WINDOW = Duration.ofMinutes(10);
     private static final int MAX_FAILS_PER_WINDOW = 10;
 
-    /**  Redis 存取模板 */
+    /** Redis 存取模板 */
     private final StringRedisTemplate redisTemplate;
 
     /** 来源维度的限流计数 */
@@ -60,6 +60,7 @@ public class CaptchaService {
             throw BizException.badRequest("验证码获取过于频繁,请稍后再试");
         }
         rateGuard.record(key, ISSUE_WINDOW);
+        // 120x40 画布、4 位字符、10 条干扰线;位数要与前端登录页的 len=4 校验一致
         LineCaptcha captcha = CaptchaUtil.createLineCaptcha(120, 40, 4, 10);
         String captchaKey = IdUtil.fastSimpleUUID();
         redisTemplate.opsForValue().set(KEY_PREFIX + captchaKey, captcha.getCode(), TTL);
@@ -76,6 +77,7 @@ public class CaptchaService {
             countFail(failKey);
             throw new LoginRejects.Captcha("请输入验证码");
         }
+        // GETDEL 原子核销:同一码无论答案对错都只可能被取到一次,并发重放也只有一个请求能拿到答案
         String cached = redisTemplate.opsForValue().getAndDelete(KEY_PREFIX + captchaKey);
         if (cached == null) {
             countFail(failKey);
@@ -85,6 +87,7 @@ public class CaptchaService {
             countFail(failKey);
             throw new LoginRejects.Captcha("验证码错误");
         }
+        // 通过即清零本 IP 的失败计数,历史失败不累积到下一次
         rateGuard.clear(failKey);
     }
 
