@@ -45,6 +45,7 @@ public class MailOutboundChannel implements OutboundChannel {
         if (sender == null) {
             throw new IllegalStateException("邮件通道未配置");
         }
+        // 空白/非法/重复地址在此剔除:脏地址会让整封被 SMTP 拒收,一个人也只该收到一封
         List<String> addresses = message.targets().stream()
                 .map(OutboundTarget::address)
                 .filter(StrUtil::isNotBlank)
@@ -53,13 +54,16 @@ public class MailOutboundChannel implements OutboundChannel {
                 .distinct()
                 .toList();
         if (addresses.isEmpty()) {
+            // 全部无效按失败上抛,由 dispatcher 记 failed 与错因,不静默当成功
             throw new IllegalStateException("收件人没有可用邮箱地址");
         }
         MimeMessage mime = sender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mime, false, "UTF-8");
         helper.setFrom(from);
         helper.setSubject(message.title());
+        // 第二个参数 false 即纯文本:正文由运营录入,不按 HTML 解析,免去标签注入客户端
         helper.setText(message.content(), false);
+        // 收件人一律 BCC,同一封里互不可见地址
         for (String address : addresses) {
             helper.addBcc(address);
         }

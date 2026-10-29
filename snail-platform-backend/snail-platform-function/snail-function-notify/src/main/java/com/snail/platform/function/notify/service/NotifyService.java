@@ -197,6 +197,7 @@ public class NotifyService implements NotifyApi {
             return PageResult.of(List.of(), result.getTotal());
         }
         List<Long> messageIds = result.getRecords().stream().map(SysNotifyMessage::getMessageId).toList();
+        // 扇出人数按 message_id 分组一次查出,避免逐条 count 造成 N+1
         Map<Long, Long> counts = TenantContextHolder.withoutTenant(() ->
                         recipientMapper.selectMaps(new QueryWrapper<SysNotifyRecipient>()
                                 .select("message_id", "count(*) AS cnt")
@@ -225,6 +226,7 @@ public class NotifyService implements NotifyApi {
 
         List<UserBrief> briefs = userBriefPort.briefs(recipients);
         if (briefs.isEmpty()) {
+            // 收件人全部无效时抛错,事务把刚插入的消息主体一起回滚,不留没有收件人的空壳消息
             throw BizException.badRequest("收件人均不存在或已跨租户");
         }
         List<OutboundChannel.OutboundTarget> targets = briefs.stream()
@@ -237,6 +239,7 @@ public class NotifyService implements NotifyApi {
             row.setReadStatus(UNREAD);
             return row;
         }).toList();
+        // 批量插入收件行;Db 复用当前事务的 SqlSession,租户注入与审计填充同样生效
         Db.saveBatch(rows);
 
         dispatcher.dispatchAfterCommit(new OutboundDispatcher.DispatchJob(message.getMessageId(),
@@ -254,6 +257,7 @@ public class NotifyService implements NotifyApi {
                 .stream().map(SysNotifyMessage::getMessageId).toList();
     }
 
+    /** 批量取消息主体,避免收件行逐条回查 */
     private Map<Long, SysNotifyMessage> messagesOf(List<SysNotifyRecipient> rows) {
         if (rows.isEmpty()) {
             return Map.of();
@@ -263,6 +267,7 @@ public class NotifyService implements NotifyApi {
                 .collect(Collectors.toMap(SysNotifyMessage::getMessageId, Function.identity()));
     }
 
+    /** 取本人收件行;他人行与不存在同口径拒绝——存在性即隐私,不区分"无权"与"没有" */
     private SysNotifyRecipient requireOwnRecipient(Long recipientId) {
         Long userId = requireLoginUser();
         SysNotifyRecipient recipient = recipientMapper.selectById(recipientId);
@@ -272,6 +277,7 @@ public class NotifyService implements NotifyApi {
         return recipient;
     }
 
+    /** 服务层再兜一次登录态:控制器虽已要求认证,内部直调与未来的非 HTTP 入口不受它保护 */
     private Long requireLoginUser() {
         Long userId = LoginUserContextHolder.userId();
         if (userId == null) {

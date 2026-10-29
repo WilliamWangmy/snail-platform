@@ -27,10 +27,10 @@ public class SysNotifyOutbound extends AuditedEntity {
     /** 通道:mail | log */
     private String channel;
 
-    /** 寻址摘要:mail 记 bcc×N,log 记 batch×N */
+    /** 寻址摘要:每通道都记 batch×目标数,无可用通道时记原因占位 */
     private String target;
 
-    /** 投递状态:0 待发 1 成功 2 失败 */
+    /** 投递终态:1 成功 2 失败;0 仅为 DDL 默认值,代码不写 */
     private Integer status;
 
     /** 失败原因,截断落库 */

@@ -39,23 +39,29 @@ public class OutboundDispatcher implements DisposableBean {
     /** 投递状态:失败 */
     private static final int STATUS_FAILED = 2;
 
-    /** 通道可用时统一走它兜底,保证每条消息至少有一条落库记录 */
+    /** 无可用通道时的兜底通道名:落一行 log 记录,保证每条消息都有投递痕迹 */
     private static final String FALLBACK_CHANNEL = "log";
 
+    /** 通道 SPI 集合;逐个在投递时判 available,不依赖装配期条件 */
     private final ObjectProvider<OutboundChannel> channelProvider;
 
+    /** 投递终态写;ignore 表,线程内显式带租户快照 */
     private final SysNotifyOutboundMapper outboundMapper;
 
+    /** 有界队列;满即丢并告警,不反压业务事务 */
     private final BlockingQueue<DispatchJob> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
 
+    /** 专用投递线程;daemon 不阻止 JVM 退出,排空由 destroy 负责 */
     private final Thread worker;
 
+    /** 停机开关;volatile 让工作线程立即看到 destroy 的修改 */
     private volatile boolean running = true;
 
     public OutboundDispatcher(ObjectProvider<OutboundChannel> channelProvider,
                               SysNotifyOutboundMapper outboundMapper) {
         this.channelProvider = channelProvider;
         this.outboundMapper = outboundMapper;
+        // 构造即启动:队列为空时按 500ms 轮询空转,避免为无通知的时段维护额外调度器
         this.worker = new Thread(this::drainLoop, "notify-outbound");
         this.worker.setDaemon(true);
         this.worker.start();
@@ -89,12 +95,14 @@ public class OutboundDispatcher implements DisposableBean {
         }
     }
 
+    /** 非阻塞入队;队满即丢并告警,出站投递是尽力而为 */
     private void enqueue(DispatchJob job) {
         if (!queue.offer(job)) {
             log.warn("通知投递队列已满({}),消息 {} 的出站投递被丢弃", QUEUE_CAPACITY, job.messageId());
         }
     }
 
+    /** 500ms 轮询兼顾停机响应与空转开销;running=false 后先把余量排空再退出 */
     private void drainLoop() {
         while (running || !queue.isEmpty()) {
             DispatchJob job;
@@ -113,6 +121,7 @@ public class OutboundDispatcher implements DisposableBean {
         }
     }
 
+    /** 通道可用性在投递时判定;全不可用也落一行 log 兜底,保证消息有投递记录 */
     private void handle(DispatchJob job) {
         List<OutboundChannel> channels = channelProvider.stream().filter(OutboundChannel::available).toList();
         if (channels.isEmpty()) {
@@ -125,6 +134,7 @@ public class OutboundDispatcher implements DisposableBean {
         }
     }
 
+    /** 最多两次尝试(首发 + 一次重试);retryCount 记实际重试次数,不是尝试次数 */
     private void dispatchWithRetry(DispatchJob job, OutboundChannel channel, OutboundMessage message) {
         String error = null;
         int attempts = 0;
@@ -144,7 +154,7 @@ public class OutboundDispatcher implements DisposableBean {
                 error == null ? STATUS_SUCCESS : STATUS_FAILED, attempts - 1, error);
     }
 
-    /** 投递终态落库;线程无登录人上下文,审计操作人自然留空 */
+    /** 投递终态落库;线程无登录人上下文,审计操作人自然留空;摘要与错误按列宽截断 */
     private void record(DispatchJob job, String channel, String target, int status, int retryCount, String error) {
         SysNotifyOutbound row = new SysNotifyOutbound();
         row.setMessageId(job.messageId());
@@ -162,6 +172,7 @@ public class OutboundDispatcher implements DisposableBean {
         }
     }
 
+    /** 停机:置开关后最多等 10s 排空,仍未处理完的随进程退出丢弃并告警 */
     @Override
     public void destroy() throws InterruptedException {
         running = false;
