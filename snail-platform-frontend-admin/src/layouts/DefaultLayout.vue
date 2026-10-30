@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
+import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import ThemePicker from '@/components/ThemePicker.vue';
 import { fetchUnreadCount } from '@/api/notify';
@@ -47,9 +50,15 @@ async function signOut(): Promise<void> {
   void router.push('/login');
 }
 
+/** 用户下拉四项:个人信息/修改密码开弹窗,数据大屏暂未实现,退出登录直接走人 */
+const profileVisible = ref(false);
+const passwordVisible = ref(false);
+
 function handleUserCommand(command: string | number | object): void {
   if (command === 'logout') void signOut();
-  else if (command === 'profile') void router.push('/profile');
+  else if (command === 'profile') profileVisible.value = true;
+  else if (command === 'password') passwordVisible.value = true;
+  else if (command === 'dashboard') ElMessage.info('数据大屏开发中，敬请期待');
 }
 
 /* ------------------------- 通知未读数:30s 轮询 ------------------------- */
@@ -234,7 +243,13 @@ onBeforeUnmount(() => {
             <template #dropdown>
               <ElDropdownMenu>
                 <ElDropdownItem command="profile">
-                  个人中心
+                  个人信息
+                </ElDropdownItem>
+                <ElDropdownItem command="password">
+                  修改密码
+                </ElDropdownItem>
+                <ElDropdownItem command="dashboard">
+                  数据大屏
                 </ElDropdownItem>
                 <ElDropdownItem
                   divided
@@ -261,6 +276,15 @@ onBeforeUnmount(() => {
         </div>
       </ElMain>
     </ElContainer>
+
+    <ProfileEditDialog
+      :visible="profileVisible"
+      @closed="profileVisible = false"
+    />
+    <ChangePasswordDialog
+      :visible="passwordVisible"
+      @closed="passwordVisible = false"
+    />
   </ElContainer>
 </template>
 

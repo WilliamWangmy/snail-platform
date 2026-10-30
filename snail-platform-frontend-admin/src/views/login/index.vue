@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue';
+import { onMounted, ref, useTemplateRef, watch } from 'vue';
 import type { FormInstance } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
+import { useAuthStore } from '@/stores/auth';
+import ForceChangePasswordDialog from './ForceChangePasswordDialog.vue';
 import { useLogin } from './useLogin';
 
+const auth = useAuthStore();
 const formRef = useTemplateRef<FormInstance>('formRef');
 const {
   form,
@@ -13,9 +16,30 @@ const {
   captcha,
   captchaState,
   statusLabel,
+  forcePasswordChange,
   submit,
   refreshCaptcha,
 } = useLogin(formRef);
+
+const forceChangeVisible = ref(false);
+
+watch(forcePasswordChange, (required) => {
+  if (required) forceChangeVisible.value = true;
+});
+
+/** 刷新恢复的待改密会话:守卫已把它收拢到登录页,这里按会话标志补弹窗 */
+onMounted(() => {
+  if (auth.token && (auth.pendingPasswordChange || auth.user?.passwordChangeRequired === true)) {
+    forceChangeVisible.value = true;
+  }
+});
+
+/** 改密成功或退出登录后关窗,清掉已提交过的旧密码并换码 */
+function onForceChangeClosed(): void {
+  forceChangeVisible.value = false;
+  form.password = '';
+  void refreshCaptcha();
+}
 </script>
 
 <template>
@@ -203,6 +227,11 @@ const {
         </div>
       </div>
     </section>
+
+    <ForceChangePasswordDialog
+      :visible="forceChangeVisible"
+      @closed="onForceChangeClosed"
+    />
   </div>
 </template>
 

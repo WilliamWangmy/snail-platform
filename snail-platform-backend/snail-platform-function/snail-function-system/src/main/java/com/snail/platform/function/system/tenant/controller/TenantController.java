@@ -5,6 +5,7 @@ import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.function.system.tenant.dto.TenantCreateRequest;
+import com.snail.platform.function.system.tenant.dto.TenantCreatedVO;
 import com.snail.platform.function.system.tenant.dto.TenantQuery;
 import com.snail.platform.function.system.tenant.dto.TenantUpdateRequest;
 import com.snail.platform.function.system.tenant.dto.TenantVO;
@@ -14,6 +15,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,10 +54,20 @@ public class TenantController {
     }
 
     @PreAuthorize("hasAuthority('platform:tenant:create')")
-    @Operation(summary = "开通租户(同事务复制根组织/内置角色/管理员模板)")
+    @Operation(summary = "管理员登录名占用查询(全表口径,含已删行;失焦即查用,保存时服务端仍会再拦)")
+    @GetMapping("/admin-username-exists")
+    public R<Boolean> adminUsernameExists(@RequestParam @NotBlank(message = "请输入管理员登录名")
+                                          @Size(min = 3, max = 30, message = "登录名长度 3-30")
+                                          @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
+                                          String username) {
+        return R.ok(tenantService.adminUsernameExists(username));
+    }
+
+    @PreAuthorize("hasAuthority('platform:tenant:create')")
+    @Operation(summary = "开通租户(同事务复制根组织/内置角色/管理员模板;管理员口令可不传,服务端生成,明文仅本次响应可见)")
     @OperLog(module = "租户管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public R<Long> create(@Valid @RequestBody TenantCreateRequest request) {
+    public R<TenantCreatedVO> create(@Valid @RequestBody TenantCreateRequest request) {
         return R.ok(tenantService.provision(request));
     }
 

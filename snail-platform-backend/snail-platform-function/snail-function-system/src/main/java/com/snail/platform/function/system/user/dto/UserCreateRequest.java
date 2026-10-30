@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * 职责:新增用户契约。username 全局唯一(登录不选租户的代价),查重在服务端按全表口径做;
- * roleIds 可选,提交即在建号同事务内完成授权。
+ * roleIds 可选,提交即在建号同事务内完成授权;password 可空,不传由服务端随机生成。
  * 上游:用户管理页面;下游:UserService.create。
  */
 @Schema(description = "新增用户请求")
@@ -22,8 +22,7 @@ public record UserCreateRequest(
         @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
         String username,
 
-        @Schema(description = "初始口令,BCrypt 落库;强度口径见 PasswordPolicy", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "请输入初始密码")
+        @Schema(description = "初始口令,可空——不传则由服务端按 PasswordPolicy 随机生成并随响应返回明文", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
         @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
         String password,
 

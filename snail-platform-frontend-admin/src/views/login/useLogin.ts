@@ -35,6 +35,8 @@ export function useLogin(formRef: Readonly<ShallowRef<FormInstance | null>>) {
   const loading = ref(false);
   const captcha = ref<Captcha | null>(null);
   const captchaState = ref<CaptchaState>('loading');
+  /** 登录成功但待强制改密:不进业务页,由视图在登录页上弹强制改密窗 */
+  const forcePasswordChange = ref(false);
 
   const remembered = readRememberedAccount();
   const form = reactive({ username: remembered, password: '', captchaCode: '' });
@@ -86,9 +88,9 @@ export function useLogin(formRef: Readonly<ShallowRef<FormInstance | null>>) {
         captchaCode: form.captchaCode.trim(),
       });
       writeRememberedAccount(remember.value ? form.username.trim() : '');
-      // 待强制改密的会话进不了业务页,redirect 参数让位
+      // 待强制改密的会话留在登录页弹窗,redirect 参数让位
       if (result.passwordChangeRequired) {
-        await router.replace('/force-change-password');
+        forcePasswordChange.value = true;
       } else {
         await router.replace(redirectTarget());
       }
@@ -109,6 +111,7 @@ export function useLogin(formRef: Readonly<ShallowRef<FormInstance | null>>) {
     captcha,
     captchaState,
     statusLabel,
+    forcePasswordChange,
     submit,
     refreshCaptcha,
   };

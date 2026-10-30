@@ -17,13 +17,6 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: '无权限' },
   },
   {
-    // 强制改密页:非 public、非菜单路由,不带布局——待改密会话进不了业务菜单
-    path: '/force-change-password',
-    name: 'force-change-password',
-    component: () => import('@/views/force-change-password/index.vue'),
-    meta: { title: '修改初始密码' },
-  },
-  {
     path: '/',
     name: WORKSPACE,
     component: DefaultLayout,
@@ -62,27 +55,39 @@ function needsPasswordChange(auth: ReturnType<typeof useAuthStore>): boolean {
   return auth.user?.passwordChangeRequired === true || auth.pendingPasswordChange;
 }
 
-/** 首个受保护路由先取登录人与导航菜单,再按菜单纯态注册业务路由;令牌失效即退回登录页。
- *  顺序冻结:loadSession → 判待改密标志 → 命中即跳改密页并跳过 loadMenus——
+/** 待改密会话没有独立路由:守卫把带令牌的待改密访问一律收拢到登录页,由页面弹出强制改密窗。
+ *  顺序冻结:loadSession → 判待改密标志 → 命中即留在登录页并跳过 loadMenus——
  *  菜单接口属业务接口,会被后端兜底闸 403,先拉后判会 401→登出→再登录→再拉菜单 死循环。 */
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
   if (to.meta.public) {
-    return to.name === 'login' && auth.token ? { path: '/' } : true;
+    if (to.name !== 'login' || !auth.token) return true;
+    // 带令牌访问登录页:先恢复会话,待改密则留在登录页弹改密窗,其余回工作台
+    try {
+      if (!auth.loaded) await auth.loadSession();
+      if (needsPasswordChange(auth)) return true;
+      if (!auth.menus.length) {
+        await auth.loadMenus();
+        installMenuRoutes(router, auth.menus);
+      }
+    } catch {
+      // 半途失败也要清:上一次成功注册的业务路由还挂在实例上,不清就是"换个账号仍能直达上一页"
+      resetMenuRoutes(router);
+      auth.signOut();
+      return true;
+    }
+    return { path: '/' };
   }
   if (!auth.token) {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
   if (auth.loaded) {
-    if (needsPasswordChange(auth)) {
-      return to.name === 'force-change-password' ? true : { path: '/force-change-password' };
-    }
-    return to.name === 'force-change-password' ? { path: '/' } : true;
+    return needsPasswordChange(auth) ? { path: '/login' } : true;
   }
   try {
     await auth.loadSession();
     if (needsPasswordChange(auth)) {
-      return to.name === 'force-change-password' ? true : { path: '/force-change-password' };
+      return { path: '/login' };
     }
     await auth.loadMenus();
   } catch {

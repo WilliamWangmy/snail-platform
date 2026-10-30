@@ -25,7 +25,7 @@ export interface TenantQuery extends PageParams {
   status?: number | null;
 }
 
-/** 开通租户同事务复制根组织/内置角色/管理员模板,故要带管理员口令。 */
+/** 开通租户同事务复制根组织/内置角色/管理员模板;管理员口令不传,由服务端随机生成。 */
 export interface TenantCreatePayload {
   /** 全局唯一、建后不可改:小写字母数字与点/下划线/连字符,首尾须是字母或数字 */
   tenantCode: string;
@@ -37,8 +37,12 @@ export interface TenantCreatePayload {
   remark?: string | null;
   /** 全站唯一(登录不选租户),重名直接业务拒绝 */
   adminUsername: string;
-  /** 8-64 位,后端过密码强度校验后 BCrypt 落库 */
-  adminPassword: string;
+}
+
+/** 开通出参:首任管理员明文口令仅本次响应可见,前端须展示+复制后转交租户 */
+export interface TenantCreated {
+  tenantId: number;
+  password: string;
 }
 
 /** 修改是整份覆盖:除 name 外全部可清空,留空即清库;status 不传即不动。 */
@@ -57,9 +61,14 @@ export function pageTenants(query: TenantQuery): Promise<PageResult<TenantVO>> {
   return get<PageResult<TenantVO>>('/system/tenant/page', query);
 }
 
+/** 管理员登录名占用查询(全站口径,含已删行);失焦即查用,保存时后端仍会再拦一次防并发抢占 */
+export function checkAdminUsername(username: string): Promise<boolean> {
+  return get<boolean>('/system/tenant/admin-username-exists', { username });
+}
+
 /** 开通:租户标识或管理员登录名占用即整单业务拒绝,模板复制与租户行同事务,失败不留半个租户。 */
-export function createTenant(payload: TenantCreatePayload): Promise<number> {
-  return post<number>('/system/tenant', payload);
+export function createTenant(payload: TenantCreatePayload): Promise<TenantCreated> {
+  return post<TenantCreated>('/system/tenant', payload);
 }
 
 /** 修改:每次提交都会整体刷新登录快照缓存;只在"转为停用"或"到期时间变更"时作废该租户存量令牌。 */
