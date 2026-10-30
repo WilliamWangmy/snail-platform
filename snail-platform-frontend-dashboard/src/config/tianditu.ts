@@ -32,6 +32,39 @@ export const MAP_CENTER: MapCenter = {
   height: parseNumber(import.meta.env.VITE_MAP_CENTER_HEIGHT, 200000),
 };
 
+/** 3D 模型入口（3D Tiles 的 tileset.json），换地标时改 VITE_MODEL_URL 指向新目录即可 */
+export const MODEL_URL: string =
+  import.meta.env.VITE_MODEL_URL ?? '/3dtiles/tileset.json';
+
+/** 3D 模型视角配置（开启"3D 模型"开关时相机飞到的固定机位） */
+export interface ModelView {
+  /** 机位经度（十进制度） */
+  lon: number;
+  /** 机位纬度（十进制度） */
+  lat: number;
+  /** 机位高度（米） */
+  height: number;
+  /** 水平朝向（度，0=正北，90=东，270=西） */
+  headingDeg: number;
+  /** 俯仰角（度，0=平视，-90=垂直向下） */
+  pitchDeg: number;
+}
+
+/**
+ * 模型固定机位：五个 VITE_MODEL_VIEW_* 环境变量全部有效时启用；
+ * 任一缺失则回退到 Cesium 自动包围盒取景（viewer.flyTo(tileset)）。
+ */
+export const MODEL_VIEW: ModelView | null = (() => {
+  const env = import.meta.env;
+  const lon = Number(env.VITE_MODEL_VIEW_LON);
+  const lat = Number(env.VITE_MODEL_VIEW_LAT);
+  const height = Number(env.VITE_MODEL_VIEW_HEIGHT);
+  const headingDeg = Number(env.VITE_MODEL_VIEW_HEADING ?? 0);
+  const pitchDeg = Number(env.VITE_MODEL_VIEW_PITCH ?? 0);
+  if (![lon, lat, height, headingDeg, pitchDeg].every(Number.isFinite)) return null;
+  return { lon, lat, height, headingDeg, pitchDeg };
+})();
+
 /** 天地图 DataServer 图层类型（_w = Web 墨卡托投影） */
 export type TiandituLayerType =
   | 'vec' // 矢量底图
