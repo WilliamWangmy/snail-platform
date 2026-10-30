@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  snail-framework-redis：Lettuce 客户端装配 + 无状态服务所需的最小共享状态。
-  不做业务缓存，不做 token 黑名单。
+  snail-framework-redis：Redis(Lettuce)接入 + 无状态服务所需的最小共享状态（计数锁定、键名收口）。
+  不做业务缓存，不做 token 黑名单；连接参数由 spring.data.redis 在 start 侧声明。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

@@ -21,7 +21,8 @@ import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
  * 口径:寻址方式由 snail.storage.s3.path-style 决定,默认路径式(MinIO 不吃虚拟主机寻址),
  * 阿里 OSS/腾讯 COS 的兼容端点要显式关掉本开关改走虚拟主机寻址;
  * put 显式携带 ContentLength(已知,来自元数据);
- * get 返回 SDK 的 ResponseInputStream,调用方关闭;exists 走 headObject,NoSuchKey 即不存在。
+ * get 返回 SDK 的 ResponseInputStream,调用方关闭;exists 走 headObject,仅 NoSuchKeyException 视为不存在,
+ * 其余 S3 异常(含部分兼容端点对 404 的其它映射)原样上抛。
  */
 public class S3StoragePort implements StoragePort {
 
@@ -31,6 +32,7 @@ public class S3StoragePort implements StoragePort {
     /** 同步 S3 客户端,线程安全,随端口生命周期复用 */
     private final S3Client client;
 
+    /** 构造同步客户端;path-style 决定 MinIO 形态与云厂商虚拟主机形态 */
     public S3StoragePort(SnailStorageProperties.S3 config) {
         this.bucket = config.getBucket();
         this.client = S3Client.builder()
@@ -46,6 +48,7 @@ public class S3StoragePort implements StoragePort {
                 .build();
     }
 
+    /** 写入对象:长度与类型显式声明,同键覆盖 */
     @Override
     public void put(String key, InputStream in, long size, String contentType) {
         PutObjectRequest request = PutObjectRequest.builder()
@@ -57,17 +60,20 @@ public class S3StoragePort implements StoragePort {
         client.putObject(request, RequestBody.fromInputStream(in, size));
     }
 
+    /** 读取对象:返回 SDK 流,调用方负责关闭;键不存在由 SDK 抛异常 */
     @Override
     public InputStream get(String key) {
         GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
         return client.getObject(request);
     }
 
+    /** 删除对象:S3 对不存在的键本就返回成功,天然幂等 */
     @Override
     public void delete(String key) {
         client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 
+    /** 存在性探测:headObject 成功即存在,NoSuchKeyException 视为不存在 */
     @Override
     public boolean exists(String key) {
         HeadObjectRequest request = HeadObjectRequest.builder().bucket(bucket).key(key).build();

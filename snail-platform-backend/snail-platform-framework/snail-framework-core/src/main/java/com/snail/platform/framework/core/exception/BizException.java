@@ -30,6 +30,7 @@ public class BizException extends RuntimeException {
         return new BizException(403, message);
     }
 
+    /** 业务错误码,供 GlobalExceptionHandler 原样写入响应信封 */
     public int getCode() {
         return code;
     }

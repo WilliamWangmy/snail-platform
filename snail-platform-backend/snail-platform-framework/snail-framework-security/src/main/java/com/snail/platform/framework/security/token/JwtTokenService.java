@@ -43,6 +43,7 @@ public class JwtTokenService {
     /** 令牌有效期 */
     private final Duration ttl;
 
+    /** 读取密钥与有效期;密钥缺失或短于 32 字符在启动期即拒绝 */
     public JwtTokenService(SnailSecurityProperties properties) {
         String configured = properties.getJwt().getSecret();
         if (configured == null || configured.length() < 32) {

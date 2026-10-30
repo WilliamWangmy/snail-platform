@@ -23,6 +23,7 @@ public class SnailTenantLineHandler implements TenantLineHandler {
         this.properties = properties;
     }
 
+    /** 注入的租户值;无上下文即抛错——放行一条无租户条件的 SQL 等于跨租户越权 */
     @Override
     public Expression getTenantId() {
         Long tenantId = TenantContextHolder.get();
@@ -32,11 +33,13 @@ public class SnailTenantLineHandler implements TenantLineHandler {
         return new LongValue(tenantId);
     }
 
+    /** 租户判别列名,全库统一 tenant_id */
     @Override
     public String getTenantIdColumn() {
         return TENANT_COLUMN;
     }
 
+    /** 豁免判定:旁路窗口内全表放行,其余只认配置清单(大小写不敏感比较) */
     @Override
     public boolean ignoreTable(String tableName) {
         // 旁路窗口(登录窄路径)内一切表豁免;窗口由 TenantContextHolder.withoutTenant 成对管理

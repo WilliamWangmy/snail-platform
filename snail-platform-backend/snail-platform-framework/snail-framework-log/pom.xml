@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  snail-framework-log：traceId 过滤器与 MDC、操作日志注解与切面。
-  不落库：日志记录经端口下沉给 snail-function-system 的 log 子域。
+  snail-framework-log：操作日志注解与切面、敏感字段脱敏、落库端口。
+  不落库：日志记录经 OperLogSink 下沉给 snail-function-system 的 log 子域；
+  traceId 由 snail-framework-core 的 TraceFilter 提供，本构件只消费 MDC。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

@@ -16,10 +16,12 @@ public final class LoginUserContextHolder {
     private LoginUserContextHolder() {
     }
 
+    /** 认证过滤器在请求线程注入登录人快照 */
     public static void set(LoginUser loginUser) {
         LOGIN_USER.set(loginUser);
     }
 
+    /** 当前登录人快照;未认证线程为 null,调用方需自行判空 */
     public static LoginUser get() {
         return LOGIN_USER.get();
     }

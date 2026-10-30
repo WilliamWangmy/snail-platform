@@ -29,6 +29,7 @@ public class PasswordTransferCipher {
     /** IV 一次性随机源 */
     private final SecureRandom random = new SecureRandom();
 
+    /** 解码并校验密钥:Base64 非法、缺失或不是 32 字节都在启动期拒绝,不等到加密时才炸 */
     public PasswordTransferCipher(String base64Key) {
         byte[] raw;
         try {

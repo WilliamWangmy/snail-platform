@@ -37,6 +37,7 @@ public class ForcePasswordChangeFilter extends OncePerRequestFilter {
         return false;
     }
 
+    /** 待改密会话只放行 ALLOWED 内的三条请求,其余 403;匿名请求不进本闸 */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {

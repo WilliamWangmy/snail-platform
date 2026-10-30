@@ -15,6 +15,7 @@ import org.apache.ibatis.reflection.MetaObject;
  */
 public class SnailAuditMetaObjectHandler implements MetaObjectHandler {
 
+    /** insert:补创建/修改时间;有登录人时再补创建人/修改人 */
     @Override
     public void insertFill(MetaObject metaObject) {
         LocalDateTime now = LocalDateTime.now();
@@ -27,6 +28,7 @@ public class SnailAuditMetaObjectHandler implements MetaObjectHandler {
         }
     }
 
+    /** update:只动修改侧;条件构造器写法必须传空实体,否则这里填不到值 */
     @Override
     public void updateFill(MetaObject metaObject) {
         strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());

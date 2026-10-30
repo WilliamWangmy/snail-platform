@@ -42,6 +42,7 @@ public record LoginUser(
             String roleName) {
     }
 
+    /** 归一化角色列表:null 落空集,其余复制为不可变副本,保证消费方拿到的快照不可被篡改 */
     public LoginUser {
         roles = roles == null ? List.of() : List.copyOf(roles);
     }

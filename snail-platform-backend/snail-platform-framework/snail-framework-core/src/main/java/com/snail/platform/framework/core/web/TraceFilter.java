@@ -35,6 +35,7 @@ public class TraceFilter extends OncePerRequestFilter {
      */
     private static final Pattern INCOMING_TRACE_ID = Pattern.compile("[A-Za-z0-9-]{8,64}");
 
+    /** 取/生成 traceId 后写入 MDC 与响应头,请求结束必清 MDC,避免线程复用串号 */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {

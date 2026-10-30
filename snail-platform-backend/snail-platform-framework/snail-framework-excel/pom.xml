@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  snail-framework-excel：fastexcel 流式导出、分批导入。
-  不认识业务 DTO，只吃表头声明与数据供给函数；全量取数一律走本构件，不用分页接口拉全表。
+  snail-framework-excel：fastexcel 的导出单点——行数据写 xlsx 直接挂 HTTP 响应。
+  不认识业务 DTO，只吃带 @ExcelProperty 的表头类与已筛好的行集合；导入通道尚未实现。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

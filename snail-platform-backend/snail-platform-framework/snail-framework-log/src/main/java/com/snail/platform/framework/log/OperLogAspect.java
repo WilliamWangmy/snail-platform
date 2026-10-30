@@ -69,6 +69,7 @@ public class OperLogAspect {
                 (task, pool) -> log.warn("操作日志队列已满,丢弃一条留痕"));
     }
 
+    /** 环绕留痕:请求线程采齐上下文与入参,业务返回或抛错后定格结果并异步落库,业务异常原样外抛 */
     @Around("@annotation(operLog)")
     public Object around(ProceedingJoinPoint joinPoint, OperLog operLog) throws Throwable {
         long start = System.currentTimeMillis();

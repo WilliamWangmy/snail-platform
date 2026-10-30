@@ -5,6 +5,7 @@ import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.security.authority.UserAuthorityProvider;
+import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import com.snail.platform.framework.security.login.LoginUserProvider;
 import com.snail.platform.framework.security.token.JwtTokenService;
 import com.snail.platform.framework.security.token.SnailPrincipal;
@@ -12,11 +13,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import java.io.IOException;
 import java.util.LinkedHashSet;
-import java.util.Objects;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -68,6 +68,7 @@ public class SnailAuthFilter extends OncePerRequestFilter {
         return false;
     }
 
+    /** 解析 Bearer 令牌并装满三份上下文;令牌无效保持匿名,请求收尾必清上下文 */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
@@ -84,8 +85,7 @@ public class SnailAuthFilter extends OncePerRequestFilter {
                     // 权限解析要读租户托管表,必须先于 Provider 调用注入租户
                     TenantContextHolder.set(principal.tenantId());
                     LoginUserProvider provider = loginUserProviders.getIfAvailable();
-                    LoginUser snapshot = provider != null ? provider.load(principal)
-                            : LoginUserProvider.minimal(principal);
+                    LoginUser snapshot = loginUserOf(principal);
                     if (sessionValid(provider != null, principal, snapshot)) {
                         LoginUserContextHolder.set(snapshot);
                         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

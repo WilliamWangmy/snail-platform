@@ -22,6 +22,7 @@ public class SnailStorageConfig {
     private static final Set<String> VALID_TYPES =
             Set.of("", SnailStorageProperties.TYPE_SFTP, SnailStorageProperties.TYPE_S3);
 
+    /** 装配前先校验 type 合法性;非法值直接拒绝启动 */
     public SnailStorageConfig(SnailStorageProperties properties) {
         String type = properties.getType();
         if (type == null || !VALID_TYPES.contains(type.trim())) {
@@ -30,6 +31,7 @@ public class SnailStorageConfig {
         }
     }
 
+    /** 组装注册表:出现即装配(并校验完整性),active 类型必须有对应端口,否则拒绝启动 */
     @Bean
     public StoragePortRegistry storagePortRegistry(SnailStorageProperties properties) {
         Map<String, StoragePort> ports = new LinkedHashMap<>();
@@ -60,6 +62,7 @@ public class SnailStorageConfig {
                 || hasText(s3.getAccessKey()) || hasText(s3.getSecretKey());
     }
 
+    /** 校验 SFTP 必填项与二选一凭据,构建端口 */
     private static StoragePort buildSftp(SnailStorageProperties.Sftp sftp) {
         requireText(sftp.getHost(), "snail.storage.sftp.host");
         requireText(sftp.getUsername(), "snail.storage.sftp.username");
@@ -77,6 +80,7 @@ public class SnailStorageConfig {
         return new SftpStoragePort(sftp);
     }
 
+    /** 校验 S3 必填连接与凭证,构建端口 */
     private static StoragePort buildS3(SnailStorageProperties.S3 s3) {
         requireText(s3.getEndpoint(), "snail.storage.s3.endpoint");
         requireText(s3.getRegion(), "snail.storage.s3.region");

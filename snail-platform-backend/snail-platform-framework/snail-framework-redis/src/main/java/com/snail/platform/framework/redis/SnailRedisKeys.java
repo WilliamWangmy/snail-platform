@@ -22,10 +22,12 @@ public final class SnailRedisKeys {
     private SnailRedisKeys() {
     }
 
+    /** 在线会话详情键:snail:online:{tenantId}:{userId} */
     public static String online(Long tenantId, Long userId) {
         return ONLINE + tenantId + ":" + userId;
     }
 
+    /** 租户在线会话索引键(集合成员为用户 ID):snail:online:idx:{tenantId} */
     public static String onlineIndex(Long tenantId) {
         return ONLINE_INDEX + tenantId;
     }

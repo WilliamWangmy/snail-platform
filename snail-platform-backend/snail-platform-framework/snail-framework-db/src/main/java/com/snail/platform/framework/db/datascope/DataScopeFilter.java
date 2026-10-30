@@ -20,12 +20,14 @@ public record DataScopeFilter(List<Long> orgIds, Long creatorId, String orgColum
 
     private static final Pattern COLUMN_NAME = Pattern.compile("[a-z][a-z0-9_]{0,63}");
 
+    /** 列名会被拼进 SQL,构造时即校验形态;ID 为 BIGINT 数值,不存在注入面 */
     public DataScopeFilter {
         if (!COLUMN_NAME.matcher(orgColumn).matches() || !COLUMN_NAME.matcher(creatorColumn).matches()) {
             throw new IllegalArgumentException("数据权限列名只允许小写字母/数字/下划线: " + orgColumn + ", " + creatorColumn);
         }
     }
 
+    /** 使用默认列名(org_id / create_by)构造谓词 */
     public static DataScopeFilter of(List<Long> orgIds, Long creatorId) {
         return new DataScopeFilter(orgIds, creatorId, DEFAULT_ORG_COLUMN, DEFAULT_CREATOR_COLUMN);
     }

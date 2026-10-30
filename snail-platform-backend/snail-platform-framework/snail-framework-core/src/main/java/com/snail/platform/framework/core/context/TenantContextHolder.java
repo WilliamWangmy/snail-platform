@@ -17,10 +17,12 @@ public final class TenantContextHolder {
     private TenantContextHolder() {
     }
 
+    /** 认证过滤器在请求线程注入租户身份 */
     public static void set(Long tenantId) {
         TENANT_ID.set(tenantId);
     }
 
+    /** 当前线程租户 ID;未认证线程为 null,租户拦截器据此拒绝无租户的托管表查询 */
     public static Long get() {
         return TENANT_ID.get();
     }
@@ -48,8 +50,9 @@ public final class TenantContextHolder {
 
     /**
      * 把当前线程的租户身份临时切到指定租户,结束(含异常)必恢复原值。
-     * 只允许租户开通这一处使用:新租户的根组织/内置角色/管理员是"替别人写数据",
-     * 拦截器注入与审计必须落在新租户头上,而不是发起请求的平台管理员租户。
+     * 只允许平台侧"替目标租户读写"的动作使用:租户开通播种(根组织/内置角色/管理员)、
+     * 通知与公告按收件租户落库、跨租户人员摘要、租户级会话失效。
+     * 这些动作的拦截器注入与审计必须落在目标租户头上,而不是发起请求的平台管理员租户。
      */
     public static <T> T asTenant(Long tenantId, java.util.function.Supplier<T> action) {
         return runAs(tenantId, action);

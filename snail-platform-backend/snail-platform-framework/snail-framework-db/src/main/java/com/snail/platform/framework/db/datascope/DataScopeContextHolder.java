@@ -16,6 +16,7 @@ public final class DataScopeContextHolder {
     private DataScopeContextHolder() {
     }
 
+    /** 当前窗口的权限谓词;窗口外为 null,拦截器据此跳过 */
     public static DataScopeFilter get() {
         return FILTER.get();
     }

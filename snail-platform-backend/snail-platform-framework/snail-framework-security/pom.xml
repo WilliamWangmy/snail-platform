@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  snail-framework-security：令牌签发与校验、口令散列、认证主体与权限码判定入口。
+  snail-framework-security：令牌签发与校验、口令回传加密、认证过滤器与权限码判定入口。
   不查账户表，不判断「账户是否存在」这类业务事实；与 Web 无关，非 HTTP 协议层可复用同一套语义。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"

@@ -80,6 +80,7 @@ public class BpmnKeyRewriter {
         return serialize(document);
     }
 
+    /** 硬化解析:禁 DOCTYPE 与外部实体,解析失败按 400 拒绝 */
     private Document parse(String xml) {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -99,6 +100,7 @@ public class BpmnKeyRewriter {
         }
     }
 
+    /** 取指定命名空间下的直接子元素(用于精确圈定 process,避免误匹配扩展元素) */
     private static List<Element> childElements(Element parent, String localName, String namespace) {
         List<Element> found = new ArrayList<>();
         for (Node node = parent.getFirstChild(); node != null; node = node.getNextSibling()) {
@@ -111,12 +113,14 @@ public class BpmnKeyRewriter {
         return found;
     }
 
+    /** 收集整棵文档的全部元素(含图形信息节点) */
     private static List<Element> allElements(Element root) {
         List<Element> found = new ArrayList<>();
         collect(root, found);
         return found;
     }
 
+    /** 先序遍历收集元素 */
     private static void collect(Element current, List<Element> sink) {
         sink.add(current);
         for (Node node = current.getFirstChild(); node != null; node = node.getNextSibling()) {
@@ -126,6 +130,7 @@ public class BpmnKeyRewriter {
         }
     }
 
+    /** DOM 序列化回字符串;空白与属性顺序会被重排,所以原标识未变时调用方直接返回原文 */
     private static String serialize(Document document) {
         try {
             Transformer transformer = TransformerFactory.newInstance().newTransformer();

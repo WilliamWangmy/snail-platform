@@ -37,11 +37,13 @@ public class GlobalExceptionHandler {
     /** 兜底日志,含堆栈 */
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /** 业务拒绝:业务码原样透传,HTTP 状态保持 200 */
     @ExceptionHandler(BizException.class)
     public R<Void> handleBiz(BizException e) {
         return R.fail(e.getCode(), e.getMessage());
     }
 
+    /** @Valid 请求体校验失败:只取第一条字段错误,文案带字段名 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public R<Void> handleValidation(MethodArgumentNotValidException e) {
         FieldError first = e.getBindingResult().getFieldErrors().stream().findFirst().orElse(null);
@@ -77,11 +79,13 @@ public class GlobalExceptionHandler {
         return R.fail(400, "请求体格式不正确");
     }
 
+    /** 缺少必填查询参数 */
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public R<Void> handleMissingParam(MissingServletRequestParameterException e) {
         return R.fail(400, "缺少参数 " + e.getParameterName());
     }
 
+    /** 路径变量或查询参数的类型转换失败 */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public R<Void> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return R.fail(400, "参数 " + e.getName() + " 类型不正确");
@@ -93,16 +97,19 @@ public class GlobalExceptionHandler {
         return R.fail(400, "文件超出单次上传大小限制");
     }
 
+    /** 方法不匹配:属于传输层错误,回真实 405,前端据此判断"接口没挂上" */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<R<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(R.fail(405, "请求方法不支持"));
     }
 
+    /** 静态资源/端点不存在:回真实 404 */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<R<Void>> handleNotFound(NoResourceFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(R.fail(404, "接口不存在"));
     }
 
+    /** 未预期异常:记 error 日志(含堆栈)后统一 500,响应体不暴露内部细节 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<R<Void>> handleUnknown(Exception e) {
         log.error("未处理异常", e);

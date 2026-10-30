@@ -47,16 +47,19 @@ public class SnailSecurityConfig {
             "/swagger-ui.html"
     };
 
+    /** 令牌服务:构造期即校验密钥长度,配置不合格在这里拒绝启动 */
     @Bean
     public JwtTokenService jwtTokenService(SnailSecurityProperties properties) {
         return new JwtTokenService(properties);
     }
 
+    /** 口令回传加密器:构造期校验 AES 密钥,缺失或长度不符拒绝启动 */
     @Bean
     public PasswordTransferCipher passwordTransferCipher(SnailSecurityProperties properties) {
         return new PasswordTransferCipher(properties.getPasswordTransfer().getKey());
     }
 
+    /** 安全链:无状态、白名单放行、其余认证;认证过滤器在前,强制改密闸在其后 */
     @Bean
     public SecurityFilterChain snailSecurityFilterChain(HttpSecurity http, SnailSecurityProperties properties,
                                                         JwtTokenService jwtTokenService,

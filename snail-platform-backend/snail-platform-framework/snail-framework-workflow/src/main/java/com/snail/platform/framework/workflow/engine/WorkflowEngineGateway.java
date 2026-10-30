@@ -199,7 +199,7 @@ public class WorkflowEngineGateway {
                 runAsUser(operator, () -> taskService.setAssignee(task.id(), targetUserId)));
     }
 
-    /** 撤销在途实例(业务侧的"撤回申请");已结束的实例由引擎抛对象不存在,统一翻成 400 */
+    /** 撤销在途实例(业务侧的"撤回申请");已结束的实例由 requireRunningInstance 直接拒绝 */
     public void withdraw(String processInstanceId, String reason) {
         WorkflowInstance instance = requireRunningInstance(processInstanceId);
         String operator = requireLoginUserId();
@@ -596,6 +596,7 @@ public class WorkflowEngineGateway {
         });
     }
 
+    /** 在途实例视图:补当前活动节点,endTime 为空、ended=false */
     private WorkflowInstance toRunningInstance(ProcessInstance instance) {
         return new WorkflowInstance(instance.getId(), instance.getProcessDefinitionId(),
                 instance.getProcessDefinitionKey(), instance.getBusinessKey(), instance.getName(),
@@ -609,6 +610,7 @@ public class WorkflowEngineGateway {
                 () -> runtimeService.getActiveActivityIds(processInstanceId));
     }
 
+    /** 在途任务视图:候选组从身份链接读取,endTime 为空 */
     private WorkflowTask toTask(Task row) {
         return new WorkflowTask(row.getId(), row.getTaskDefinitionKey(), row.getName(),
                 row.getProcessDefinitionId(), row.getProcessInstanceId(),

@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-后端线已完成工程骨架：Maven 多模块结构、分层护栏、装配入口与三份 profile 配置均已落地，可直接 `package` 出可执行 jar 并启动。业务代码（framework 构件的实现类、`snail-function-system` 各子域）尚在填充中。
+后端线已完成三层的工程骨架与实现：framework 八个构件、function 各业务模块（system/auth/notify/storage/workflow）均已落地，分层护栏、装配入口与三份 profile 配置齐备，可直接 `package` 出可执行 jar 并启动。
 
 - 版本：`0.0.1`
 - 基础包名：`com.snail.platform`
@@ -14,12 +14,13 @@
 
 ```
 snail-platform/
-├── snail-platform-backend/     # 后端线（当前唯一在开发的线）
-├── docs/                       # 设计与决策文档
+├── snail-platform-backend/            # 后端（framework / function / start）
+├── snail-platform-frontend-admin/     # 管理端前端
+├── snail-platform-frontend-dashboard/ # 数据大屏前端
+├── snail-platform-agent/              # AI / Agent 线（Python）
+├── docs/                              # 设计与决策文档
 └── README.md
 ```
-
-管理端前端、Python/AI 线暂未建立工程目录，规划中不预先创建空壳。
 
 ## 后端架构
 
@@ -28,12 +29,14 @@ snail-platform/
 | 构件 | 层次 | 职责 |
 | --- | --- | --- |
 | `snail-platform-framework` | 技术基建层（聚合） | 纯技术能力，不含业务逻辑 |
-| &nbsp;&nbsp;├ `snail-framework-core` | 基建 | 响应、异常、分页、租户作用域、事件信封、traceId 键的唯一口径 |
-| &nbsp;&nbsp;├ `snail-framework-db` | 基建 | 连接、租户行级过滤、分页上限、审计填充；方言 `DbType.MYSQL` 在此固定 |
-| &nbsp;&nbsp;├ `snail-framework-redis` | 基建 | Lettuce 客户端装配 + 无状态服务所需的最小共享状态 |
-| &nbsp;&nbsp;├ `snail-framework-security` | 基建 | 令牌签发与校验、口令散列、认证主体与权限码判定入口 |
-| &nbsp;&nbsp;├ `snail-framework-log` | 基建 | traceId 过滤器与 MDC、操作日志注解与切面；不落库，经端口下沉给业务层 |
-| &nbsp;&nbsp;└ `snail-framework-excel` | 基建 | fastexcel 流式导出、分批导入 |
+| &nbsp;&nbsp;├ `snail-framework-core` | 基建 | 统一响应/业务异常、`PageQuery`→`PageResult` 分页装配、租户与登录人上下文、traceId 过滤器；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-core/README.md) |
+| &nbsp;&nbsp;├ `snail-framework-db` | 基建 | 连接与事务装配、租户行级过滤、数据范围拦截、分页上限、审计填充；方言 `DbType.MYSQL` 在此固定；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-db/README.md) |
+| &nbsp;&nbsp;├ `snail-framework-redis` | 基建 | Lettuce 客户端装配、Redis key 约定、限流小工具；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-redis/README.md) |
+| &nbsp;&nbsp;├ `snail-framework-security` | 基建 | JWT 签发与校验、认证过滤器与会话吊销、口令回传 AES-256-GCM 解密、权限码判定入口；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-security/README.md) |
+| &nbsp;&nbsp;├ `snail-framework-log` | 基建 | 操作日志注解与切面；不落库，经 `OperLogSink` 端口下沉给业务层；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-log/README.md) |
+| &nbsp;&nbsp;├ `snail-framework-excel` | 基建 | fastexcel 导出单点（流式写入、表头与样式约定）；导入通道未实现；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-excel/README.md) |
+| &nbsp;&nbsp;├ `snail-framework-storage` | 基建 | 文件存储端口与 SFTP/S3 双实现、按类型路由的活动注册表；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-storage/README.md) |
+| &nbsp;&nbsp;└ `snail-framework-workflow` | 基建 | Flowable 流程引擎门面、BPMN 安全校验与键改写、流程变量准入、租户桥接；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-workflow/README.md) |
 | `snail-platform-function` | 业务层（聚合） | 模块 = 上下文聚类，子域只到包级 |
 | &nbsp;&nbsp;└ `snail-function-system` | 业务 | 系统管理：`tenant/user/org/role/menu/dict/log` + `api`，表分组 `sys_*`；详见[模块说明](snail-platform-backend/snail-platform-function/snail-function-system/README.md) |
 | `snail-platform-start` | 装配层 | 唯一装配点与唯一启动类，配置、日志、Flyway 脚本与 ArchUnit 测试都住在这里 |
@@ -53,7 +56,7 @@ snail-platform/
 | ORM | MyBatis-Plus 3.5.17（`spring-boot4-starter` 线 + 独立 `jsqlparser` 构件） |
 | 数据库 / 迁移 | MySQL + Flyway，脚本位于 `snail-platform-start/src/main/resources/db/migration` |
 | 缓存 | Caffeine（经 Spring Cache 抽象）+ Redis 协议兼容服务（Valkey，Lettuce 客户端） |
-| 安全 | Spring Security + OAuth2 Resource Server，JWT 实现单一收敛在 Nimbus JOSE+JWT 10.9.1 |
+| 安全 | Spring Security + Nimbus JOSE+JWT 10.9.1（HS256 签发与校验） |
 | 接口文档 | springdoc-openapi 3.1.1 |
 | 表格文件 | fastexcel 1.3.0 |
 | 对象映射 | MapStruct 1.6.3（编译期生成，PO 不出 outbound） |
@@ -122,17 +125,16 @@ java -jar snail-platform-start/target/snail-platform.jar      # 加 --spring.pro
 
 `snail-platform-start` 的三份配置文件承担全部装配语义：
 
-- `application.yml`：应用名、虚拟线程开关、Flyway 位置、Caffeine 缓存名单点（`dictItem, menuTree, tenantConfig`）、springdoc 开关
+- `application.yml`：应用名、虚拟线程开关、Flyway 位置、Caffeine 缓存名单点（`dictItem, menuTree, tenantConfig, orgSubtree, userPerms, userSession`）、springdoc 开关
 - `application-dev.yml`：本机连接 + `com.snail.platform` 置 DEBUG
 - `application-prod.yml`：连接串全部来自环境变量，且关闭文档端点
 - `logback-spring.xml`：日志 pattern 含 `%X{traceId}`，与 `ApiResponse.traceId` 同源
 
 ## 路线图
 
-1. 补齐 `snail-framework-*` 各构件的实现与自动配置
-2. 落地 `snail-function-system` 的 `tenant/user/org/role/menu/dict/log` 子域及 `sys_*` 迁移脚本
-3. 建立管理端前端线
-4. 引入 AI / 数据侧工程线
+1. 管理端前端（`snail-platform-frontend-admin`）与数据大屏（`snail-platform-frontend-dashboard`）持续迭代
+2. AI / Agent 线（`snail-platform-agent`）建设
+3. 既有后端模块按业务反馈迭代
 
 ## License
 

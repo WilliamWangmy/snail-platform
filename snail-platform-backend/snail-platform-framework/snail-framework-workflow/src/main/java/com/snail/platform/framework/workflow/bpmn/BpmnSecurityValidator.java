@@ -187,6 +187,7 @@ public class BpmnSecurityValidator {
         return shape;
     }
 
+    /** 结构闸门:一个开始、至少一个结束、至少一个人工任务 */
     private void requireExecutableShape(Shape shape) {
         if (shape.startEvents != 1) {
             throw BizException.badRequest("流程必须且只能有一个开始事件,当前 " + shape.startEvents + " 个");

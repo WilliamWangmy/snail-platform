@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  snail-framework-core：响应、异常、分页、租户作用域、事件信封、traceId 键的唯一口径。
+  snail-framework-core：响应、异常、分页、登录人/租户上下文、traceId 键的唯一口径。
   不认业务表、不认具体端点、不含业务错误文案。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"

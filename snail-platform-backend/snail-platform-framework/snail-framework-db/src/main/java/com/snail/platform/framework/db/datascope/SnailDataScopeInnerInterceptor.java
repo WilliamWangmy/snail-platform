@@ -27,6 +27,10 @@ import org.apache.ibatis.session.ResultHandler;
  */
 public class SnailDataScopeInnerInterceptor implements InnerInterceptor {
 
+    /**
+     * 窗口内有谓词时把 (组织臂 OR 本人臂) AND 进单表 SELECT 的 WHERE;
+     * 非单表形态直接抛错而不是静默放过——放过即越权且没有痕迹。
+     */
     @Override
     public void beforeQuery(Executor executor, MappedStatement ms, Object parameter, RowBounds rowBounds,
                             ResultHandler resultHandler, BoundSql boundSql) {

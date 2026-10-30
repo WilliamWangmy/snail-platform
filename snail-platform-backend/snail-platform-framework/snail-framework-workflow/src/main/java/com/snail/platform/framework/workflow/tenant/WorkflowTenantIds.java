@@ -8,7 +8,7 @@ import com.snail.platform.framework.core.exception.BizException;
  * 上游:WorkflowEngineGateway(写侧取当前线程租户)、WorkflowTenantBridge(异步线程反查);
  * 下游:Flowable 的 TENANT_ID_ 列(varchar)。
  * 口径:引擎表绕过平台租户拦截器(方案 §3.1),租户只能在这两处显式进出,
- * 因此换算必须集中——散落各处的 String.valueOf 会让"无租户即拒绝"这条闸门前 later 失效。
+ * 因此换算必须集中——散落各处的 String.valueOf 会让"无租户即拒绝"这条闸门日后失效。
  */
 public final class WorkflowTenantIds {
 
