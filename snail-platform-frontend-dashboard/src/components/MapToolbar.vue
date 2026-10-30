@@ -23,12 +23,18 @@ const switches = ref<Record<string, boolean>>({
 
 const rootRef = ref<HTMLDivElement>();
 
+const emit = defineEmits<{
+  /** 图层开关变化：key 为图层标识，value 为是否开启 */
+  layerToggle: [key: string, value: boolean];
+}>();
+
 function togglePanel(name: PanelName) {
   activePanel.value = activePanel.value === name ? null : name;
 }
 
 function toggleSwitch(key: string) {
   switches.value[key] = !switches.value[key];
+  emit('layerToggle', key, switches.value[key]);
 }
 
 function onDocumentMousedown(e: MouseEvent) {
