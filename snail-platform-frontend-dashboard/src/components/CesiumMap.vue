@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import {
+  Cesium3DTileset,
   CallbackProperty,
   Cartesian3,
   Cartographic,
@@ -17,7 +18,13 @@ import {
   Viewer,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { MAP_CENTER, TIANDITU_KEY, createTiandituImagery } from '@/config/tianditu';
+import {
+  MAP_CENTER,
+  MODEL_URL,
+  MODEL_VIEW,
+  TIANDITU_KEY,
+  createTiandituImagery,
+} from '@/config/tianditu';
 import MapToolbar from '@/components/MapToolbar.vue';
 
 const containerRef = ref<HTMLDivElement>();
@@ -32,6 +39,62 @@ let maskImageryLayer: ImageryLayer | null = null;
 let techDataSource: CustomDataSource | null = null;
 /** 动效渲染循环句柄 */
 let rafId = 0;
+
+/** 空域图层配置：工具栏开关 key -> 数据源与样式（均为 WGS84，默认隐藏，立体挤出展示） */
+const ZONE_LAYERS = [
+  {
+    key: 'no-fly',
+    url: '/forbid-zone.json',
+    name: '禁飞区',
+    extrude: {
+      min: 9000,
+      max: 14000,
+      fill: 'rgba(222, 67, 41, 0.30)',
+      topEdge: 'rgba(248, 113, 113, 0.7)',
+    },
+  },
+  {
+    key: 'fly-ok',
+    url: '/flyable-zone.json',
+    name: '适飞区',
+    extrude: {
+      min: 4000,
+      max: 8000,
+      fill: 'rgba(34, 197, 94, 0.18)',
+      topEdge: 'rgba(74, 222, 128, 0.6)',
+    },
+  },
+] as const;
+
+type ZoneKey = (typeof ZONE_LAYERS)[number]['key'];
+const zoneDataSources: Record<ZoneKey, GeoJsonDataSource | null> = {
+  'no-fly': null,
+  'fly-ok': null,
+};
+
+/** 3D 建筑模型（3D Tiles，首次打开开关时才加载） */
+let modelTileset: Cesium3DTileset | null = null;
+let modelLoading = false;
+
+/** 懒加载 3D Tiles 模型，返回是否已就绪 */
+async function ensureModelTileset(): Promise<boolean> {
+  if (modelTileset || !viewer) return Boolean(modelTileset);
+  if (modelLoading) return false;
+  modelLoading = true;
+  try {
+    const tileset = await Cesium3DTileset.fromUrl(MODEL_URL);
+    if (!viewer) return false;
+    tileset.show = false;
+    modelTileset = tileset;
+    viewer.scene.primitives.add(tileset);
+    return true;
+  } catch (err) {
+    console.error('3D 模型加载失败:', err);
+    return false;
+  } finally {
+    modelLoading = false;
+  }
+}
 
 onMounted(async () => {
   if (!containerRef.value) return;
@@ -94,7 +157,7 @@ onMounted(async () => {
     }
     dataSource.show = false;
     dataSource.name = '成都行政区';
-    applyExtrusion(dataSource);
+    applyExtrusion(dataSource, ADMIN_EXTRUDE);
     adminDataSource = dataSource;
     viewer.dataSources.add(dataSource);
 
@@ -105,15 +168,46 @@ onMounted(async () => {
     techDataSource = buildTechEffects(dataSource);
     viewer.dataSources.add(techDataSource);
 
+    // 空域图层（禁飞区/适飞区），与行政区同样的立体挤出展示，默认隐藏由工具栏开关联动
+    for (const zone of ZONE_LAYERS) {
+      try {
+        const zoneDs = await GeoJsonDataSource.load(zone.url, {
+          fill: Color.TRANSPARENT,
+          strokeWidth: 1,
+          clampToGround: false,
+        });
+        zoneDs.show = false;
+        zoneDs.name = zone.name;
+        applyExtrusion(zoneDs, zone.extrude);
+        zoneDataSources[zone.key] = zoneDs;
+        viewer.dataSources.add(zoneDs);
+      } catch (err) {
+        console.error(`${zone.name}图层加载失败:`, err);
+      }
+    }
+
     viewer.scene.requestRender();
   } catch (err) {
     console.error('行政区边界加载失败:', err);
   }
 });
 
-/** 立体挤出高度范围（米）：按区县名称哈希取值，形成高低起伏的 3D 天际线 */
-const ADMIN_EXTRUDE_MIN = 6000;
-const ADMIN_EXTRUDE_MAX = 12000;
+/** 立体挤出样式：高度范围 + 填充色 + 顶边高光色 */
+interface ExtrudeStyle {
+  min: number;
+  max: number;
+  fill: string;
+  topEdge: string;
+}
+
+/** 行政区挤出样式 */
+const ADMIN_EXTRUDE: ExtrudeStyle = {
+  min: 6000,
+  max: 12000,
+  fill: 'rgba(34, 211, 238, 0.16)',
+  topEdge: 'rgba(125, 211, 252, 0.7)',
+};
+
 /**
  * 打开行政区图层时的斜视相机。
  * 实测几何：取景框中心 ≈ 相机位置向北偏移 height/tan(|pitch|)，
@@ -121,20 +215,20 @@ const ADMIN_EXTRUDE_MAX = 12000;
  */
 const ADMIN_VIEW = { lon: 104.0, lat: 29.54, height: 220000, pitchDeg: -60 };
 
-/** 由区县名称生成确定性伪高度（后续可替换为真实业务数据，如无人机数量） */
-function extrudeHeightFor(name: string): number {
+/** 由名称生成确定性伪高度（后续可替换为真实业务数据，如空域高度/无人机数量） */
+function extrudeHeightFor(name: string, min: number, max: number): number {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   const t = (hash % 1000) / 1000;
-  return ADMIN_EXTRUDE_MIN + t * (ADMIN_EXTRUDE_MAX - ADMIN_EXTRUDE_MIN);
+  return min + t * (max - min);
 }
 
 /**
- * 把行政区平面多边形改造成立体挤出多面体：
- * - 每个区县设置 extrudedHeight（从地面立起来的“楼块”）
+ * 把平面多边形改造成立体挤出多面体（行政区/禁飞区/适飞区共用）：
+ * - 每个面设置 extrudedHeight（从地面立起来的“体块”）
  * - 顶面边缘加亮色描边（polyline），凸显体块轮廓
  */
-function applyExtrusion(ds: GeoJsonDataSource) {
+function applyExtrusion(ds: GeoJsonDataSource, style: ExtrudeStyle) {
   const now = JulianDate.now();
   // 先快照再改（entities.values 是活数组，遍历时新增 polyline 会干扰迭代）
   const polygonEntities = [...ds.entities.values].filter((e) => e.polygon);
@@ -145,17 +239,17 @@ function applyExtrusion(ds: GeoJsonDataSource) {
     const name = String(
       entity.name ?? entity.properties?.name?.getValue(now) ?? entity.id,
     );
-    const height = extrudeHeightFor(name);
+    const height = extrudeHeightFor(name, style.min, style.max);
 
     polygon.height = 0 as never;
     polygon.extrudedHeight = height as never;
     // 关闭多边形自带描边（顶边高光由 addTopEdges 的 polyline 负责）
     polygon.outline = false as never;
     polygon.material = new ColorMaterialProperty(
-      Color.fromCssColorString('rgba(34, 211, 238, 0.16)'),
+      Color.fromCssColorString(style.fill),
     );
 
-    addTopEdges(ds, polygon.hierarchy.getValue(now), height);
+    addTopEdges(ds, polygon.hierarchy.getValue(now), height, style.topEdge);
   }
 }
 
@@ -164,6 +258,7 @@ function addTopEdges(
   ds: GeoJsonDataSource,
   hierarchy: PolygonHierarchy,
   height: number,
+  color: string,
 ) {
   const rings = [hierarchy.positions, ...hierarchy.holes.map((h) => h.positions)];
   for (const ring of rings) {
@@ -176,9 +271,7 @@ function addTopEdges(
       polyline: {
         positions,
         width: 2,
-        material: new ColorMaterialProperty(
-          Color.fromCssColorString('rgba(125, 211, 252, 0.7)'),
-        ),
+        material: new ColorMaterialProperty(Color.fromCssColorString(color)),
       },
     });
   }
@@ -362,7 +455,7 @@ async function buildAdminMaskLayer(
   return layer;
 }
 
-/** 工具栏图层开关回调：目前接入行政区，其余图层待接入 */
+/** 工具栏图层开关回调：行政区 / 禁飞区 / 适飞区已接入，其余待接入 */
 function onLayerToggle(key: string, value: boolean) {
   if (key === 'admin') {
     if (adminDataSource) adminDataSource.show = value;
@@ -404,6 +497,39 @@ function onLayerToggle(key: string, value: boolean) {
     } else {
       viewer?.scene.requestRender();
     }
+  } else if (key === 'no-fly' || key === 'fly-ok') {
+    // 空域图层：贴地平面显隐即可
+    const zoneDs = zoneDataSources[key];
+    if (zoneDs) zoneDs.show = value;
+    viewer?.scene.requestRender();
+  } else if (key === 'model-3d') {
+    // 3D 模型：懒加载后显隐，开启时飞到模型位置
+    void ensureModelTileset().then((ready) => {
+      if (modelTileset) modelTileset.show = value;
+      if (value && ready && viewer && modelTileset) {
+        if (MODEL_VIEW) {
+          // 环境变量配置了固定机位（VITE_MODEL_VIEW_*），按配置取景
+          viewer.camera.flyTo({
+            destination: Cartesian3.fromDegrees(
+              MODEL_VIEW.lon,
+              MODEL_VIEW.lat,
+              MODEL_VIEW.height,
+            ),
+            orientation: {
+              heading: CesiumMath.toRadians(MODEL_VIEW.headingDeg),
+              pitch: CesiumMath.toRadians(MODEL_VIEW.pitchDeg),
+              roll: 0,
+            },
+            duration: 1.5,
+          });
+        } else {
+          // 未配置机位时回退：按模型包围盒自动取景
+          viewer.flyTo(modelTileset, { duration: 1.5 });
+        }
+      } else {
+        viewer?.scene.requestRender();
+      }
+    });
   }
 }
 
@@ -414,6 +540,9 @@ onBeforeUnmount(() => {
   adminDataSource = null;
   maskImageryLayer = null;
   techDataSource = null;
+  zoneDataSources['no-fly'] = null;
+  zoneDataSources['fly-ok'] = null;
+  modelTileset = null;
 });
 </script>
 
