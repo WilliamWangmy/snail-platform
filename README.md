@@ -102,7 +102,7 @@ java -jar snail-platform-start/target/snail-platform.jar      # 加 --spring.pro
 
 ### 环境变量
 
-`dev` 提供指向本机的默认值，口令不同用变量覆盖；`prod` 不提供任何默认值，六个变量必填。
+`dev` 提供指向本机的默认值，口令不同用变量覆盖；`prod` 不提供任何默认值，七个变量必填。
 
 | 变量 | 说明 |
 | --- | --- |
@@ -112,6 +112,9 @@ java -jar snail-platform-start/target/snail-platform.jar      # 加 --spring.pro
 | `SNAIL_REDIS_URL` | 缓存服务连接串 |
 | `SNAIL_JWT_SECRET` | JWT 签名密钥，长度 ≥ 32；dev 有开发占位默认值，**prod 必填，缺失启动即失败** |
 | `SNAIL_SEED_ADMIN_PASSWORD` | 内置 admin 种子口令的 **BCrypt 密文**（非明文，用 Hutool `BCrypt.hashpw` 离线生成）；**prod 必填**，V2 种子迁移用它写入 admin 初始口令，缺失迁移失败、启动被拦 |
+| `SNAIL_PASSWORD_TRANSFER_KEY` | 一次性口令回传的 AES-256-GCM 密钥（Base64，解码后 32 字节）；dev 有开发占位默认值，**prod 必填，缺失或长度不符启动即失败** |
+
+前端构建另有 `VITE_PASSWORD_TRANSFER_KEY`：与后端上面的密钥同值，管理端用它解密结果弹窗里的口令；未注入时落到 dev 占位（与 `application-dev.yml` 一致）。两侧不一致表现为"口令解密失败"提示。
 
 本地覆盖请写在 `application-local.yml`，该文件已在 `.gitignore` 内。
 

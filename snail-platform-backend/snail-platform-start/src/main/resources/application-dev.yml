@@ -21,6 +21,9 @@ snail:
     jwt:
       # 开发占位密钥只住 dev profile;生产密钥必须由 SNAIL_JWT_SECRET 提供,共享配置无默认可漏
       secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}
+    password-transfer:
+      # 开发占位密钥只住 dev profile,与前端 src/utils/passwordTransfer.ts 的 DEV_KEY 同值
+      key: ${SNAIL_PASSWORD_TRANSFER_KEY:+boKbssh0dSJgi2wEIJbWRBWzL9Y5CDuIN9ZDxvcJVs=}
   storage:
     sftp:
       # 本机 SFTP 的开发默认连接;生产必须由环境变量提供,共享配置不放开任何默认口令

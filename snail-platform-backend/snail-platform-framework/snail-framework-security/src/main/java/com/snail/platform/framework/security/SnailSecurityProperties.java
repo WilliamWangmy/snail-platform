@@ -22,6 +22,17 @@ public class SnailSecurityProperties {
     /** 跨域配置 */
     private final Cors cors = new Cors();
 
+    /** 口令回传加密配置 */
+    private final PasswordTransfer passwordTransfer = new PasswordTransfer();
+
+    @Getter
+    @Setter
+    public static class PasswordTransfer {
+
+        /** AES-256-GCM 共享密钥(Base64,解码后须 32 字节);前端用同值解密展示,缺配置拒绝启动 */
+        private String key;
+    }
+
     @Getter
     @Setter
     public static class Cors {

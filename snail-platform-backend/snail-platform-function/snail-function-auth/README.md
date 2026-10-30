@@ -434,6 +434,7 @@ mvn -q -pl snail-platform-function/snail-function-auth -am -DskipTests compile
 | `snail.security.jwt.secret` | `SNAIL_JWT_SECRET`，至少 32 字符；dev profile 有开发占位，prod 缺失即启动失败 |
 | `snail.security.jwt.expire-minutes` | 令牌有效期，当前 `120` |
 | `snail.security.cors.allowed-origins` | 留空不下发 CORS 头；配置时逐名写全，不支持 `*` |
+| `snail.security.password-transfer.key` | `SNAIL_PASSWORD_TRANSFER_KEY`，一次性口令回传的 AES-256-GCM 密钥（Base64 解码后 32 字节）；dev 有开发占位，prod 缺失或长度不符即启动失败 |
 
 ### 走一遍登录
 

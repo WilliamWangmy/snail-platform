@@ -2,6 +2,7 @@ package com.snail.platform.framework.security.config;
 
 import com.snail.platform.framework.security.SnailSecurityProperties;
 import com.snail.platform.framework.security.authority.UserAuthorityProvider;
+import com.snail.platform.framework.security.crypto.PasswordTransferCipher;
 import com.snail.platform.framework.security.login.LoginUserProvider;
 import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import com.snail.platform.framework.security.token.JwtTokenService;
@@ -49,6 +50,11 @@ public class SnailSecurityConfig {
     @Bean
     public JwtTokenService jwtTokenService(SnailSecurityProperties properties) {
         return new JwtTokenService(properties);
+    }
+
+    @Bean
+    public PasswordTransferCipher passwordTransferCipher(SnailSecurityProperties properties) {
+        return new PasswordTransferCipher(properties.getPasswordTransfer().getKey());
     }
 
     @Bean

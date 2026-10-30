@@ -1,5 +1,6 @@
 import { get, post, put } from './http';
 import type { PageParams, PageResult } from './types';
+import { decryptPassword } from '@/utils/passwordTransfer';
 
 /** 租户行:平台面列表与详情共用。存储配额(storage_limit_mb)不在此列,租户接口既读不到也改不了。 */
 export interface TenantVO {
@@ -39,7 +40,7 @@ export interface TenantCreatePayload {
   adminUsername: string;
 }
 
-/** 开通出参:首任管理员明文口令仅本次响应可见,前端须展示+复制后转交租户 */
+/** 开通出参:服务端只回口令密文,解密在 api 层完成,视图拿到的是可直接展示的明文 */
 export interface TenantCreated {
   tenantId: number;
   password: string;
@@ -66,9 +67,10 @@ export function checkAdminUsername(username: string): Promise<boolean> {
   return get<boolean>('/system/tenant/admin-username-exists', { username });
 }
 
-/** 开通:租户标识或管理员登录名占用即整单业务拒绝,模板复制与租户行同事务,失败不留半个租户。 */
-export function createTenant(payload: TenantCreatePayload): Promise<TenantCreated> {
-  return post<TenantCreated>('/system/tenant', payload);
+/** 开通:租户标识或管理员登录名占用即整单业务拒绝,模板复制与租户行同事务,失败不留半个租户;口令密文在此解密。 */
+export async function createTenant(payload: TenantCreatePayload): Promise<TenantCreated> {
+  const created = await post<TenantCreated>('/system/tenant', payload);
+  return { tenantId: created.tenantId, password: await decryptPassword(created.password) };
 }
 
 /** 修改:每次提交都会整体刷新登录快照缓存;只在"转为停用"或"到期时间变更"时作废该租户存量令牌。 */

@@ -1,5 +1,6 @@
 import { del, get, post, put } from './http';
 import type { PageParams, PageResult } from './types';
+import { decryptPassword } from '@/utils/passwordTransfer';
 
 export interface UserVO {
   userId: number;
@@ -39,7 +40,7 @@ export interface UserCreatePayload {
   roleIds?: number[];
 }
 
-/** 建号/重置口令出参:明文由服务端生成,仅本次响应可见,前端须展示+复制后转交本人 */
+/** 建号/重置口令出参:服务端只回密文,解密在 api 层完成,视图拿到的是可直接展示的明文 */
 export interface UserCreated {
   userId: number;
   password: string;
@@ -69,9 +70,10 @@ export function checkUsername(username: string): Promise<boolean> {
   return get<boolean>('/system/user/username-exists', { username });
 }
 
-/** 建号同事务完成授权;口令不传,由服务端按 PasswordPolicy 随机生成并随响应返回明文 */
-export function createUser(payload: UserCreatePayload): Promise<UserCreated> {
-  return post<UserCreated>('/system/user', payload);
+/** 建号同事务完成授权;口令不传,由服务端按 PasswordPolicy 随机生成,密文随响应返回、此处解密 */
+export async function createUser(payload: UserCreatePayload): Promise<UserCreated> {
+  const created = await post<UserCreated>('/system/user', payload);
+  return { userId: created.userId, password: await decryptPassword(created.password) };
 }
 
 /** 只改档案五列;username/password/status 不在契约里,改口令走 reset、改状态走 changeUserStatus */
@@ -79,12 +81,11 @@ export function updateUser(userId: number, payload: UserUpdatePayload): Promise<
   return put<void>(`/system/user/${userId}`, payload);
 }
 
-/** 重置由服务端按 PasswordPolicy 随机生成新口令并前推令牌版本,明文仅本次响应可见,前端展示+复制 */
-export function resetUserPassword(userId: number): Promise<string> {
-  // 明文包在 password 键下:后端审计落库走键级脱敏,裸字符串会被原样记进 sys_oper_log
-  return put<{ password: string }>(`/system/user/${userId}/password`, undefined).then(
-    (body) => body.password,
-  );
+/** 重置由服务端按 PasswordPolicy 随机生成新口令并前推令牌版本,密文回传后在此解密供展示+复制 */
+export async function resetUserPassword(userId: number): Promise<string> {
+  // 密文包在 password 键下:后端审计落库走键级脱敏,裸字符串会被原样记进 sys_oper_log
+  const body = await put<{ password: string }>(`/system/user/${userId}/password`, undefined);
+  return decryptPassword(body.password);
 }
 
 /** status 走 query 参数而非请求体;停用即刻失效存量会话,且不允许停用自己 */

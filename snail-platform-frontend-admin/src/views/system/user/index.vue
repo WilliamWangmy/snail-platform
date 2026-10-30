@@ -219,7 +219,7 @@ const resultVisible = ref(false);
 const resultTitle = ref('');
 const resultPassword = ref('');
 
-/** 建号/重置共用的明文口令结果弹窗:明文仅服务端返回这一次,展示+复制后转交本人 */
+/** 建号/重置共用的口令结果弹窗:接口只回密文,api 层解密后仅展示这一次,复制后转交本人 */
 function showPasswordResult(title: string, password: string): void {
   resultTitle.value = title;
   resultPassword.value = password;
@@ -230,7 +230,7 @@ function showPasswordResult(title: string, password: string): void {
 
 const resetting = ref(false);
 
-/** 重置 = 弹框确认 → 后端按 PasswordPolicy 随机生成并落库 → 明文仅返回一次,结果弹窗展示+复制 */
+/** 重置 = 弹框确认 → 后端按 PasswordPolicy 随机生成并落库 → 口令密文仅返回一次,解密后弹窗展示+复制 */
 async function openResetPassword(row: UserVO): Promise<void> {
   const confirmed = await ElMessageBox.confirm(
     `重置 ${row.nickname}(${row.username}) 的密码？将生成随机新密码，原密码与全部登录会话立即失效。`,

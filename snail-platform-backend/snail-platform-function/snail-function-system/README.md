@@ -277,7 +277,8 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
   拒绝空白字符与常见弱口令黑名单，校验顺序为长度 → 空白 → 黑名单 → 字符类。
   新增用户、重置口令、自助改密、强制改密、租户开通五条写路径共用，前端 `validatePassword` 同序同文案。
   DTO 的 `@Size` 只做同区间兜底；重置口令的报文不再携带口令，改由服务端 `PasswordPolicy.generate()` 随机生成、
-  明文仅随本次响应返回一次（管理员复制后线下交付，不落日志）。
+  密文仅随本次响应返回一次（`PasswordTransferCipher` 以 AES-256-GCM 加密，键名仍挂 `password` 供审计脱敏；
+  管理端用同值密钥解密展示，管理员复制后线下交付，不落日志）。
 - **`ProfileService`**：本人档案、自助改资料（只改白名单字段）、自助改密、强制改密、下线自己。
   改密防爆破：原密码错按用户计数锁定（5 次 / 10 分钟，`SnailRateGuard` 原子计数）；
   改密成功 = 口令更新 + `password_modify_time` 落当前时间 + `token_version` 自增同语句 + `userSession` 失效，全部存量令牌下一次请求即 401。
@@ -349,7 +350,7 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
 | 子域 | 方法 路径 | 权限码 | 说明 |
 | --- | --- | --- | --- |
 | 租户 | `GET /system/tenant/page` | `platform:tenant:list` | 全平台租户分页 |
-| | `POST /system/tenant` | `platform:tenant:create` | 开通租户（模板复制；管理员口令可空，服务端生成并随响应返回明文一次） |
+| | `POST /system/tenant` | `platform:tenant:create` | 开通租户（模板复制；管理员口令可空，服务端生成并随响应返回密文一次） |
 | | `GET /system/tenant/admin-username-exists` | `platform:tenant:create` | 管理员登录名占用查询（全表口径含已删；失焦即查，保存仍会再拦） |
 | | `PUT /system/tenant/{tenantId}` | `platform:tenant:update` | 修改资料（整份覆盖） |
 | | `PUT /system/tenant/{tenantId}/status` | `platform:tenant:update` | 停用/启用 |
@@ -362,9 +363,9 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
 | 用户 | `GET /system/user/page` | `system:user:list` | 按 data_scope 开窗 |
 | | `GET /system/user/username-exists` | `system:user:create` | 登录名占用查询（全表口径含已删；失焦即查，保存仍会再拦） |
 | | `GET /system/user/{userId}` | `system:user:list` | 详情含授权角色集 |
-| | `POST /system/user` | `system:user:create` | 新增（含建号即授权，受 `account_limit`；口令可空，服务端生成并随响应返回明文一次） |
+| | `POST /system/user` | `system:user:create` | 新增（含建号即授权，受 `account_limit`；口令可空，服务端生成并随响应返回密文一次） |
 | | `PUT /system/user/{userId}` | `system:user:update` | 修改 |
-| | `PUT /system/user/{userId}/password` | `system:user:reset-password` | 重置口令（服务端生成，返回明文一次） |
+| | `PUT /system/user/{userId}/password` | `system:user:reset-password` | 重置口令（服务端生成，返回密文一次） |
 | | `PUT /system/user/{userId}/status` | `system:user:update` | 停用/启用（不许对自己） |
 | | `POST /system/user/{userId}/force-logout` | `system:user:kick` | 强制下线 |
 | | `DELETE /system/user/{userId}` | `system:user:delete` | 逻辑删（同事务清授权） |
