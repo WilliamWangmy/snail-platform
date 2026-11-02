@@ -20,8 +20,9 @@ LOG = logging.getLogger("snail-agent")
 _API_KEY_HEADER = "X-API-Key"
 _api_key_header = APIKeyHeader(name=_API_KEY_HEADER, auto_error=False)
 
-# 部署时注入;为空表示"尚未配置密钥",此时业务路由一律拒绝而不是裸奔
-API_KEY: str | None = None  # 由部署环境注入(env/secret 管理),占位值禁止入库
+# 部署时注入(经 settings.api_key,SecretStr 防日志带出明文);为空表示"尚未配置密钥",
+# 此时业务路由一律拒绝而不是裸奔
+API_KEY: str | None = settings.api_key.get_secret_value() if settings.api_key else None
 
 
 async def verify_api_key(api_key: str | None = Security(_api_key_header)) -> None:

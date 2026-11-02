@@ -4,7 +4,6 @@ import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
 import com.snail.platform.framework.core.response.PageResult;
-import com.snail.platform.framework.security.crypto.PasswordTransferCipher;
 import com.snail.platform.function.system.tenant.dto.TenantCreateRequest;
 import com.snail.platform.function.system.tenant.dto.TenantCreatedVO;
 import com.snail.platform.function.system.tenant.dto.TenantQuery;
@@ -44,11 +43,8 @@ public class TenantController {
     private final TenantService tenantService;
 
     /** 一次性口令的传输加密 */
-    private final PasswordTransferCipher passwordTransferCipher;
-
-    public TenantController(TenantService tenantService, PasswordTransferCipher passwordTransferCipher) {
+    public TenantController(TenantService tenantService) {
         this.tenantService = tenantService;
-        this.passwordTransferCipher = passwordTransferCipher;
     }
 
     @PreAuthorize("hasAuthority('platform:tenant:list')")
@@ -69,12 +65,11 @@ public class TenantController {
     }
 
     @PreAuthorize("hasAuthority('platform:tenant:create')")
-    @Operation(summary = "开通租户(同事务复制根组织/内置角色/管理员模板;管理员口令可不传,服务端生成,加密后仅本次响应可见)")
+    @Operation(summary = "开通租户(同事务复制根组织/内置角色/管理员模板;首任管理员口令由平台管理员自输,响应只回租户ID)")
     @OperLog(module = "租户管理", businessType = BusinessType.INSERT)
     @PostMapping
     public R<TenantCreatedVO> create(@Valid @RequestBody TenantCreateRequest request) {
-        TenantCreatedVO created = tenantService.provision(request);
-        return R.ok(new TenantCreatedVO(created.tenantId(), passwordTransferCipher.encrypt(created.password())));
+        return R.ok(tenantService.provision(request));
     }
 
     @PreAuthorize("hasAuthority('platform:tenant:update')")

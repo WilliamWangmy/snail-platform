@@ -32,7 +32,7 @@ snail-platform/
 | &nbsp;&nbsp;├ `snail-framework-core` | 基建 | 统一响应/业务异常、`PageQuery`→`PageResult` 分页装配、租户与登录人上下文、traceId 过滤器；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-core/README.md) |
 | &nbsp;&nbsp;├ `snail-framework-db` | 基建 | 连接与事务装配、租户行级过滤、数据范围拦截、分页上限、审计填充；方言 `DbType.MYSQL` 在此固定；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-db/README.md) |
 | &nbsp;&nbsp;├ `snail-framework-redis` | 基建 | Lettuce 客户端装配、Redis key 约定、限流小工具；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-redis/README.md) |
-| &nbsp;&nbsp;├ `snail-framework-security` | 基建 | JWT 签发与校验、认证过滤器与会话吊销、口令回传 AES-256-GCM 解密、权限码判定入口；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-security/README.md) |
+| &nbsp;&nbsp;├ `snail-framework-security` | 基建 | JWT 签发与校验、认证过滤器与会话吊销、权限码判定入口；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-security/README.md) |
 | &nbsp;&nbsp;├ `snail-framework-log` | 基建 | 操作日志注解与切面；不落库，经 `OperLogSink` 端口下沉给业务层；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-log/README.md) |
 | &nbsp;&nbsp;├ `snail-framework-excel` | 基建 | fastexcel 导出单点（流式写入、表头与样式约定）；导入通道未实现；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-excel/README.md) |
 | &nbsp;&nbsp;├ `snail-framework-storage` | 基建 | 文件存储端口与 SFTP/S3 双实现、按类型路由的活动注册表；详见[模块说明](snail-platform-backend/snail-platform-framework/snail-framework-storage/README.md) |
@@ -115,9 +115,8 @@ java -jar snail-platform-start/target/snail-platform.jar      # 加 --spring.pro
 | `SNAIL_REDIS_URL` | 缓存服务连接串 |
 | `SNAIL_JWT_SECRET` | JWT 签名密钥，长度 ≥ 32；dev 有开发占位默认值，**prod 必填，缺失启动即失败** |
 | `SNAIL_SEED_ADMIN_PASSWORD` | 内置 admin 种子口令的 **BCrypt 密文**（非明文，用 Hutool `BCrypt.hashpw` 离线生成）；**prod 必填**，V4 种子迁移用它写入 admin 初始口令，缺失启动被拦；dev 未提供时启动期现场生成随机口令并打印到控制台（仅首次初始化空库时生效），仓库中不存在可预测的种子口令 |
-| `SNAIL_PASSWORD_TRANSFER_KEY` | 一次性口令回传的 AES-256-GCM 密钥（Base64，解码后 32 字节）；dev 有开发占位默认值，**prod 必填，缺失或长度不符启动即失败** |
 
-前端构建另有 `VITE_PASSWORD_TRANSFER_KEY`：与后端上面的密钥同值，管理端用它解密结果弹窗里的口令。**该密钥随前端产物分发，不是机密性控制**——只防链路明文被日志/代理误记录，链路机密性由 HTTPS 保证；生产构建未注入时构建直接失败（仓库中无任何占位密钥），本地开发复制 `.env.example` 为 `.env.local`。密文报文带 `v1:` 版本前缀，密钥轮换时前后端同步升版。两侧不一致表现为"口令解密失败"提示。
+初始口令交付口径（P2-3）：新建用户/重置密码/开通租户的口令一律由管理员在表单自输或点"生成"，随 HTTPS 请求体提交，响应只回 ID、不再回传口令——"服务端生成口令加密回传"链路已整体退役，前端无需任何密钥环境变量。
 
 本地覆盖请写在 `application-local.yml`，该文件已在 `.gitignore` 内。
 

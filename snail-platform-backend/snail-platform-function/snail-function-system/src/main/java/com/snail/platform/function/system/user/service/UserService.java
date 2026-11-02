@@ -130,7 +130,8 @@ public class UserService {
         if (usernameExists(username)) {
             throw BizException.badRequest("登录名已存在");
         }
-        String rawPassword = request.password() != null ? request.password() : PasswordPolicy.generate();
+        // 管理员自输初始口令(P2-3):服务端不再代生成,PasswordPolicy 是唯一裁决
+        String rawPassword = request.password();
         PasswordPolicy.validate(rawPassword);
         requireUsableOrg(request.orgId());
         requireAssignableOrg(request.orgId());
@@ -155,7 +156,7 @@ public class UserService {
         if (request.roleIds() != null && !request.roleIds().isEmpty()) {
             replaceRoles(user.getUserId(), resolveGrantable(request.roleIds()));
         }
-        return new UserCreatedVO(user.getUserId(), rawPassword);
+        return new UserCreatedVO(user.getUserId());
     }
 
     /**
@@ -187,17 +188,16 @@ public class UserService {
      * 不清 userPerms:重置口令不动授权。
      */
     @Transactional
-    public String resetPassword(Long userId) {
+    public void resetPassword(Long userId, String newPassword) {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
-        String rawPassword = PasswordPolicy.generate();
+        PasswordPolicy.validate(newPassword);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
-                .set(SysUser::getPassword, BCrypt.hashpw(rawPassword))
+                .set(SysUser::getPassword, BCrypt.hashpw(newPassword))
                 .set(SysUser::getPasswordModifyTime, null)
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, user.getUserId()));
         cacheEvictor.evict("userSession", sessionKey(userId));
-        return rawPassword;
     }
 
     /** 强制下线:令牌版本自增 + 快照失效,该用户存量令牌下一次请求即 401;不判自我,由调用方决定 */

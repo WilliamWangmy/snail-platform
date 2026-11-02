@@ -101,6 +101,9 @@ public class ProfileService {
             throw BizException.badRequest("原密码不正确");
         }
         PasswordPolicy.validate(request.newPassword());
+        if (BCrypt.checkpw(request.newPassword(), user.getPassword())) {
+            throw BizException.badRequest("新密码不能与当前密码相同");
+        }
         rateGuard.clear(guardKey);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getPassword, BCrypt.hashpw(request.newPassword()))

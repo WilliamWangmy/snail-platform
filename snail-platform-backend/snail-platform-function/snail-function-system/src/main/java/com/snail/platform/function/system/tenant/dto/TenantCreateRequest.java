@@ -55,7 +55,8 @@ public record TenantCreateRequest(
         @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
         String adminUsername,
 
-        @Schema(description = "首任管理员初始口令,可空——不传则由服务端按 PasswordPolicy 随机生成并随响应返回明文", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "首任管理员初始口令,平台管理员自输;服务端按 PasswordPolicy 校验,不再代生成", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotBlank(message = "请输入管理员初始密码")
         @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
         String adminPassword) {
 }

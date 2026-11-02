@@ -20,7 +20,8 @@ import {
 } from '@/api/user';
 import { usePageList } from '@/composables/usePageList';
 import { useAuthStore } from '@/stores/auth';
-import { copyText } from '@/utils/password';
+import { generatePassword, validatePassword } from '@/utils/password';
+import PasswordHintInput from '@/components/PasswordHintInput.vue';
 import RowActions, { type RowAction } from '@/components/RowActions.vue';
 
 const auth = useAuthStore();
@@ -78,6 +79,8 @@ function reset(): void {
 
 interface UserForm {
   username: string;
+  /** 初始口令(P2-3):管理员自输或点生成,仅在新增态提交 */
+  password: string;
   nickname: string;
   email: string;
   phone: string;
@@ -88,6 +91,7 @@ interface UserForm {
 
 const emptyForm: UserForm = {
   username: '',
+  password: '',
   nickname: '',
   email: '',
   phone: '',
@@ -104,15 +108,6 @@ const saving = ref(false);
 
 /** 与后端 UserCreateRequest 的 @Pattern 同口径;失焦占用查询前先过它,脏输入不打接口 */
 const USERNAME_PATTERN = /^[A-Za-z0-9_.@-]+$/;
-
-async function copyPassword(value: string): Promise<void> {
-  if (!value) return;
-  if (await copyText(value)) {
-    ElMessage.success('已复制到剪贴板');
-  } else {
-    ElMessage.error('复制失败,请手动复制');
-  }
-}
 
 /** 与后端 UserCreateRequest 的注解同口径,超限在前端先拦住;口令由服务端生成,不进表单 */
 const rules = computed<FormRules<UserForm>>(() => ({
@@ -133,6 +128,20 @@ const rules = computed<FormRules<UserForm>>(() => ({
               checkUsername(value)
                 .then((taken) => callback(taken ? new Error('登录名已被占用') : undefined))
                 .catch(() => callback());
+            },
+            trigger: 'blur',
+          },
+        ]
+      : [],
+  password:
+    editingId.value === null
+      ? [
+          { required: true, message: '请输入初始密码', trigger: 'blur' },
+          {
+            // 强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载
+            validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+              const message = validatePassword(value);
+              callback(message ? new Error(message) : undefined);
             },
             trigger: 'blur',
           },
@@ -179,8 +188,9 @@ async function submitForm(): Promise<void> {
   try {
     const text = (value: string): string | null => value.trim() || null;
     if (editingId.value === null) {
-      const created = await createUser({
+      await createUser({
         username: form.username.trim(),
+        password: form.password,
         nickname: form.nickname.trim(),
         email: text(form.email),
         phone: text(form.phone),
@@ -188,9 +198,8 @@ async function submitForm(): Promise<void> {
         remark: text(form.remark),
         roleIds: form.roleIds,
       });
-      ElMessage.success('已新增用户');
-      // 初始口令由服务端生成且仅此一次可见:结果弹窗展示+复制,转交本人
-      showPasswordResult(`新增用户 · ${form.nickname.trim()}`, created.password);
+      // 初始口令由管理员自输(P2-3),线下转交本人;响应只回新用户ID
+      ElMessage.success('已新增用户,请把初始口令线下告知本人');
     } else {
       await updateUser(editingId.value, {
         nickname: form.nickname.trim(),
@@ -218,37 +227,36 @@ async function toggleStatus(row: UserVO): Promise<void> {
   ElMessage.success(next === 0 ? '已启用' : '已停用');
 }
 
-/* ------------------------------ 口令结果展示 ------------------------------- */
-
-const resultVisible = ref(false);
-const resultTitle = ref('');
-const resultPassword = ref('');
-
-/** 建号/重置共用的口令结果弹窗:接口只回密文,api 层解密后仅展示这一次,复制后转交本人 */
-function showPasswordResult(title: string, password: string): void {
-  resultTitle.value = title;
-  resultPassword.value = password;
-  resultVisible.value = true;
-}
-
 /* -------------------------------- 重置密码 -------------------------------- */
 
+/** 重置口令弹窗(P2-3):新口令由管理员自输或点生成,提交后原密码与全部会话立即失效,线下转交本人 */
+const resetVisible = ref(false);
+const resetTarget = ref<UserVO | null>(null);
+const resetPassword = ref('');
 const resetting = ref(false);
 
-/** 重置 = 弹框确认 → 后端按 PasswordPolicy 随机生成并落库 → 口令密文仅返回一次,解密后弹窗展示+复制 */
-async function openResetPassword(row: UserVO): Promise<void> {
-  const confirmed = await ElMessageBox.confirm(
-    `重置 ${row.nickname}(${row.username}) 的密码？将生成随机新密码，原密码与全部登录会话立即失效。`,
-    '重置密码确认',
-    { type: 'warning', confirmButtonText: '生成新密码', cancelButtonText: '取消' },
-  )
-    .then(() => true)
-    .catch(() => false);
-  if (!confirmed) return;
+function openResetPassword(row: UserVO): void {
+  resetTarget.value = row;
+  resetPassword.value = '';
+  resetVisible.value = true;
+}
+
+function generateResetPassword(): void {
+  resetPassword.value = generatePassword();
+}
+
+async function submitResetPassword(): Promise<void> {
+  if (!resetTarget.value) return;
+  const message = validatePassword(resetPassword.value);
+  if (message) {
+    ElMessage.warning(message);
+    return;
+  }
   resetting.value = true;
   try {
-    const password = await resetUserPassword(row.userId);
-    showPasswordResult(`重置密码 · ${row.nickname}`, password);
+    await resetUserPassword(resetTarget.value.userId, resetPassword.value);
+    ElMessage.success('密码已重置,原密码与全部登录会话已失效,请线下告知本人');
+    resetVisible.value = false;
   } finally {
     resetting.value = false;
   }
@@ -533,6 +541,18 @@ async function kickUser(row: UserVO): Promise<void> {
           />
         </ElFormItem>
         <ElFormItem
+          v-if="editingId === null"
+          label="初始密码"
+          prop="password"
+        >
+          <div class="pwd-gen-row">
+            <PasswordHintInput v-model="form.password" />
+            <ElButton @click="form.password = generatePassword()">
+              生成
+            </ElButton>
+          </div>
+        </ElFormItem>
+        <ElFormItem
           label="显示名"
           prop="nickname"
         >
@@ -610,35 +630,38 @@ async function kickUser(row: UserVO): Promise<void> {
     </ElDialog>
 
     <ElDialog
-      v-model="resultVisible"
-      :title="resultTitle"
+      v-model="resetVisible"
+      :title="`重置密码 · ${resetTarget?.nickname ?? ''}`"
       width="420px"
     >
       <ElAlert
         type="warning"
         :closable="false"
         show-icon
-        title="密码明文仅展示这一次，关闭后不可再见，请立即复制并告知本人。"
+        title="提交后原密码与全部登录会话立即失效,新口令请线下告知本人。"
       />
-      <div class="reset-pwd-row">
-        <ElInput
-          :model-value="resultPassword"
-          readonly
-          size="large"
+      <div
+        class="pwd-gen-row"
+        style="margin-top: 12px"
+      >
+        <PasswordHintInput
+          v-model="resetPassword"
+          placeholder="输入新口令或点生成"
         />
-        <ElButton
-          type="primary"
-          @click="copyPassword(resultPassword)"
-        >
-          复制
+        <ElButton @click="generateResetPassword">
+          生成
         </ElButton>
       </div>
       <template #footer>
+        <ElButton @click="resetVisible = false">
+          取消
+        </ElButton>
         <ElButton
           type="primary"
-          @click="resultVisible = false"
+          :loading="resetting"
+          @click="submitResetPassword"
         >
-          我已保存，关闭
+          确认重置
         </ElButton>
       </template>
     </ElDialog>
@@ -681,13 +704,13 @@ async function kickUser(row: UserVO): Promise<void> {
   width: 100%;
 }
 
-.reset-pwd-row {
+.pwd-gen-row {
   display: flex;
   gap: 10px;
   margin-top: 16px;
 }
 
-.reset-pwd-row :deep(.el-input__inner) {
+.pwd-gen-row :deep(.el-input__inner) {
   font-family: monospace;
   font-weight: 600;
   letter-spacing: 0.04em;

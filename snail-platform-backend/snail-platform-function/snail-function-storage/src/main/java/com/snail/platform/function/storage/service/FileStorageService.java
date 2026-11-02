@@ -67,6 +67,12 @@ public class FileStorageService {
     /** 非法字符替换符 */
     private static final String NAME_REPLACEMENT = "_";
 
+    /** bizType 合法字符集:字母数字与 _ : - ,不放进查询与元数据的裸字符串垃圾场 */
+    private static final Pattern BIZ_TYPE_PATTERN = Pattern.compile("[\\w:-]+");
+
+    /** bizType 长度上限,与列宽对齐即可,不需要更长 */
+    private static final int BIZ_TYPE_MAX_LENGTH = 64;
+
     /** 写入端口缺席时的统一文案 */
     private static final String STORAGE_NOT_CONFIGURED = "文件存储未配置";
 
@@ -127,6 +133,8 @@ public class FileStorageService {
         if (ext == null || !extWhitelist.contains(ext)) {
             throw BizException.badRequest("文件类型不在白名单: " + (ext == null ? "无扩展名" : ext));
         }
+        // bizType 是自由标注字段,但会进查询条件与元数据落库:收口长度与字符集,防当垃圾场
+        String normalizedBizType = normalizeBizType(bizType);
         long size = file.getSize();
         if (size > maxSizeBytes) {
             throw BizException.badRequest("文件超过单文件上限 " + properties.getUpload().getMaxSizeMb() + "MB");
@@ -149,7 +157,7 @@ public class FileStorageService {
         row.setStorageKey(storageKey);
         // 这一列是历史对象的路由依据:日后换写入后端,老文件仍按行内类型取端口读
         row.setStorageType(storageRegistry.activeType());
-        row.setBizType(trimToNull(bizType));
+        row.setBizType(normalizedBizType);
         row.setBizId(bizId);
         LoginUser uploader = LoginUserContextHolder.get();
         row.setUploadBy(uploader == null ? null : uploader.userId());
@@ -283,5 +291,20 @@ public class FileStorageService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /**
+     * bizType 收口:空归 null;超长或字符集外(仅允许字母数字与 _ : -)按业务拒绝——
+     * 该值会进查询条件与元数据落库,不做白名单会变成任意字符串垃圾场。
+     */
+    private static String normalizeBizType(String bizType) {
+        String value = trimToNull(bizType);
+        if (value == null) {
+            return null;
+        }
+        if (value.length() > BIZ_TYPE_MAX_LENGTH || !BIZ_TYPE_PATTERN.matcher(value).matches()) {
+            throw BizException.badRequest("bizType 仅允许字母数字与 _ : - ,长度不超过 " + BIZ_TYPE_MAX_LENGTH);
+        }
+        return value;
     }
 }

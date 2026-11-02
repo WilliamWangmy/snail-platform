@@ -1,17 +1,13 @@
 package com.snail.platform.function.system.user.service;
 
 import com.snail.platform.framework.core.exception.BizException;
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 /**
  * 职责:口令强度的服务端单点口径——长度 8-20、四类字符全含、拒绝常见弱口令;
  * 新增用户、重置口令、自助改密、租户开通、强制改密五条写路径共用,改口径只动这里,DTO 的 @Size 只做同区间兜底。
- * 上游:UserService/ProfileService/TenantService 的口令写路径;下游:无,纯校验与生成。
+ * 上游:UserService/ProfileService/TenantService 的口令写路径;下游:无,纯校验。口令生成已移交前端(管理员自输,utils/password.generatePassword 同口径)。
  * 口径:黑名单只收"公开口令表"里的高频值,不是完整字典;前端 src/utils/password.ts 持有同口径副本,改黑名单或文案必须两侧同步。
  */
 public final class PasswordPolicy {
@@ -25,11 +21,6 @@ public final class PasswordPolicy {
     /** 必须命中的字符类别数(大写/小写/数字/符号全含) */
     private static final int MIN_CHAR_CLASSES = 4;
 
-    /** 生成口令的固定长度:落在 8-20 区间内且四类全含 */
-    private static final int GENERATED_LENGTH = 12;
-
-    /** 生成用的符号集:不含空白,全部落在"其余可见符号算一类"的判定域内 */
-    private static final String GENERATED_SYMBOLS = "!@#$%^&*()-_=+[]{};:,.?";
 
     /** 高频弱口令:命中即拒,不看长度是否达标 */
     private static final Set<String> COMMON_WEAK = Set.of(
@@ -55,32 +46,6 @@ public final class PasswordPolicy {
         }
     }
 
-    /** 生成满足本口径的随机口令:12 位、四类各至少 1、无空白、不命中黑名单;重置密码用,明文仅随响应返回一次 */
-    public static String generate() {
-        String lower = "abcdefghijklmnopqrstuvwxyz";
-        String upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        String digit = "0123456789";
-        String all = lower + upper + digit + GENERATED_SYMBOLS;
-        SecureRandom random = new SecureRandom();
-        for (;;) {
-            List<Character> chars = new ArrayList<>(GENERATED_LENGTH);
-            // 四类各先取 1 位,再从全集补足,洗牌打散避免四类固定落位
-            for (String pool : new String[] {lower, upper, digit, GENERATED_SYMBOLS}) {
-                chars.add(pool.charAt(random.nextInt(pool.length())));
-            }
-            while (chars.size() < GENERATED_LENGTH) {
-                chars.add(all.charAt(random.nextInt(all.length())));
-            }
-            Collections.shuffle(chars, random);
-            StringBuilder password = new StringBuilder(GENERATED_LENGTH);
-            for (char c : chars) {
-                password.append(c);
-            }
-            if (violationOf(password.toString()) == null) {
-                return password.toString();
-            }
-        }
-    }
 
     /** 违规返回文案,合规返回 null;短路顺序:长度→空白→黑名单→类别 */
     private static String violationOf(String rawPassword) {

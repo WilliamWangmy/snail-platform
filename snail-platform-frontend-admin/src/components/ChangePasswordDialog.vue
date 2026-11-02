@@ -3,7 +3,7 @@ import { reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { changePassword } from '@/api/profile';
 import { useAuthStore } from '@/stores/auth';
-import { validatePassword } from '@/utils/password';
+import { passwordConfirmRules } from '@/utils/passwordFormRules';
 import PasswordHintInput from '@/components/PasswordHintInput.vue';
 
 const props = defineProps<{ visible: boolean }>();
@@ -29,27 +29,7 @@ watch(
 
 const rules: FormRules = {
   oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    {
-      // 密码强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载
-      validator: (_rule: unknown, value: string, callback: (error?: Error) => void): void => {
-        const message = validatePassword(value);
-        callback(message ? new Error(message) : undefined);
-      },
-      trigger: 'blur',
-    },
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
-    {
-      validator: (_rule: unknown, value: string, callback: (error?: Error) => void): void => {
-        if (value !== form.newPassword) callback(new Error('两次输入的密码不一致'));
-        else callback();
-      },
-      trigger: 'blur',
-    },
-  ],
+  ...passwordConfirmRules(() => form.newPassword),
 };
 
 /** 改密成功即令牌版本自增,所有设备(含本机)被强制重新登录,清本地态回登录页 */
@@ -85,7 +65,9 @@ async function submit(): Promise<void> {
     @update:model-value="emit('closed')"
   >
     <template #header>
-      <h3 class="cp-title">修改密码</h3>
+      <h3 class="cp-title">
+        修改密码
+      </h3>
     </template>
 
     <ElForm

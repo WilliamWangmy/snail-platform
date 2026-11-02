@@ -252,6 +252,10 @@ public class OperLogAspect implements DisposableBean {
         if (result instanceof byte[] || result instanceof Resource) {
             return "[二进制响应]";
         }
+        if (result instanceof org.springframework.http.ResponseEntity<?> entity) {
+            // 流式下载(文件/导出)走 ResponseEntity:只留状态行,响应体不序列化
+            return "[HTTP " + entity.getStatusCode().value() + "]";
+        }
         try {
             return SensitiveDataMasker.mask(JSONUtil.toJsonStr(normalize(result)));
         } catch (RuntimeException e) {

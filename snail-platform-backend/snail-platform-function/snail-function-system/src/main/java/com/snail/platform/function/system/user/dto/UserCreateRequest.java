@@ -22,7 +22,8 @@ public record UserCreateRequest(
         @Pattern(regexp = "[A-Za-z0-9_.@-]+", message = "登录名只允许字母、数字、下划线、点、@、连字符")
         String username,
 
-        @Schema(description = "初始口令,可空——不传则由服务端按 PasswordPolicy 随机生成并随响应返回明文", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Schema(description = "初始口令,管理员输入(可用前端生成按钮),服务端按 PasswordPolicy 校验;不再由服务端代生成", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotBlank(message = "请输入初始密码")
         @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
         String password,
 
@@ -36,8 +37,9 @@ public record UserCreateRequest(
         @Size(max = 50, message = "邮箱过长")
         String email,
 
-        @Schema(description = "手机号")
+        @Schema(description = "手机号,可空;非空须为 11 位大陆手机号或 3-20 位含区号的座机")
         @Size(max = 20, message = "手机号过长")
+        @Pattern(regexp = "^(?:$|1[3-9]\\d{9}|0\\d{2,3}-?[1-9]\\d{6,7})$", message = "手机号格式不正确")
         String phone,
 
         @Schema(description = "所属组织,须为本租户内状态正常的节点", requiredMode = Schema.RequiredMode.REQUIRED)

@@ -2,7 +2,6 @@ package com.snail.platform.framework.security.config;
 
 import com.snail.platform.framework.security.SnailSecurityProperties;
 import com.snail.platform.framework.security.authority.UserAuthorityProvider;
-import com.snail.platform.framework.security.crypto.PasswordTransferCipher;
 import com.snail.platform.framework.security.login.LoginUserProvider;
 import com.snail.platform.framework.security.heartbeat.SessionHeartbeatPort;
 import com.snail.platform.framework.security.token.JwtTokenService;
@@ -56,12 +55,6 @@ public class SnailSecurityConfig {
     @Bean
     public JwtTokenService jwtTokenService(SnailSecurityProperties properties) {
         return new JwtTokenService(properties);
-    }
-
-    /** 口令回传加密器:构造期校验 AES 密钥,缺失或长度不符拒绝启动 */
-    @Bean
-    public PasswordTransferCipher passwordTransferCipher(SnailSecurityProperties properties) {
-        return new PasswordTransferCipher(properties.getPasswordTransfer().getKey());
     }
 
     /** 安全链:无状态、白名单放行、其余认证;认证过滤器在前,强制改密闸在其后 */

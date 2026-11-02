@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import { confirmAction } from '@/composables/useConfirmAction';
 import {
   changeDictTypeStatus,
   createDictData,
@@ -100,14 +101,12 @@ async function submitType(): Promise<void> {
 async function toggleTypeStatus(row: DictTypeVO): Promise<void> {
   const next = row.status === 0 ? 1 : 0;
   if (next === 1) {
-    const confirmed = await ElMessageBox.confirm(
+    const goOn = await confirmAction(
       `停用字典类型 ${row.dictName}(${row.dictType})?业务页面按该类型取的下拉会立即取不到并报错;类型下的字典项与已落库的历史值都不受影响。`,
-      '停用确认',
-      { type: 'warning', confirmButtonText: '停用', cancelButtonText: '取消' },
-    )
-      .then(() => true)
-      .catch(() => false);
-    if (!confirmed) return;
+      () => Promise.resolve(),
+      { title: '停用确认', confirmText: '停用' },
+    );
+    if (!goOn) return;
   }
   await changeDictTypeStatus(row.dictId, next);
   row.status = next;
@@ -115,22 +114,17 @@ async function toggleTypeStatus(row: DictTypeVO): Promise<void> {
 }
 
 async function removeType(row: DictTypeVO): Promise<void> {
-  const confirmed = await ElMessageBox.confirm(
+  await confirmAction(
     `删除字典类型 ${row.dictName}(${row.dictType})?该类型下的字典项一并删除,类型标识此后终身占用、不能同码重建。`,
-    '删除确认',
-    { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-  )
-    .then(() => true)
-    .catch(() => false);
-  if (!confirmed) return;
-  await deleteDictType(row.dictId);
+    () => deleteDictType(row.dictId),
+    { title: '删除确认', confirmText: '删除', successText: '已删除' },
+  );
   // 删的正是右栏当前选中的类型:先把选中态与残留行清掉,否则表头还挂着已删类型的名字
   if (activeType.value?.dictId === row.dictId) {
     activeType.value = null;
     dataList.rows.value = [];
     dataList.total.value = 0;
   }
-  ElMessage.success('已删除');
   await typeList.refresh();
 }
 
@@ -226,16 +220,11 @@ async function submitData(): Promise<void> {
 }
 
 async function removeData(row: DictDataVO): Promise<void> {
-  const confirmed = await ElMessageBox.confirm(
+  await confirmAction(
     `删除字典项 ${row.dictLabel}(${row.dictValue})?`,
-    '删除确认',
-    { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-  )
-    .then(() => true)
-    .catch(() => false);
-  if (!confirmed) return;
-  await deleteDictData(row.dictDataId);
-  ElMessage.success('已删除');
+    () => deleteDictData(row.dictDataId),
+    { title: '删除确认', confirmText: '删除', successText: '已删除' },
+  );
   await dataList.refresh();
 }
 

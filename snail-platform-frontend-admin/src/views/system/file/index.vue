@@ -127,7 +127,7 @@ function rowActions(row: FileVO): RowAction[] {
       type="file"
       hidden
       @change="onFileChange"
-    >
+    />
 
     <ElCard
       shadow="never"

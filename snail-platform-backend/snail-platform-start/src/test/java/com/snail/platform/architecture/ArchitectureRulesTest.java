@@ -104,6 +104,20 @@ class ArchitectureRulesTest {
     private static final Set<String> MAPPER_WRITE_METHODS =
             Set.of("insert", "update", "updateById", "delete", "deleteById", "deleteByMap", "insertOrUpdate", "upsert");
 
+    /**
+     * last() 白名单:该方法把原文拼进 SQL 末尾,属注入面——只准已登记的 5 处使用,
+     * 且参数必须是编译期常量("FOR UPDATE"/"LIMIT " + 静态常量);新增使用先来这儿登记再写代码。
+     */
+    private static final Set<String> LAST_ALLOWED = Set.of(
+            "com.snail.platform.function.storage.service.FileQuotaService",
+            "com.snail.platform.function.system.log.service.LoginLogService",
+            "com.snail.platform.function.system.log.service.OperLogService",
+            "com.snail.platform.function.system.user.service.UserService");
+
+    /** slf4j Logger 的输出口径方法名:落 password 字段的日志都从这些口出去 */
+    private static final Set<String> LOGGER_METHODS =
+            Set.of("trace", "debug", "info", "warn", "error");
+
     /** 全部纪律一次执行:装配纪律(事务/启动类/框架回望/分页单点)、跨子域白名单、契约不互借、散参阈值、引擎边界与租户旁路 */
     @ArchTest
     static void allRules(JavaClasses classes) {
@@ -133,6 +147,10 @@ class ArchitectureRulesTest {
                     if (isMapped(method) && !method.isAnnotatedWith(PreAuthorize.class)) {
                         violations.add(method.getFullName() + ":公开端点缺 @PreAuthorize(权限全量收口)");
                     }
+                    if (isMapped(method) && returnsEntity(method)) {
+                        violations.add(method.getFullName()
+                                + ":Controller 出参引用 .entity 持久化对象,只准出 VO(契约不外泄)");
+                    }
                     long count = method.getParameterAnnotations().stream()
                             .filter(params -> params.stream().map(JavaAnnotation::getRawType)
                                     .anyMatch(raw -> raw.getName().equals(RequestParam.class.getName())))
@@ -143,6 +161,18 @@ class ArchitectureRulesTest {
                     }
                 }
             }
+
+            owner.getMethodCallsFromSelf().forEach(call -> {
+                // last() 注入面:仅白名单类可用,且参数须为编译期常量(人工纪律,名单锁范围)
+                if (call.getName().equals("last") && !LAST_ALLOWED.contains(owner.getFullName())) {
+                    violations.add(owner.getFullName() + " -> " + call.getTarget().getFullName()
+                            + ":last() 把原文拼进 SQL 末尾,属注入面,只准白名单类以编译期常量使用(约定 §7)");
+                }
+                if (isPasswordLogging(owner, call)) {
+                    violations.add(owner.getFullName() + ":日志输出方法出现在触及 password 字段的方法 "
+                            + call.getOrigin().getName() + " 内(口令禁止进日志)");
+                }
+            });
 
             owner.getDirectDependenciesFromSelf().forEach(dependency ->
                     checkCrossSubdomain(owner, dependency, violations));
@@ -362,6 +392,27 @@ class ArchitectureRulesTest {
                 || method.isAnnotatedWith(DeleteMapping.class)
                 || method.isAnnotatedWith(PatchMapping.class)
                 || method.isAnnotatedWith(RequestMapping.class);
+    }
+
+    /** 出参全类型(含泛型实参)里是否出现 .entity 持久化对象——R&lt;PageResult&lt;SysFile&gt;&gt; 也逃不掉 */
+    private static boolean returnsEntity(JavaMethod method) {
+        return method.getReturnType().getAllInvolvedRawTypes().stream()
+                .anyMatch(raw -> raw.getPackageName().endsWith(".entity"));
+    }
+
+    /**
+     * 口令进日志的启发式闸:同一方法内既触及名字含 password 的字段又调用日志输出口,
+     * 十有八九是把口令拼进了日志——逐例人工复核的信号灯,宁误报不放行。
+     */
+    private static boolean isPasswordLogging(JavaClass owner, com.tngtech.archunit.core.domain.JavaMethodCall call) {
+        String target = call.getTarget().getFullName();
+        boolean logOutput = (target.startsWith("org.slf4j.Logger") && LOGGER_METHODS.contains(call.getName()))
+                || target.startsWith("java.io.PrintStream.");
+        if (!logOutput) {
+            return false;
+        }
+        return call.getOrigin().getFieldAccesses().stream().anyMatch(access ->
+                access.getTarget().getName().toLowerCase(java.util.Locale.ROOT).contains("password"));
     }
 
     private static boolean isImplementationLayer(String targetPackage) {

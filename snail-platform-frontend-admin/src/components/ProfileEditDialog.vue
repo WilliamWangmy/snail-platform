@@ -72,12 +72,14 @@ async function submit(): Promise<void> {
     @update:model-value="emit('closed')"
   >
     <template #header>
-      <h3 class="pe-title">个人信息</h3>
+      <h3 class="pe-title">
+        个人信息
+      </h3>
     </template>
 
     <ElForm
-      v-loading="loading"
       ref="formRef"
+      v-loading="loading"
       :model="form"
       :rules="rules"
       label-position="top"

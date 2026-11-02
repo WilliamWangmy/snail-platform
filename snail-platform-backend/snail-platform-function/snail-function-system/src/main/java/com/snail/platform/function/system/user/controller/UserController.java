@@ -6,10 +6,10 @@ import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
 import com.snail.platform.framework.core.response.PageResult;
-import com.snail.platform.framework.security.crypto.PasswordTransferCipher;
 import com.snail.platform.function.system.user.dto.AssignRolesRequest;
 import com.snail.platform.function.system.user.dto.UserCreateRequest;
 import com.snail.platform.function.system.user.dto.UserCreatedVO;
+import com.snail.platform.function.system.user.dto.ResetPasswordRequest;
 import com.snail.platform.function.system.user.dto.UserQuery;
 import com.snail.platform.function.system.user.dto.UserUpdateRequest;
 import com.snail.platform.function.system.user.dto.UserVO;
@@ -22,7 +22,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.util.Map;
 import java.util.Objects;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -49,12 +48,8 @@ public class UserController {
     /** 用户业务服务 */
     private final UserService userService;
 
-    /** 一次性口令的传输加密 */
-    private final PasswordTransferCipher passwordTransferCipher;
-
-    public UserController(UserService userService, PasswordTransferCipher passwordTransferCipher) {
+    public UserController(UserService userService) {
         this.userService = userService;
-        this.passwordTransferCipher = passwordTransferCipher;
     }
 
     @PreAuthorize("hasAuthority('system:user:list')")
@@ -82,12 +77,11 @@ public class UserController {
     }
 
     @PreAuthorize("hasAuthority('system:user:create')")
-    @Operation(summary = "新增用户(口令可不传,服务端随机生成,加密后仅本次响应可见)")
+    @Operation(summary = "新增用户(初始口令由管理员自输,服务端按 PasswordPolicy 校验;响应只回新用户ID)")
     @OperLog(module = "用户管理", businessType = BusinessType.INSERT)
     @PostMapping
     public R<UserCreatedVO> create(@Valid @RequestBody UserCreateRequest request) {
-        UserCreatedVO created = userService.create(request);
-        return R.ok(new UserCreatedVO(created.userId(), passwordTransferCipher.encrypt(created.password())));
+        return R.ok(userService.create(request));
     }
 
     @PreAuthorize("hasAuthority('system:user:update')")
@@ -100,13 +94,12 @@ public class UserController {
     }
 
     @PreAuthorize("hasAuthority('system:user:reset-password')")
-    @Operation(summary = "重置密码(服务端生成随机口令,加密后仅本次响应可见)")
+    @Operation(summary = "重置密码(新口令由管理员自输,服务端按 PasswordPolicy 校验并前推令牌版本)")
     @OperLog(module = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/{userId}/password")
-    public R<Map<String, String>> resetPassword(@PathVariable Long userId) {
-        // 密文仍包在 password 键下而非裸字符串:OperLog 落库走 SensitiveDataMasker 键级脱敏,
-        // 键名对上才会打码;裸字符串直挂 data 会绕过名单,整段密文原样进 sys_oper_log.result
-        return R.ok(Map.of("password", passwordTransferCipher.encrypt(userService.resetPassword(userId))));
+    public R<Void> resetPassword(@PathVariable Long userId, @Valid @RequestBody ResetPasswordRequest request) {
+        userService.resetPassword(userId, request.password());
+        return R.ok(null);
     }
 
     @PreAuthorize("hasAuthority('system:user:update')")

@@ -92,6 +92,7 @@ public class FileController {
 
     @PreAuthorize("hasAuthority('system:file:download')")
     @Operation(summary = "下载文件(本租户 + 文件级可见性)")
+    @OperLog(module = "文件管理", businessType = BusinessType.EXPORT)
     @GetMapping("/{fileId}/raw")
     public ResponseEntity<StreamingResponseBody> raw(@PathVariable Long fileId) {
         FileStorageService.StorageDownload download = fileStorageService.download(fileId);

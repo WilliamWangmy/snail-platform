@@ -13,7 +13,8 @@ import {
 } from '@/api/tenant';
 import { usePageList } from '@/composables/usePageList';
 import { dateTime } from '@/utils/format';
-import { copyText } from '@/utils/password';
+import { generatePassword, validatePassword } from '@/utils/password';
+import PasswordHintInput from '@/components/PasswordHintInput.vue';
 
 const query = reactive<TenantQuery>({ name: '', status: null });
 const { rows, total, loading, pageNum, pageSize, refresh, search } = usePageList<TenantVO>((page) =>
@@ -39,6 +40,8 @@ interface TenantForm {
   accountLimit: number | null;
   remark: string;
   adminUsername: string;
+  /** 首任管理员初始口令(P2-3):平台管理员自输或点生成,仅在开通态提交 */
+  adminPassword: string;
 }
 
 const emptyForm: TenantForm = {
@@ -50,6 +53,7 @@ const emptyForm: TenantForm = {
   accountLimit: null,
   remark: '',
   adminUsername: '',
+  adminPassword: '',
 };
 
 const formVisible = ref(false);
@@ -57,28 +61,6 @@ const formRef = ref<FormInstance>();
 const editingId = ref<number | null>(null);
 const form = reactive<TenantForm>({ ...emptyForm });
 const saving = ref(false);
-
-/* ---------------------------- 管理员口令结果展示 ---------------------------- */
-
-const resultVisible = ref(false);
-const resultTitle = ref('');
-const resultPassword = ref('');
-
-/** 开通成功后弹管理员初始口令:明文仅服务端返回这一次,展示+复制后转交租户 */
-function showPasswordResult(title: string, password: string): void {
-  resultTitle.value = title;
-  resultPassword.value = password;
-  resultVisible.value = true;
-}
-
-async function copyPassword(value: string): Promise<void> {
-  if (!value) return;
-  if (await copyText(value)) {
-    ElMessage.success('已复制到剪贴板');
-  } else {
-    ElMessage.error('复制失败,请手动复制');
-  }
-}
 
 const rules: FormRules<TenantForm> = {
   tenantCode: [
@@ -115,6 +97,17 @@ const rules: FormRules<TenantForm> = {
       trigger: 'blur',
     },
   ],
+  adminPassword: [
+    { required: true, message: '请输入管理员初始密码', trigger: 'blur' },
+    {
+      // 强度口径与后端 PasswordPolicy 同值,由 validatePassword 单点承载
+      validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+        const message = validatePassword(value);
+        callback(message ? new Error(message) : undefined);
+      },
+      trigger: 'blur',
+    },
+  ],
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 };
 
@@ -136,6 +129,7 @@ function openEdit(row: TenantVO): void {
     accountLimit: row.accountLimit,
     remark: row.remark ?? '',
     adminUsername: '',
+    adminPassword: '',
   });
   formVisible.value = true;
 }
@@ -156,14 +150,14 @@ async function submitForm(): Promise<void> {
       remark: text(form.remark),
     };
     if (editingId.value === null) {
-      const created = await createTenant({
+      await createTenant({
         tenantCode: form.tenantCode.trim(),
         adminUsername: form.adminUsername.trim(),
+        adminPassword: form.adminPassword,
         ...common,
       });
-      ElMessage.success('租户已开通');
-      // 管理员初始口令由服务端生成且仅此一次可见:结果弹窗展示+复制,转交租户
-      showPasswordResult(`开通租户 · ${form.name.trim()}`, created.password);
+      // 管理员初始口令由平台管理员自输(P2-3),线下转交租户;响应只回新租户ID
+      ElMessage.success('租户已开通,请把管理员初始口令线下告知租户');
     } else {
       // 修改是整份提交:表单回填了现值,所以"留空即清空"在这里只在用户真删了内容时发生
       // status 不在载荷里:启停只走独立端点,弹窗里放开关等于给高危动作开第二条无确认的通路
@@ -440,6 +434,18 @@ async function toggleStatus(row: TenantVO): Promise<void> {
           />
         </ElFormItem>
         <ElFormItem
+          v-if="editingId === null"
+          label="初始密码"
+          prop="adminPassword"
+        >
+          <div class="pwd-gen-row">
+            <PasswordHintInput v-model="form.adminPassword" />
+            <ElButton @click="form.adminPassword = generatePassword()">
+              生成
+            </ElButton>
+          </div>
+        </ElFormItem>
+        <ElFormItem
           label="联系人"
           prop="contactUser"
         >
@@ -503,40 +509,6 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         </ElButton>
       </template>
     </ElDialog>
-
-    <ElDialog
-      v-model="resultVisible"
-      :title="resultTitle"
-      width="420px"
-    >
-      <ElAlert
-        type="warning"
-        :closable="false"
-        show-icon
-        title="管理员初始密码明文仅展示这一次，关闭后不可再见，请立即复制并告知租户。"
-      />
-      <div class="reset-pwd-row">
-        <ElInput
-          :model-value="resultPassword"
-          readonly
-          size="large"
-        />
-        <ElButton
-          type="primary"
-          @click="copyPassword(resultPassword)"
-        >
-          复制
-        </ElButton>
-      </div>
-      <template #footer>
-        <ElButton
-          type="primary"
-          @click="resultVisible = false"
-        >
-          我已保存，关闭
-        </ElButton>
-      </template>
-    </ElDialog>
   </div>
 </template>
 
@@ -545,13 +517,13 @@ async function toggleStatus(row: TenantVO): Promise<void> {
   width: 100%;
 }
 
-.reset-pwd-row {
+.pwd-gen-row {
   display: flex;
   gap: 10px;
   margin-top: 16px;
 }
 
-.reset-pwd-row :deep(.el-input__inner) {
+.pwd-gen-row :deep(.el-input__inner) {
   font-family: monospace;
   font-weight: 600;
   letter-spacing: 0.04em;

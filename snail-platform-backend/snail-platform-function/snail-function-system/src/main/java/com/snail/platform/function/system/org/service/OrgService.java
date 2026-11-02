@@ -92,10 +92,25 @@ public class OrgService {
         return roots;
     }
 
-    /** 子树清单的页面入口:先过可见性闸,再取未过滤的缓存清单(档位三内部调用不走这里,它没有"目标节点"概念) */
+    /**
+     * 子树清单的页面入口:先过可见性闸,再取缓存清单并按数据权限二次过滤。
+     * 只验目标节点不够——"本组织"档的登录者看得见自己的组织,但它的子孙不在其可见集内,
+     * 原样返回就是一份越权组织清单;这里用可见集 SQL 对子孙 ID 交集收口。
+     */
     public List<Long> subtreeWithinScope(Long orgId) {
         requireOrgInScope(orgId);
-        return orgQueryService.subtreeIds(orgId);
+        List<Long> subtreeIds = orgQueryService.subtreeIds(orgId);
+        DataScopeFilter scope = dataScopeService.currentFilterOrNull();
+        if (scope == null) {
+            return subtreeIds;
+        }
+        return DataScopeContextHolder.filter(scope, () -> orgMapper.selectList(
+                        Wrappers.<SysOrg>lambdaQuery()
+                                .select(SysOrg::getOrgId)
+                                .in(SysOrg::getOrgId, subtreeIds)))
+                .stream()
+                .map(SysOrg::getOrgId)
+                .toList();
     }
 
     /**

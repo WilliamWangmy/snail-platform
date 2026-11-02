@@ -79,9 +79,9 @@ function onHintFocusOut(event: FocusEvent): void {
           :class="`l${strength.score}`"
         >
           <div class="strength-bars">
-            <i :class="{ on: strength.score >= 1 }" />
-            <i :class="{ on: strength.score >= 2 }" />
-            <i :class="{ on: strength.score >= 3 }" />
+            <i :class="{ on: strength.score >= 1 }"></i>
+            <i :class="{ on: strength.score >= 2 }"></i>
+            <i :class="{ on: strength.score >= 3 }"></i>
           </div>
           <span class="strength-label">强度：{{ strength.label }}</span>
         </div>

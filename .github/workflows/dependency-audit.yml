@@ -1,0 +1,63 @@
+# 依赖审计门禁:三线(前端 pnpm audit / 后端 OWASP / Python pip-audit)每周例行 + 手动触发。
+# 只做"已知漏洞拦门",不跑全量测试——测试归各线的常规流水线。
+name: dependency-audit
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # 每周一 03:00 UTC(北京时间周一上午)
+  workflow_dispatch: {}
+
+jobs:
+  frontend-audit:
+    name: 前端 pnpm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: audit(high 及以上即失败)
+        working-directory: snail-platform-frontend-admin
+        run: pnpm audit --audit-level high
+
+  backend-audit:
+    name: 后端 OWASP dependency-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      # CVSS>=9 才判失败:7~8 分的传递依赖告警先看报告人工裁决,避免门禁形同虚设被禁用
+      # NVD_API_KEY 建议配置为仓库 Secret,没 key 时 NVD 匿名限流慢但不影响结论
+      - name: dependency-check
+        working-directory: snail-platform-backend
+        run: >
+          mvn -B -Denforcer.skip=true
+          org.owasp:dependency-check-maven:12.1.0:aggregate
+          -DfailBuildOnCVSS=9
+          -DnvdApiKey=${{ secrets.NVD_API_KEY }}
+          -DnvdApiDelay=6000
+
+  agent-audit:
+    name: Python pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装项目依赖
+        working-directory: snail-platform-agent
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          pip install .[dev]
+      - name: pip-audit(已知 CVE 即失败)
+        working-directory: snail-platform-agent
+        run: pip-audit --strict

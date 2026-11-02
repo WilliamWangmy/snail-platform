@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath, URL } from 'node:url';
 
@@ -27,16 +27,7 @@ function cspMeta(): Plugin {
   };
 }
 
-export default defineConfig(({ mode, command }) => {
-  const env = loadEnv(mode, process.cwd(), 'VITE_');
-  // 构建期守门:口令回传解密依赖 VITE_PASSWORD_TRANSFER_KEY,缺钥的产物没有存在价值——
-  // 与其产出一个"运行到结果弹窗才报解密失败"的包,不如在 CI 当场失败。
-  if (command === 'build' && !env.VITE_PASSWORD_TRANSFER_KEY) {
-    throw new Error(
-      'VITE_PASSWORD_TRANSFER_KEY 未注入,拒绝构建。'
-      + '请在构建环境或 .env.production 中提供,与后端 snail.security.password-transfer.key 同值。',
-    );
-  }
+export default defineConfig(() => {
   return {
     plugins: [vue(), cspMeta()],
     resolve: {

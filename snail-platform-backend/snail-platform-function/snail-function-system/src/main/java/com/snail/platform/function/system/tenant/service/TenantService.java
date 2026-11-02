@@ -105,7 +105,8 @@ public class TenantService {
     public TenantCreatedVO provision(TenantCreateRequest request) {
         String tenantCode = request.tenantCode().trim();
         String adminUsername = request.adminUsername().trim();
-        String adminPassword = request.adminPassword() != null ? request.adminPassword() : PasswordPolicy.generate();
+        // 平台管理员自输首任管理员口令(P2-3):服务端不再代生成,响应也不再回传口令
+        String adminPassword = request.adminPassword();
         PasswordPolicy.validate(adminPassword);
 
         if (tenantMapper.selectCount(Wrappers.<SysTenant>lambdaQuery()
@@ -163,7 +164,7 @@ public class TenantService {
             userRoleMapper.insert(binding);
             return null;
         });
-        return new TenantCreatedVO(newTenantId, adminPassword);
+        return new TenantCreatedVO(newTenantId);
     }
 
     /**

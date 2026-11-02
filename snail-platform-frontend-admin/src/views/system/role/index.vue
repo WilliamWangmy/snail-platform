@@ -2,12 +2,12 @@
 import { nextTick, onMounted, reactive, ref } from 'vue';
 import {
   ElMessage,
-  ElMessageBox,
   ElTree,
   type FormInstance,
   type FormRules,
 } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
+import { confirmAction } from '@/composables/useConfirmAction';
 import {
   assignRoleMenus,
   changeRoleStatus,
@@ -196,16 +196,11 @@ async function submitAssignMenus(): Promise<void> {
 /* --------------------------------- 删除 ----------------------------------- */
 
 async function remove(row: RoleVO): Promise<void> {
-  const confirmed = await ElMessageBox.confirm(
+  await confirmAction(
     `删除角色 ${row.roleName}(${row.roleCode})?内置角色与已被用户使用的角色会被拒绝。`,
-    '删除确认',
-    { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-  )
-    .then(() => true)
-    .catch(() => false);
-  if (!confirmed) return;
-  await deleteRole(row.roleId);
-  ElMessage.success('已删除');
+    () => deleteRole(row.roleId),
+    { title: '删除确认', confirmText: '删除', successText: '已删除' },
+  );
   await refresh();
 }
 

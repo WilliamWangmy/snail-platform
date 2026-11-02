@@ -77,7 +77,6 @@ com.snail.platform.framework.security
 ├── config/
 │   └── SnailSecurityConfig.java          安全链、CORS、JWT 与口令加密器装配
 ├── crypto/
-│   └── PasswordTransferCipher.java       AES-256-GCM 口令回传加密
 ├── heartbeat/
 │   └── SessionHeartbeatPort.java         在线心跳端口
 ├── login/
@@ -151,7 +150,6 @@ com.snail.platform.framework.security
 - 算法：AES-256-GCM，每条随机 12 字节 IV、128 位认证标签；
 - 报文：`Base64(iv ‖ 密文 ‖ tag)`，直接挂在 `password` 键出参（键名保持原样供审计脱敏）；
 - 方向：服务端加密、管理端解密展示；响应体与操作日志里都不出现口令明文；
-- 密钥：`snail.security.password-transfer.key`，Base64 解码后必须 32 字节；缺失/非法 Base64/长度不符都在启动期拒绝；
 - 前端实现：`snail-platform-frontend-admin/src/utils/passwordTransfer.ts`，两侧报文格式与密钥必须同改；
 - 边界：密钥随前端包分发，挡的是链路明文暴露，不是对持有前端包者的机密性保证。
 
@@ -173,7 +171,6 @@ com.snail.platform.framework.security
 | [`SnailAuthFilter`](src/main/java/com/snail/platform/framework/security/web/SnailAuthFilter.java) | 认证主链 | 先租户后 Provider；快照无版本即无效；`finally` 清三份上下文 |
 | [`ForcePasswordChangeFilter`](src/main/java/com/snail/platform/framework/security/web/ForcePasswordChangeFilter.java) | 强制改密兜底 | 精确 `(方法,路径)` 放行集；不豁免异步派发 |
 | [`SecurityExceptionHandler`](src/main/java/com/snail/platform/framework/security/web/SecurityExceptionHandler.java) | 方法级鉴权拒绝 | 403 + `R`；抢在全局 500 兜底之前 |
-| [`PasswordTransferCipher`](src/main/java/com/snail/platform/framework/security/crypto/PasswordTransferCipher.java) | 口令回传加密 | 12 字节 IV、128 位 tag；启动期校验密钥 |
 | [`UserAuthorityProvider`](src/main/java/com/snail/platform/framework/security/authority/UserAuthorityProvider.java) | 权限码端口 | 调用时租户已就绪；无权限返回空集合 |
 | [`AuthorityChecker`](src/main/java/com/snail/platform/framework/security/authority/AuthorityChecker.java) | Service 层判权 | 未认证或无码一律 false |
 | [`LoginUserProvider`](src/main/java/com/snail/platform/framework/security/login/LoginUserProvider.java) | 登录人快照端口 | 必须非 null；实现必须缓存；`minimal` 与过滤器共用兜底口径 |
@@ -186,7 +183,6 @@ com.snail.platform.framework.security
 | `snail.security.jwt.secret` | 无（dev 有占位） | HS256 密钥，≥32 字符；prod 必填 `SNAIL_JWT_SECRET` |
 | `snail.security.jwt.expire-minutes` | `120` | 令牌有效期（分钟） |
 | `snail.security.cors.allowed-origins` | 空 | 跨域来源白名单；留空不启用 CORS |
-| `snail.security.password-transfer.key` | 无（dev 有占位） | AES-256-GCM 密钥（Base64，32 字节）；prod 必填 `SNAIL_PASSWORD_TRANSFER_KEY` |
 
 前端构建对应 `VITE_PASSWORD_TRANSFER_KEY`，必须与后端同值；不一致表现为"口令解密失败"。
 
@@ -212,7 +208,6 @@ return R.ok(Map.of("password", passwordTransferCipher.encrypt(rawPassword)));
 
 ## 验证手段
 
-- `PasswordTransferCipherTest`：报文格式、密钥校验、加解密一致性；
 - `LoginFlowTest` / `AuthSessionFlowTest`：登录、令牌校验、会话失效；
 - `LoginUserFlowTest`：登录人快照与租户隔离；
 - `PasswordForceChangeFlowTest`：强制改密闸的 403 与三条放行；

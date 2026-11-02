@@ -1,6 +1,5 @@
 import { del, get, post, put } from './http';
 import type { PageParams, PageResult } from './types';
-import { decryptPassword } from '@/utils/passwordTransfer';
 
 export interface UserVO {
   userId: number;
@@ -31,6 +30,8 @@ export interface UserQuery extends PageParams {
 export interface UserCreatePayload {
   /** 全表唯一(跨租户也算占用),建后不可改;查重由后端兜底 */
   username: string;
+  /** 初始口令(P2-3):管理员自输,走 HTTPS 请求体;服务端按 PasswordPolicy 校验,不再代生成 */
+  password: string;
   nickname: string;
   email?: string | null;
   phone?: string | null;
@@ -40,10 +41,9 @@ export interface UserCreatePayload {
   roleIds?: number[];
 }
 
-/** 建号/重置口令出参:服务端只回密文,解密在 api 层完成,视图拿到的是可直接展示的明文 */
+/** 建号出参:只有新用户ID,响应不再回传口令 */
 export interface UserCreated {
   userId: number;
-  password: string;
 }
 
 export interface UserUpdatePayload {
@@ -70,10 +70,9 @@ export function checkUsername(username: string): Promise<boolean> {
   return get<boolean>('/system/user/username-exists', { username });
 }
 
-/** 建号同事务完成授权;口令不传,由服务端按 PasswordPolicy 随机生成,密文随响应返回、此处解密 */
-export async function createUser(payload: UserCreatePayload): Promise<UserCreated> {
-  const created = await post<UserCreated>('/system/user', payload);
-  return { userId: created.userId, password: await decryptPassword(created.password) };
+/** 建号同事务完成授权;初始口令随请求体提交(P2-3),响应只回新用户ID */
+export function createUser(payload: UserCreatePayload): Promise<UserCreated> {
+  return post<UserCreated>('/system/user', payload);
 }
 
 /** 只改档案五列;username/password/status 不在契约里,改口令走 reset、改状态走 changeUserStatus */
@@ -81,11 +80,9 @@ export function updateUser(userId: number, payload: UserUpdatePayload): Promise<
   return put<void>(`/system/user/${userId}`, payload);
 }
 
-/** 重置由服务端按 PasswordPolicy 随机生成新口令并前推令牌版本,密文回传后在此解密供展示+复制 */
-export async function resetUserPassword(userId: number): Promise<string> {
-  // 密文包在 password 键下:后端审计落库走键级脱敏,裸字符串会被原样记进 sys_oper_log
-  const body = await put<{ password: string }>(`/system/user/${userId}/password`, undefined);
-  return decryptPassword(body.password);
+/** 重置口令:新口令由管理员自输(P2-3),后端校验强度并前推令牌版本;响应为空 */
+export function resetUserPassword(userId: number, password: string): Promise<void> {
+  return put<void>(`/system/user/${userId}/password`, { password });
 }
 
 /** status 走 query 参数而非请求体;停用即刻失效存量会话,且不允许停用自己 */

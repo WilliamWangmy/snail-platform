@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -23,8 +24,9 @@ public record UserUpdateRequest(
         @Size(max = 50, message = "邮箱过长")
         String email,
 
-        @Schema(description = "手机号")
+        @Schema(description = "手机号,可空;非空须为 11 位大陆手机号或 3-20 位含区号的座机")
         @Size(max = 20, message = "手机号过长")
+        @Pattern(regexp = "^(?:$|1[3-9]\\d{9}|0\\d{2,3}-?[1-9]\\d{6,7})$", message = "手机号格式不正确")
         String phone,
 
         @Schema(description = "所属组织", requiredMode = Schema.RequiredMode.REQUIRED)
