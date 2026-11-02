@@ -1,0 +1,24 @@
+/**
+ * 大屏主题变量（深色默认）。Element 暗色变量映射同文件维护。
+ */
+
+:root {
+  --snail-bg-deep: #0b1220;
+  --snail-bg-nav: #101a2c;
+  --snail-bg-panel: rgba(23, 36, 58, 0.9);
+  --snail-border: rgba(148, 178, 218, 0.18);
+  --snail-accent: #3d8bff;
+  --snail-accent-dim: rgba(61, 139, 255, 0.45);
+  --snail-text-primary: #e6edf7;
+  --snail-text-secondary: #8fa3bf;
+  --snail-radius-lg: 12px;
+}
+
+/* Element 暗色微调（基于官方 dark css-vars） */
+html.dark {
+  --el-bg-color: #101a2c;
+  --el-bg-color-overlay: #172438;
+  --el-border-color: var(--snail-border);
+  --el-text-color-primary: var(--snail-text-primary);
+  --el-text-color-regular: var(--snail-text-secondary);
+}

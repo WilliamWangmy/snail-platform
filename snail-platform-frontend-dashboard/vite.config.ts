@@ -31,7 +31,7 @@ export default defineConfig({
     'process.env.BASE_URL': JSON.stringify('/'),
   },
   server: {
-    port: 5174,
+    port: 8001,
     strictPort: true,
   },
   build: {
