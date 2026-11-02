@@ -51,6 +51,7 @@ public class S3StoragePort implements StoragePort {
     /** 写入对象:长度与类型显式声明,同键覆盖 */
     @Override
     public void put(String key, InputStream in, long size, String contentType) {
+        StorageKeys.requireSafe(key);
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
@@ -63,6 +64,7 @@ public class S3StoragePort implements StoragePort {
     /** 读取对象:返回 SDK 流,调用方负责关闭;键不存在由 SDK 抛异常 */
     @Override
     public InputStream get(String key) {
+        StorageKeys.requireSafe(key);
         GetObjectRequest request = GetObjectRequest.builder().bucket(bucket).key(key).build();
         return client.getObject(request);
     }
@@ -70,12 +72,14 @@ public class S3StoragePort implements StoragePort {
     /** 删除对象:S3 对不存在的键本就返回成功,天然幂等 */
     @Override
     public void delete(String key) {
+        StorageKeys.requireSafe(key);
         client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 
     /** 存在性探测:headObject 成功即存在,NoSuchKeyException 视为不存在 */
     @Override
     public boolean exists(String key) {
+        StorageKeys.requireSafe(key);
         HeadObjectRequest request = HeadObjectRequest.builder().bucket(bucket).key(key).build();
         try {
             client.headObject(request);

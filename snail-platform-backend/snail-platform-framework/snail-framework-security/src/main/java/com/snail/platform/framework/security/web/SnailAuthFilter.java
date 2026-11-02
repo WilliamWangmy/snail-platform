@@ -18,6 +18,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -36,6 +38,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * 约束:不作为 Spring Bean 注册(否则会被容器再挂一遍全局 filter 链,双跑一次上下文覆盖)。
  */
 public class SnailAuthFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(SnailAuthFilter.class);
 
     /** 认证态角色前缀;当前只放 authenticated,业务权限码原样追加 */
     public static final String ROLE_AUTHORITY_PREFIX = "ROLE_";
@@ -77,9 +81,11 @@ public class SnailAuthFilter extends OncePerRequestFilter {
             if (header != null && header.startsWith("Bearer ")) {
                 SnailPrincipal principal = null;
                 try {
-                    principal = jwtTokenService.verify(header.substring(7));
-                } catch (BizException ignored) {
-                    // 令牌不合法:保持匿名,是否拒绝交给授权规则
+                    // token 值 trim:防手抄脚本/网关注入时带出的首尾空白导致全量校验失败
+                    principal = jwtTokenService.verify(header.substring(7).trim());
+                } catch (BizException e) {
+                    // 令牌不合法:保持匿名,是否拒绝交给授权规则;debug 留痕供观测探测行为,不打 token 内容
+                    log.debug("Bearer 令牌校验未通过: {}", e.getMessage());
                 }
                 if (principal != null) {
                     // 权限解析要读租户托管表,必须先于 Provider 调用注入租户
@@ -93,8 +99,12 @@ public class SnailAuthFilter extends OncePerRequestFilter {
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                         SessionHeartbeatPort heartbeat = heartbeats.getIfAvailable();
                         if (heartbeat != null) {
-                            // 在线心跳是辅助观测:实现侧自行容错,失败不影响认证主链
-                            heartbeat.beat(principal, request.getRemoteAddr(), request.getHeader("User-Agent"));
+                            // 在线心跳是辅助观测:框架层兜底容错,任何实现侧异常都不击穿认证主链
+                            try {
+                                heartbeat.beat(principal, request.getRemoteAddr(), request.getHeader("User-Agent"));
+                            } catch (RuntimeException e) {
+                                log.warn("会话心跳写入失败,不影响本次认证: {}", e.getMessage());
+                            }
                         }
                     }
                     // 快照无版本(用户已删/停用、租户停用/到期)直接判无效;版本不一致视同令牌已被吊销,保持匿名交授权规则出 401

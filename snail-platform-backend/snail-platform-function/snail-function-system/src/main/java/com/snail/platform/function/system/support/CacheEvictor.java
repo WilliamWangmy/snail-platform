@@ -42,6 +42,25 @@ public class CacheEvictor {
         afterCommit(() -> keys.forEach(cache::evict));
     }
 
+    /**
+     * 整缓存失效:menuTree/userPerms/orgSubtree 这类"一个写动作影响全部键"的缓存用它,
+     * 与 evict/evictEach 同一提交后时点——@CacheEvict(allEntries=true) 在提交前清且幂等短路也清,
+     * 并发读可能把旧权限码回填,两种失效口径并存是该缓存一致性的洞,全部收口到这里。
+     */
+    public void evictAll(String... cacheNames) {
+        if (cacheNames.length == 0) {
+            return;
+        }
+        afterCommit(() -> {
+            for (String cacheName : cacheNames) {
+                Cache cache = cacheManager.getCache(cacheName);
+                if (cache != null) {
+                    cache.clear();
+                }
+            }
+        });
+    }
+
     /** 带租户段的键口径:生产端的 SpEL 与这里的拼法必须一致,都是"租户 ID:主体" */
     public static String tenantKey(Object tenantId, Object id) {
         return tenantId + ":" + id;

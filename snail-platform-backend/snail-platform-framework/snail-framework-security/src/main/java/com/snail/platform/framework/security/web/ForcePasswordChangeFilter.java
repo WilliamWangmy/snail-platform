@@ -42,8 +42,10 @@ public class ForcePasswordChangeFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         LoginUser snapshot = LoginUserContextHolder.get();
+        // 路径取 servletPath 而非 requestURI:后者含 context-path,配了前缀的部署会让放行集永不命中,
+        // 待改密用户连改密接口都进不去(fail-closed 方向安全,但属功能故障)
         if (snapshot != null && snapshot.passwordChangeRequired()
-                && !ALLOWED.contains(request.getMethod() + " " + request.getRequestURI())) {
+                && !ALLOWED.contains(request.getMethod() + " " + request.getServletPath())) {
             response.setStatus(403);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"code\":403,\"message\":\"" + MESSAGE + "\",\"data\":null}");

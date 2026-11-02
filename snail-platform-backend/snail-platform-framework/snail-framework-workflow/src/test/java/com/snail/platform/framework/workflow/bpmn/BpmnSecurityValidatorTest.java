@@ -103,6 +103,34 @@ class BpmnSecurityValidatorTest {
         assertRejected("<userTask id=\"u2\" flowable:assignee=\"${T(java.lang.Runtime)}\"/>", "表达式");
     }
 
+    /**
+     * 裸文本 UEL 绕过回归:JUEL 解析条件表达式不需要 ${} 包裹,
+     * 不含 ${ 的裸方法调用文本若只按"出现 ${ 才裁剪"会整段绕过字符白名单。
+     * 这组用例钉死"conditionExpression 必须整体形如 ${...}"的契约。
+     */
+    @Test
+    void rejectsBareUelConditionExpressions() {
+        assertRejected("""
+                <sequenceFlow id="f2" sourceRef="start" targetRef="approve">
+                  <conditionExpression xsi:type="tFormalExpression">execution.getProcessEngineConfiguration()</conditionExpression>
+                </sequenceFlow>""", "条件表达式必须形如");
+        assertRejected("""
+                <sequenceFlow id="f2" sourceRef="start" targetRef="approve">
+                  <conditionExpression xsi:type="tFormalExpression">java.lang.Runtime.getRuntime()</conditionExpression>
+                </sequenceFlow>""", "条件表达式必须形如");
+        assertRejected("""
+                <sequenceFlow id="f2" sourceRef="start" targetRef="approve">
+                  <conditionExpression xsi:type="tFormalExpression">${execution.getVariable('x')}</conditionExpression>
+                </sequenceFlow>""", "表达式");
+    }
+
+    /** 求值语言切换属性会架空字符白名单:expressionLanguage/typeLanguage 一律拒绝 */
+    @Test
+    void rejectsLanguageOverrideAttributes() {
+        assertRejected("<userTask id=\"u2\" expressionLanguage=\"juel\"/>", "属性不在白名单内");
+        assertRejected("<userTask id=\"u2\" typeLanguage=\"http://java.sun.com/java\"/>", "属性不在白名单内");
+    }
+
     /** 外部实体不解析:DOCTYPE 直接拒,设计器产物不该有它 */
     @Test
     void rejectsDoctype() {

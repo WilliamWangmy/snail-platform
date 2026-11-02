@@ -70,10 +70,15 @@ public class BpmnSecurityValidator {
             "exclusiveGateway", "parallelGateway", "sequenceFlow",
             "conditionExpression", "incoming", "outgoing");
 
-    /** 允许出现在模型元素上的无命名空间属性 */
+    /**
+     * 允许出现在模型元素上的无命名空间属性。
+     * 刻意不含 expressionLanguage 与 typeLanguage:BPMN 规范允许用它们把求值语言切向
+     * classpath 上的其它脚本引擎(如 Groovy/JUEL 实现),一旦放行,表达式字符白名单
+     * 裁剪的对象就不再是平台认定的那门语言——裁剪被整体架空,故一并禁止。
+     */
     private static final Set<String> ALLOWED_ATTRIBUTES = Set.of(
             "id", "name", "sourceRef", "targetRef", "isExecutable",
-            "targetNamespace", "expressionLanguage", "typeLanguage", "namespace");
+            "targetNamespace", "namespace");
 
     /** 允许的 Flowable 扩展属性:只用于绑审批人,不用于绑 Bean */
     private static final Set<String> ALLOWED_FLOWABLE_ATTRIBUTES = Set.of("assignee", "candidateGroups");
@@ -247,14 +252,24 @@ public class BpmnSecurityValidator {
         }
     }
 
-    /** 表达式裁剪:属性与元素文本里的 ${...} 都只准读标量变量 */
+    /**
+     * 表达式裁剪:属性与元素文本里的 ${...} 都只准读标量变量。
+     * conditionExpression 是唯一的例外处理对象——它整段文本都是 UEL 求值入口,
+     * 见 requireScalarCondition 的注释。
+     */
     private void checkExpressions(Element element) {
         NamedNodeMap attributes = element.getAttributes();
         for (int i = 0; i < attributes.getLength(); i++) {
             requireScalarExpression(attributes.item(i).getNodeValue());
         }
         String text = element.getTextContent();
-        if (text != null && text.contains("${")) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        if (BPMN_MODEL_NS.equals(element.getNamespaceURI())
+                && "conditionExpression".equals(element.getLocalName())) {
+            requireScalarCondition(text.trim());
+        } else if (text.contains("${")) {
             requireScalarExpression(text);
         }
     }
@@ -275,6 +290,18 @@ public class BpmnSecurityValidator {
             }
             cursor = end + 1;
         }
+    }
+
+    /**
+     * conditionExpression 的文本是 JUEL 求值入口,而 JUEL 解析裸表达式并不需要 ${} 包裹——
+     * 只按"出现 ${ 才裁剪"会让 execution.getProcessEngineConfiguration() 这类裸方法调用
+     * 整段绕过字符白名单。因此条件表达式必须整体形如 ${...},再进标量字符白名单。
+     */
+    private void requireScalarCondition(String text) {
+        if (!text.startsWith("${") || !text.endsWith("}")) {
+            throw BizException.badRequest("条件表达式必须形如 ${...},只允许读取标量变量:" + text);
+        }
+        requireScalarExpression(text);
     }
 
     /** 流程骨架计数,供结构性验收使用 */

@@ -199,10 +199,18 @@ public class WorkflowEngineGateway {
                 runAsUser(operator, () -> taskService.setAssignee(task.id(), targetUserId)));
     }
 
-    /** 撤销在途实例(业务侧的"撤回申请");已结束的实例由 requireRunningInstance 直接拒绝 */
+    /**
+     * 撤销在途实例(业务侧的"撤回申请");已结束的实例由 requireRunningInstance 直接拒绝。
+     * 发起人才可撤销:撤销与办理同属写动作,complete/claim 都有办理权校验,撤销不能因为是
+     * "整单级操作"就豁免——任何同租户用户拿到实例 ID 即可撤回他人审批单是水平越权。
+     * 平台代撤场景显式另开口径,不在本方法放行。
+     */
     public void withdraw(String processInstanceId, String reason) {
         WorkflowInstance instance = requireRunningInstance(processInstanceId);
         String operator = requireLoginUserId();
+        if (instance.startUserId() == null || !instance.startUserId().equals(operator)) {
+            throw BizException.forbidden("只有流程发起人可以撤销申请");
+        }
         WorkflowEngineErrors.run("撤销流程", () -> runAsUser(operator,
                 () -> runtimeService.deleteProcessInstance(instance.id(),
                         reason == null || reason.isBlank() ? "撤销" : reason)));

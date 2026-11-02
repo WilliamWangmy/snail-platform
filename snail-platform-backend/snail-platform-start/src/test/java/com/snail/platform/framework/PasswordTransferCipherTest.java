@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.snail.platform.framework.security.crypto.PasswordTransferCipher;
 import java.nio.charset.StandardCharsets;
@@ -19,7 +20,7 @@ import org.junit.jupiter.api.Test;
  */
 class PasswordTransferCipherTest {
 
-    /** 与 application-dev.yml、前端 DEV_KEY 同值的开发占位密钥 */
+    /** 与 application-dev.yml 的开发占位密钥同值,仅测试环境使用 */
     private static final String KEY = "+boKbssh0dSJgi2wEIJbWRBWzL9Y5CDuIN9ZDxvcJVs=";
 
     @Test
@@ -28,7 +29,9 @@ class PasswordTransferCipherTest {
         String first = cipher.encrypt("Abc@12345678");
         String second = cipher.encrypt("Abc@12345678");
 
-        assertEquals("Abc@12345678", decrypt(first), "密文应按 iv‖密文‖tag 还原出原文");
+        assertTrue(first.startsWith(PasswordTransferCipher.VERSION_PREFIX),
+                "密文必须携带版本前缀供前端识别报文格式");
+        assertEquals("Abc@12345678", decrypt(first), "密文应按 前缀+iv‖密文‖tag 还原出原文");
         assertNotEquals(first, second, "同一明文两次加密应因随机 IV 产出不同密文");
         assertFalse(first.contains("Abc@12345678"), "密文中不得出现口令片段");
     }
@@ -36,10 +39,12 @@ class PasswordTransferCipherTest {
     @Test
     void rejectsTamperedPayload() {
         PasswordTransferCipher cipher = new PasswordTransferCipher(KEY);
-        byte[] packed = Base64.getDecoder().decode(cipher.encrypt("Abc@12345678"));
+        String sealed = cipher.encrypt("Abc@12345678");
+        byte[] packed = Base64.getDecoder().decode(sealed.substring(PasswordTransferCipher.VERSION_PREFIX.length()));
         packed[packed.length - 1] ^= 0x01;
 
-        assertThrows(Exception.class, () -> decrypt(Base64.getEncoder().encodeToString(packed)),
+        assertThrows(Exception.class, () -> decrypt(PasswordTransferCipher.VERSION_PREFIX
+                + Base64.getEncoder().encodeToString(packed)),
                 "GCM 认证标签应拦住被篡改的密文");
     }
 
@@ -52,9 +57,10 @@ class PasswordTransferCipherTest {
                 "16 字节密钥不是 AES-256,应拒绝启动");
     }
 
-    /** 按前端分帧解密:前 12 字节 IV,其余为 GCM 密文与 128 位标签 */
+    /** 按前端分帧解密:剥掉 v1: 前缀,前 12 字节 IV,其余为 GCM 密文与 128 位标签 */
     private static String decrypt(String packed) throws Exception {
-        byte[] payload = Base64.getDecoder().decode(packed);
+        String payload64 = packed.substring(PasswordTransferCipher.VERSION_PREFIX.length());
+        byte[] payload = Base64.getDecoder().decode(payload64);
         SecretKeySpec key = new SecretKeySpec(Base64.getDecoder().decode(KEY), "AES");
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, payload, 0, 12));

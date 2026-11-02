@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.springframework.cache.annotation.CacheEvict;
+import com.snail.platform.function.system.support.CacheEvictor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,12 +70,17 @@ public class RoleMenuService {
     /** 菜单目录读 */
     private final SysMenuMapper menuMapper;
 
+    /** 缓存失效出口:授权变更走编程式提交后失效,与全平台其余写路径同一口径 */
+    private final CacheEvictor cacheEvictor;
+
     public RoleMenuService(SysRoleMapper roleMapper, SysUserRoleMapper userRoleMapper,
-                           SysRoleMenuMapper roleMenuMapper, SysMenuMapper menuMapper) {
+                           SysRoleMenuMapper roleMenuMapper, SysMenuMapper menuMapper,
+                           CacheEvictor cacheEvictor) {
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMenuMapper = roleMenuMapper;
         this.menuMapper = menuMapper;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /**
@@ -215,7 +220,6 @@ public class RoleMenuService {
      * 提交平台面菜单但无平台码 → 403,不静默丢弃。
      */
     @Transactional
-    @CacheEvict(cacheNames = "userPerms", allEntries = true)
     public void assign(Long roleId, List<Long> menuIds) {
         requireRole(roleId);
         Set<Long> distinct = new LinkedHashSet<>(menuIds);
@@ -255,6 +259,7 @@ public class RoleMenuService {
             grant.setMenuId(menuId);
             roleMenuMapper.insert(grant);
         }
+        cacheEvictor.evictAll("userPerms");
     }
 
     /** 存在性闸:经租户窗口查不到即拒(他租户角色与不存在的 ID 同形,不额外区分) */

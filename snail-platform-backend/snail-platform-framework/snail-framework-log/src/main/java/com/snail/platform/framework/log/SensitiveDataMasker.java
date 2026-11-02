@@ -20,9 +20,13 @@ public final class SensitiveDataMasker {
             "phone", "mobile", "contactPhone", "idCard", "idNumber", "bankCard",
             "captchaCode");
 
-    /** 由名单一次性拼出的替换正则:捕获 "键" 与冒号,吃掉紧随其后的字符串值 */
+    /**
+     * 由名单一次性拼出的替换正则:捕获 "键" 与冒号,吃掉紧随其后的字符串值。
+     * 值部分用转义感知形态 (?:[^"\\]|\\.)*——先吃普通字符与转义对,遇到真正的收尾引号才停,
+     * 保证 "password":"ab\"cd" 这类含转义引号的值被整体替换,不残留后半段明文。
+     */
     private static final Pattern SENSITIVE_PAIR = Pattern.compile(
-            "(\"(?:" + String.join("|", SENSITIVE_KEYS) + ")\"\\s*:\\s*)\"[^\"]*\"",
+            "(\"(?:" + String.join("|", SENSITIVE_KEYS) + ")\"\\s*:\\s*)\"(?:[^\"\\\\]|\\\\.)*\"",
             Pattern.CASE_INSENSITIVE);
 
     private SensitiveDataMasker() {
@@ -31,7 +35,7 @@ public final class SensitiveDataMasker {
     /**
      * 对 JSON 文本做键级脱敏:`"key":"value"` 且 key 命中名单时值替换为 ******。
      * 直接扫原文而非反解析对象——切面拿到的已是序列化字符串,为脱敏再建对象树不值当;
-     * 值只吃连续非引号字符,含转义引号的异常形态会被整体替换,不产生半脱敏。
+     * 值按转义感知形态整体吞掉,含转义引号、反斜杠等异常形态都不会产生半脱敏残留。
      */
     public static String mask(String json) {
         if (json == null || json.isEmpty()) {

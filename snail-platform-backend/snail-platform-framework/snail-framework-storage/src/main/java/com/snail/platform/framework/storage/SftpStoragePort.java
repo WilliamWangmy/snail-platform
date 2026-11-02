@@ -54,6 +54,7 @@ public class SftpStoragePort implements StoragePort {
     @Override
     public void put(String key, InputStream in, long size, String contentType) {
         // size/contentType 由 SFTP 协议自身语义消化:SFTP 无预声明长度,内容随流写尽
+        StorageKeys.requireSafe(key);
         SessionHolder holder = open();
         try {
             ChannelSftp channel = holder.channel;
@@ -68,6 +69,7 @@ public class SftpStoragePort implements StoragePort {
 
     @Override
     public InputStream get(String key) {
+        StorageKeys.requireSafe(key);
         SessionHolder holder = open();
         try {
             // SFTP 流由通道驱动,会话必须活到流读完:关闭动作随流一并断开连接
@@ -80,6 +82,7 @@ public class SftpStoragePort implements StoragePort {
 
     @Override
     public void delete(String key) {
+        StorageKeys.requireSafe(key);
         SessionHolder holder = open();
         try {
             holder.channel.rm(remotePath(key));
@@ -95,6 +98,7 @@ public class SftpStoragePort implements StoragePort {
 
     @Override
     public boolean exists(String key) {
+        StorageKeys.requireSafe(key);
         SessionHolder holder = open();
         try {
             holder.channel.stat(remotePath(key));

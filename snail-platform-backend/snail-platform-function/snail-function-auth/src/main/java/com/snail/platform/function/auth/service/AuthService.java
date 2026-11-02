@@ -21,6 +21,8 @@ import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     /** 锁定命中时的统一文案 */
     private static final String LOCKED_MESSAGE = "失败次数过多,请稍后再试";
@@ -126,14 +130,17 @@ public class AuthService {
                     user.getPasswordModifyTime() == null);
         } catch (BizException e) {
             // 登录在租户上下文建立之前就被拒(验证码/查无此人/锁定),此处只有查到的用户能给出租户;
-            // 查不到的一律记 0=归属不明,这批行只有持跨租户码的平台侧看得见
+            // 查不到的一律记 0=归属不明,这批行只有持跨租户码的平台侧看得见。
+            // 登录日志保留细粒度原因(租户停用/到期、账号停用)供管理员排查;
+            // 对外的准入类拒绝统一口径为"账号或密码错误"防账号枚举——验证码已过即可探测状态差异
             Long tenantId = user != null ? user.getTenantId() : 0L;
             Long userId = user != null ? user.getUserId() : null;
             writeLoginLog(http, tenantId, username, userId, 0, e.getMessage());
             if (e instanceof LoginRejects.Credential) {
                 failGuard.increaseCredentialFail(ip, username);
+                throw e;
             }
-            throw e;
+            throw new LoginRejects.Access("账号或密码错误");
         }
     }
 
@@ -149,27 +156,32 @@ public class AuthService {
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .setSql("token_version = token_version + 1")
                 .eq(SysUser::getUserId, userId));
-        cacheEvictor.evict("userSession", CacheEvictor.tenantKey(TenantContextHolder.get(), userId));
+        // 租户上下文缺失时跳过点清:拼出 "null:userId" 键只会清到不存在的键,不如交由 TTL 兜底
+        Long tenantId = TenantContextHolder.get();
+        if (tenantId != null) {
+            cacheEvictor.evict("userSession", CacheEvictor.tenantKey(tenantId, userId));
+        }
     }
 
     /** 留痕写失败不许反过来影响登录响应——库都挂了的场景没有一致性问题可言 */
     private void writeLoginLog(HttpServletRequest http, Long tenantId, String username,
                                Long userId, int status, String msg) {
         UserAgent ua = UserAgentUtil.parse(http.getHeader("User-Agent"));
-        SysLoginLog log = new SysLoginLog();
-        log.setTenantId(tenantId);
-        log.setUsername(username);
-        log.setUserId(userId);
-        log.setIp(JakartaServletUtil.getClientIP(http));
-        log.setBrowser(ua == null ? null : ua.getBrowser().getName());
-        log.setOs(ua == null ? null : ua.getOs().getName());
-        log.setStatus(status);
-        log.setMsg(msg);
-        log.setLoginTime(LocalDateTime.now());
+        SysLoginLog row = new SysLoginLog();
+        row.setTenantId(tenantId);
+        row.setUsername(username);
+        row.setUserId(userId);
+        row.setIp(JakartaServletUtil.getClientIP(http));
+        row.setBrowser(ua == null ? null : ua.getBrowser().getName());
+        row.setOs(ua == null ? null : ua.getOs().getName());
+        row.setStatus(status);
+        row.setMsg(msg);
+        row.setLoginTime(LocalDateTime.now());
         try {
-            loginLogMapper.insert(log);
-        } catch (RuntimeException ignored) {
-            // 留痕失败直接忽略,不阻断登录响应;此处不另行记录
+            loginLogMapper.insert(row);
+        } catch (RuntimeException e) {
+            // 留痕失败不阻断登录响应,但至少留一条 debug 便于发现日志链路故障
+            log.debug("登录日志写入失败: username={}", username, e);
         }
     }
 }

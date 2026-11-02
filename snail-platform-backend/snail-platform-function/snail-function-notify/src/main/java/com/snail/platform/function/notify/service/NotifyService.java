@@ -12,6 +12,7 @@ import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
 import com.snail.platform.framework.core.context.TenantContextHolder;
+import com.snail.platform.framework.security.authority.AuthorityChecker;
 import com.snail.platform.function.notify.api.NotifyApi;
 import com.snail.platform.function.notify.api.NotifyApi.NotifySendCommand;
 import com.snail.platform.function.notify.dto.AnnouncementQuery;
@@ -58,6 +59,9 @@ public class NotifyService implements NotifyApi {
     /** 系统代发时的发送人署名 */
     private static final String SYSTEM_SENDER = "系统通知";
 
+    /** 跨租户投递的平台背书码,与 NotifyPlatformController 的 @PreAuthorize 同源 */
+    private static final String PLATFORM_SEND = "platform:notify:send";
+
     /** 消息主体读写 */
     private final SysNotifyMessageMapper messageMapper;
 
@@ -88,6 +92,13 @@ public class NotifyService implements NotifyApi {
         }
         if (command.tenantId() == null) {
             throw BizException.badRequest("收件租户不能为空");
+        }
+        // 租户一致性闸:NotifyApi 是公开跨模块端口,租户侧业务直调传他租户 ID 即成跨租户写入口;
+        // 当前合法调用方只有平台公告(持平台码)与工作流(同租户)——上下文与目标不一致时必须有平台码背书
+        Long currentTenantId = TenantContextHolder.get();
+        boolean sameTenant = currentTenantId != null && currentTenantId.equals(command.tenantId());
+        if (!sameTenant && !AuthorityChecker.has(PLATFORM_SEND)) {
+            throw BizException.forbidden("不允许向其它租户投递消息");
         }
         List<Long> recipients = command.recipients() == null ? List.of()
                 : command.recipients().stream().filter(Objects::nonNull).distinct().toList();

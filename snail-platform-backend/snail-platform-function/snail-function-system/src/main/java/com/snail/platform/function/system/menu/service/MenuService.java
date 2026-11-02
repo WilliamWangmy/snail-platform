@@ -9,13 +9,13 @@ import com.snail.platform.function.system.menu.entity.SysMenu;
 import com.snail.platform.function.system.menu.entity.SysRoleMenu;
 import com.snail.platform.function.system.menu.mapper.SysMenuMapper;
 import com.snail.platform.function.system.menu.mapper.SysRoleMenuMapper;
+import com.snail.platform.function.system.support.CacheEvictor;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -69,9 +69,13 @@ public class MenuService {
     /** 角色授权读,删菜单时同事务清引用 */
     private final SysRoleMenuMapper roleMenuMapper;
 
-    public MenuService(SysMenuMapper menuMapper, SysRoleMenuMapper roleMenuMapper) {
+    /** 缓存失效出口:写路径统一走编程式提交后失效,不再用 @CacheEvict 提前清 */
+    private final CacheEvictor cacheEvictor;
+
+    public MenuService(SysMenuMapper menuMapper, SysRoleMenuMapper roleMenuMapper, CacheEvictor cacheEvictor) {
         this.menuMapper = menuMapper;
         this.roleMenuMapper = roleMenuMapper;
+        this.cacheEvictor = cacheEvictor;
     }
 
     /** 全量目录树(含平台面与停用节点),平台管理页配置用;树体量有限,不分页 */
@@ -106,7 +110,6 @@ public class MenuService {
      * status 与 is_system 不进契约:建出来恒为正常、恒为非内置,内置标记只有种子能置。
      */
     @Transactional
-    @CacheEvict(cacheNames = {"menuTree", "userPerms"}, allEntries = true)
     public Long create(MenuCreateRequest request) {
         long parentId = request.parentId() == null ? 0L : request.parentId();
         SysMenu parent = parentId == 0L ? null : requireMenu(parentId);
@@ -139,6 +142,7 @@ public class MenuService {
             // deleted 行仍占唯一键,权限码终身占用;数据库拦下时统一转业务拒绝
             throw BizException.badRequest("权限码已存在");
         }
+        cacheEvictor.evictAll("menuTree", "userPerms");
         return menu.getMenuId();
     }
 
@@ -151,7 +155,6 @@ public class MenuService {
      * 停用闸只在这条路拦(内置节点不可停用);停一个节点等于整棵子树撤出导航与权限解析,故 userPerms 一并全清。
      */
     @Transactional
-    @CacheEvict(cacheNames = {"menuTree", "userPerms"}, allEntries = true)
     public void update(Long menuId, MenuUpdateRequest request) {
         SysMenu menu = requireMenu(menuId);
         int status = request.status() == null ? menu.getStatus() : request.status();
@@ -177,6 +180,7 @@ public class MenuService {
                 .set(SysMenu::getStatus, status)
                 .set(SysMenu::getRemark, trimToNull(request.remark()))
                 .eq(SysMenu::getMenuId, menuId));
+        cacheEvictor.evictAll("menuTree", "userPerms");
     }
 
     /**
@@ -186,7 +190,6 @@ public class MenuService {
      * 目录与外链的码为 NULL,不受该键约束,可以无限个不配码。
      */
     @Transactional
-    @CacheEvict(cacheNames = {"menuTree", "userPerms"}, allEntries = true)
     public void delete(Long menuId) {
         SysMenu menu = requireMenu(menuId);
         if (Integer.valueOf(1).equals(menu.getIsSystem())) {
@@ -199,6 +202,7 @@ public class MenuService {
         roleMenuMapper.delete(Wrappers.<SysRoleMenu>lambdaQuery()
                 .eq(SysRoleMenu::getMenuId, menuId));
         menuMapper.deleteById(menuId);
+        cacheEvictor.evictAll("menuTree", "userPerms");
     }
 
     /** 存在性闸:菜单是全局表(无租户列、不在租户拦截范围内),查不到就是真不存在 */

@@ -6,7 +6,9 @@ import java.io.InputStream;
  * 职责:对象存储的统一端口——放/取/删/存在性,键由业务侧生成,实现不解析键语义。
  * 上游:function-storage 按文件元数据从 StoragePortRegistry 取用;下游:SftpStoragePort/S3StoragePort。
  * 口径:snail.storage.type 为空时注册表没有写入端口,消费方按缺席降级;get 返回的流由调用方负责关闭;
- * 存在性判断不作为并发保证,业务侧存在性一律以元数据表为准,本端口只服务物理层。
+ * 存在性判断不作为并发保证,业务侧存在性一律以元数据表为准,本端口只服务物理层;
+ * 键在进入任何实现前统一过 StorageKeys 安全闸门(拒绝路径穿越/绝对路径/白名单外字符),
+ * 确需特殊键名的实现可显式绕过该工具,但须注释说明理由。
  */
 public interface StoragePort {
 

@@ -37,20 +37,27 @@ public class JwtTokenService {
     /** 令牌版本载荷键:改密/重置/停用/强制下线自增,回验与登录人快照比对实现吊销;缺失按 0 计 */
     private static final String CLAIM_VER = "ver";
 
+    /** 统一 401 文案:过期与伪造不可分辨,防时间窗探测 */
+    private static final String UNIFIED_401_MESSAGE = "登录状态无效,请重新登录";
+
     /** HS256 签名密钥 */
     private final byte[] secret;
 
     /** 令牌有效期 */
     private final Duration ttl;
 
-    /** 读取密钥与有效期;密钥缺失或短于 32 字符在启动期即拒绝 */
+    /** 读取密钥与有效期;密钥缺失或短于 32 字符、有效期非正数都在启动期即拒绝 */
     public JwtTokenService(SnailSecurityProperties properties) {
         String configured = properties.getJwt().getSecret();
         if (configured == null || configured.length() < 32) {
             throw new IllegalStateException("snail.security.jwt.secret 缺失或短于 32 字符,拒绝启动");
         }
+        long expireMinutes = properties.getJwt().getExpireMinutes();
+        if (expireMinutes <= 0) {
+            throw new IllegalStateException("snail.security.jwt.expireMinutes 必须为正数,当前 " + expireMinutes);
+        }
         this.secret = configured.getBytes(StandardCharsets.UTF_8);
-        this.ttl = Duration.ofMinutes(properties.getJwt().getExpireMinutes());
+        this.ttl = Duration.ofMinutes(expireMinutes);
     }
 
     /** 签发访问令牌 */
@@ -81,17 +88,23 @@ public class JwtTokenService {
     }
 
     /**
-     * 校验签名与有效期,任何不合法(篡改/过期/格式错)统一 401 文案,不区分原因防探测。
+     * 校验算法、签名与有效期,任何不合法(篡改/过期/格式错/算法不符)统一同一句 401 文案,
+     * 不区分原因防探测——过期令牌与伪造令牌在响应上不可分辨。
      */
     public SnailPrincipal verify(String token) {
         try {
             SignedJWT jwt = SignedJWT.parse(token);
+            // 显式钉死 HS256:MACVerifier 接受 HS256/384/512 全家族,未来引入第二密钥家族时
+            // 不加这一行就可能被"换算法头"绕过;单一密钥下也保持算法断言的纪律
+            if (!JWSAlgorithm.HS256.equals(jwt.getHeader().getAlgorithm())) {
+                throw BizException.unauthorized(UNIFIED_401_MESSAGE);
+            }
             if (!jwt.verify(new MACVerifier(secret))) {
-                throw BizException.unauthorized("登录状态无效,请重新登录");
+                throw BizException.unauthorized(UNIFIED_401_MESSAGE);
             }
             JWTClaimsSet claims = jwt.getJWTClaimsSet();
             if (claims.getExpirationTime() == null || claims.getExpirationTime().before(new Date())) {
-                throw BizException.unauthorized("登录已过期,请重新登录");
+                throw BizException.unauthorized(UNIFIED_401_MESSAGE);
             }
             Long ver = claims.getLongClaim(CLAIM_VER);
             return new SnailPrincipal(
@@ -101,7 +114,7 @@ public class JwtTokenService {
                     claims.getLongClaim(CLAIM_OID),
                     ver == null ? 0L : ver);
         } catch (ParseException | JOSEException e) {
-            throw BizException.unauthorized("登录状态无效,请重新登录");
+            throw BizException.unauthorized(UNIFIED_401_MESSAGE);
         }
     }
 }

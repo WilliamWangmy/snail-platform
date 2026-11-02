@@ -66,7 +66,7 @@ class AuthSessionFlowTest {
         String disabled = tenantStatus(tenantId, 1, adminToken);
         assertEquals(0, jsonCode(disabled), "停用演示租户失败: " + disabled);
         assertUnauthorized(tenantToken, "租户停用后存量令牌应 401");
-        assertTrue(loginAttempt("tadmin" + suffix, "Admin@123").contains("租户已停用"),
+        assertTrue(loginAttempt("tadmin" + suffix, "Admin@123").contains("账号或密码错误"),
                 "停用租户后仍可登录");
 
         String enabled = tenantStatus(tenantId, 0, adminToken);
@@ -84,7 +84,7 @@ class AuthSessionFlowTest {
         String expiring = updateTenant(tenantId, suffix, "2020-01-01T00:00:00", adminToken);
         assertEquals(0, jsonCode(expiring), "设置租户到期时间失败: " + expiring);
         assertUnauthorized(validToken, "租户到期后存量令牌应 401");
-        assertTrue(loginAttempt("tadmin" + suffix, "Admin@123").contains("租户已到期"),
+        assertTrue(loginAttempt("tadmin" + suffix, "Admin@123").contains("账号或密码错误"),
                 "到期租户仍可登录");
 
         String cleared = updateTenant(tenantId, suffix, null, adminToken);
@@ -114,7 +114,7 @@ class AuthSessionFlowTest {
         String disabled = userStatus(userId, 1, adminToken);
         assertEquals(0, jsonCode(disabled), "停用用户失败: " + disabled);
         assertUnauthorized(afterLogout, "用户停用后存量令牌应 401");
-        assertTrue(loginAttempt(username, "User@1234").contains("账号已停用"), "停用账号仍可登录");
+        assertTrue(loginAttempt(username, "User@1234").contains("账号或密码错误"), "停用账号仍可登录");
 
         String enabled = userStatus(userId, 0, adminToken);
         assertEquals(0, jsonCode(enabled), "恢复用户失败: " + enabled);

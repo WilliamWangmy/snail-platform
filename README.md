@@ -114,10 +114,10 @@ java -jar snail-platform-start/target/snail-platform.jar      # 加 --spring.pro
 | `SNAIL_DB_USERNAME` / `SNAIL_DB_PASSWORD` | 数据库账密 |
 | `SNAIL_REDIS_URL` | 缓存服务连接串 |
 | `SNAIL_JWT_SECRET` | JWT 签名密钥，长度 ≥ 32；dev 有开发占位默认值，**prod 必填，缺失启动即失败** |
-| `SNAIL_SEED_ADMIN_PASSWORD` | 内置 admin 种子口令的 **BCrypt 密文**（非明文，用 Hutool `BCrypt.hashpw` 离线生成）；**prod 必填**，V2 种子迁移用它写入 admin 初始口令，缺失迁移失败、启动被拦 |
+| `SNAIL_SEED_ADMIN_PASSWORD` | 内置 admin 种子口令的 **BCrypt 密文**（非明文，用 Hutool `BCrypt.hashpw` 离线生成）；**prod 必填**，V4 种子迁移用它写入 admin 初始口令，缺失启动被拦；dev 未提供时启动期现场生成随机口令并打印到控制台（仅首次初始化空库时生效），仓库中不存在可预测的种子口令 |
 | `SNAIL_PASSWORD_TRANSFER_KEY` | 一次性口令回传的 AES-256-GCM 密钥（Base64，解码后 32 字节）；dev 有开发占位默认值，**prod 必填，缺失或长度不符启动即失败** |
 
-前端构建另有 `VITE_PASSWORD_TRANSFER_KEY`：与后端上面的密钥同值，管理端用它解密结果弹窗里的口令；未注入时落到 dev 占位（与 `application-dev.yml` 一致）。两侧不一致表现为"口令解密失败"提示。
+前端构建另有 `VITE_PASSWORD_TRANSFER_KEY`：与后端上面的密钥同值，管理端用它解密结果弹窗里的口令。**该密钥随前端产物分发，不是机密性控制**——只防链路明文被日志/代理误记录，链路机密性由 HTTPS 保证；生产构建未注入时构建直接失败（仓库中无任何占位密钥），本地开发复制 `.env.example` 为 `.env.local`。密文报文带 `v1:` 版本前缀，密钥轮换时前后端同步升版。两侧不一致表现为"口令解密失败"提示。
 
 本地覆盖请写在 `application-local.yml`，该文件已在 `.gitignore` 内。
 

@@ -25,3 +25,6 @@ logs/
 .DS_Store
 docs/
 examples/
+
+# WorkBuddy 会话数据
+.workbuddy/

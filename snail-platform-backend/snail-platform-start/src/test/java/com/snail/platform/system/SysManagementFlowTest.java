@@ -254,7 +254,7 @@ class SysManagementFlowTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertEquals(0, jsonCode(disable), "停用测试用户失败: " + disable);
-        assertTrue(loginAttempt(username, "Reset@12345").contains("账号已停用"), "停用账号仍可登录");
+        assertTrue(loginAttempt(username, "Reset@12345").contains("账号或密码错误"), "停用账号仍可登录");
         String enable = mockMvc.perform(put("/system/user/" + scratchUserId + "/status").param("status", "0")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
@@ -344,7 +344,7 @@ class SysManagementFlowTest {
         assertEquals(0, jsonCode(block), "停用演示租户失败: " + block);
 
         String failed = loginAttempt("tadmin" + suffix, "Admin@123");
-        assertTrue(failed.contains("租户已停用"), "停用租户后其管理员仍可登录: " + failed);
+        assertTrue(failed.contains("账号或密码错误"), "停用租户后其管理员仍可登录: " + failed);
 
         String restore = mockMvc.perform(put("/system/tenant/" + demoTenantId + "/status").param("status", "0")
                         .header("Authorization", "Bearer " + adminToken))

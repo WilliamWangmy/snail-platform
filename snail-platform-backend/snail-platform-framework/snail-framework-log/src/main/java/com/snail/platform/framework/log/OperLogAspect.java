@@ -13,9 +13,11 @@ import jakarta.servlet.ServletResponse;
 import java.lang.reflect.RecordComponent;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -26,6 +28,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -40,16 +43,23 @@ import org.springframework.web.multipart.MultipartFile;
  * 整条 OperLogRecord 交给单线程池落库;队列满丢日志告警、落库异常只记应用日志,业务永不为审计阻塞或失败。
  * 上游:打标的 Controller 写操作;下游:OperLogSink 实现(function 侧)。
  * 约束:入参/出参先 JSON 化再过 SensitiveDataMasker;二进制响应体(导出流)不序列化,只记占位文案;
- * error_msg 超 2000 截断;status 1 成功 0 失败。
+ * error_msg 超 2000 截断;param/result 超 4000 截断——超长落库失败等于这条审计永久丢失,宁截不丢;
+ * status 1 成功 0 失败。
  */
 @Aspect
 @Component
-public class OperLogAspect {
+public class OperLogAspect implements DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(OperLogAspect.class);
 
     /** error_msg 列宽,超长截断 */
     private static final int ERROR_MSG_LIMIT = 2000;
+
+    /** param/result 列宽上限,超长截断为大出参占位——审计宁缺内容不缺记录 */
+    private static final int PARAM_RESULT_LIMIT = 4000;
+
+    /** normalize 递归深度上限:自引用集合(list.add(list))不做防护会栈溢出在写操作主链上 */
+    private static final int NORMALIZE_MAX_DEPTH = 8;
 
     /** 落库出口;function 构件缺席(如纯框架冒烟上下文)时为 null,丢弃并告警 */
     private final ObjectProvider<OperLogSink> sinkProvider;
@@ -67,6 +77,24 @@ public class OperLogAspect {
                     return thread;
                 },
                 (task, pool) -> log.warn("操作日志队列已满,丢弃一条留痕"));
+    }
+
+    /**
+     * 优雅停机:JVM 正常退出(发布重启是常态)时排空队列,正常态下队列里最多 2000 条审计
+     * 不应因 daemon 线程随主线程蒸发;限时 5 秒,排不空的部分随日志告警放弃。
+     */
+    @Override
+    public void destroy() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.warn("操作日志停机排空超时,丢弃剩余待落库留痕");
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            executor.shutdownNow();
+        }
     }
 
     /** 环绕留痕:请求线程采齐上下文与入参,业务返回或抛错后定格结果并异步落库,业务异常原样外抛 */
@@ -90,12 +118,12 @@ public class OperLogAspect {
             url = StrUtil.maxLength(request.getRequestURI(), 255);
             ip = JakartaServletUtil.getClientIP(request);
         }
-        String param = SensitiveDataMasker.mask(serializableArgs(joinPoint.getArgs()));
+        String param = SensitiveDataMasker.mask(truncate(serializableArgs(joinPoint.getArgs()), PARAM_RESULT_LIMIT));
 
         try {
             Object result = joinPoint.proceed();
             submit(tenantId, traceId, operLog, method, requestMethod, operator, ip, url,
-                    param, safeJson(result), 1, null, start);
+                    param, truncate(safeJson(result), PARAM_RESULT_LIMIT), 1, null, start);
             return result;
         } catch (Throwable ex) {
             submit(tenantId, traceId, operLog, method, requestMethod, operator, ip, url,
@@ -133,6 +161,14 @@ public class OperLogAspect {
         });
     }
 
+    /** 列宽截断:null 直通,超长以省略号占位——param/result 落库失败等于审计永久丢失,宁截不丢 */
+    private static String truncate(String value, int limit) {
+        if (value == null || value.length() <= limit) {
+            return value;
+        }
+        return value.substring(0, limit) + "…[超长截断]";
+    }
+
     /** Servlet 容器对象、绑定结果与文件流不是"入参事实",不入日志;其余逐个归一化后 JSON 化 */
     private String serializableArgs(Object[] args) {
         List<Object> kept = new ArrayList<>();
@@ -164,35 +200,48 @@ public class OperLogAspect {
      * isRecord/getRecordComponents 都是 Java 16 定稿 API,--release 17 门槛内。
      */
     private static Object normalize(Object value) {
+        Set<Object> seen = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        return normalize(value, 0, seen);
+    }
+
+    private static Object normalize(Object value, int depth, Set<Object> seen) {
         if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
             return value;
         }
-        Class<?> type = value.getClass();
-        if (type.isRecord()) {
-            Map<String, Object> map = new LinkedHashMap<>();
-            for (RecordComponent component : type.getRecordComponents()) {
-                try {
-                    map.put(component.getName(), normalize(component.getAccessor().invoke(value)));
-                } catch (ReflectiveOperationException | RuntimeException e) {
-                    map.put(component.getName(), "[不可读]");
+        // 深度与自引用双防护:自引用集合(list.add(list))与超深嵌套在写操作主链上直接降级占位
+        if (depth > NORMALIZE_MAX_DEPTH || !seen.add(value)) {
+            return "[递归截断]";
+        }
+        try {
+            Class<?> type = value.getClass();
+            if (type.isRecord()) {
+                Map<String, Object> map = new LinkedHashMap<>();
+                for (RecordComponent component : type.getRecordComponents()) {
+                    try {
+                        map.put(component.getName(), normalize(component.getAccessor().invoke(value), depth + 1, seen));
+                    } catch (ReflectiveOperationException | RuntimeException e) {
+                        map.put(component.getName(), "[不可读]");
+                    }
                 }
+                return map;
             }
-            return map;
+            if (value instanceof Iterable<?> iterable) {
+                List<Object> list = new ArrayList<>();
+                iterable.forEach(item -> list.add(normalize(item, depth + 1, seen)));
+                return list;
+            }
+            if (type.isArray()) {
+                return "[数组:" + type.getComponentType().getSimpleName() + "]";
+            }
+            if (value instanceof Map<?, ?> map) {
+                Map<String, Object> copy = new LinkedHashMap<>();
+                map.forEach((k, v) -> copy.put(String.valueOf(k), normalize(v, depth + 1, seen)));
+                return copy;
+            }
+            return value;
+        } finally {
+            seen.remove(value);
         }
-        if (value instanceof Iterable<?> iterable) {
-            List<Object> list = new ArrayList<>();
-            iterable.forEach(item -> list.add(normalize(item)));
-            return list;
-        }
-        if (type.isArray()) {
-            return "[数组:" + type.getComponentType().getSimpleName() + "]";
-        }
-        if (value instanceof Map<?, ?> map) {
-            Map<String, Object> copy = new LinkedHashMap<>();
-            map.forEach((k, v) -> copy.put(String.valueOf(k), normalize(v)));
-            return copy;
-        }
-        return value;
     }
 
     /** 出参同理:二进制响应体(导出)不进 TEXT 列,占位即可——文件内容本就不该落库 */

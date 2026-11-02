@@ -37,10 +37,32 @@ public class GlobalExceptionHandler {
     /** 兜底日志,含堆栈 */
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /** 业务拒绝:业务码原样透传,HTTP 状态保持 200 */
+    /**
+     * 业务文案回传前端的长度上限:框架不回显用户输入,但拦不住业务层把超长用户输入
+     * 拼进 BizException 文案——统一在这里截断兜底,不信任上游自律。
+     */
+    private static final int MAX_BIZ_MESSAGE_LENGTH = 500;
+
+    /**
+     * 业务拒绝:业务码原样透传,HTTP 状态保持 200。
+     * 文案截断到 500 字符;code ≥ 500 的业务拒绝落 warn 便于观测异常尖刺,4xx 打 debug 不刷屏。
+     */
     @ExceptionHandler(BizException.class)
     public R<Void> handleBiz(BizException e) {
-        return R.fail(e.getCode(), e.getMessage());
+        if (e.getCode() >= 500) {
+            log.warn("业务拒绝 code={}, message={}", e.getCode(), e.getMessage());
+        } else {
+            log.debug("业务拒绝 code={}, message={}", e.getCode(), e.getMessage());
+        }
+        return R.fail(e.getCode(), truncate(e.getMessage()));
+    }
+
+    /** 文案截断兜底:超长以省略号收尾,响应体不再携带截掉的部分 */
+    private static String truncate(String message) {
+        if (message == null || message.length() <= MAX_BIZ_MESSAGE_LENGTH) {
+            return message;
+        }
+        return message.substring(0, MAX_BIZ_MESSAGE_LENGTH) + "…(已截断)";
     }
 
     /** @Valid 请求体校验失败:只取第一条字段错误,文案带字段名 */
@@ -91,10 +113,14 @@ public class GlobalExceptionHandler {
         return R.fail(400, "参数 " + e.getName() + " 类型不正确");
     }
 
-    /** 上传超限: multipart 阈值先于业务的存储配额判定生效,文案要说清是大小问题而不是"系统繁忙" */
+    /**
+     * 上传超限: multipart 阈值先于业务的存储配额判定生效,文案要说清是大小问题而不是"系统繁忙"。
+     * 业务码用 413(Payload Too Large)而非 400:HTTP 状态保持信封契约的 200 不动,
+     * 但网关与监控可以按信封 code 区分"大文件攻击"与普通参数错误。
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public R<Void> handleUploadTooLarge(MaxUploadSizeExceededException e) {
-        return R.fail(400, "文件超出单次上传大小限制");
+        return R.fail(413, "文件超出单次上传大小限制");
     }
 
     /** 方法不匹配:属于传输层错误,回真实 405,前端据此判断"接口没挂上" */

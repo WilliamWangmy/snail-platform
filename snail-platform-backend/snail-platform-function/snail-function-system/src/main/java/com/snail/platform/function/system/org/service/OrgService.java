@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -106,7 +105,6 @@ public class OrgService {
      * 子树缓存按只读端口"树变更即全清"的口径失效,新节点不能漏进已缓存的清单。
      */
     @Transactional
-    @CacheEvict(cacheNames = "orgSubtree", allEntries = true)
     public Long create(OrgCreateRequest request) {
         if (request.parentId() == 0L) {
             throw BizException.badRequest("根组织由租户开通模板生成,不支持新增");
@@ -124,6 +122,7 @@ public class OrgService {
         org.setStatus(0);
         org.setRemark(request.remark());
         orgMapper.insert(org);
+        cacheEvictor.evictAll("orgSubtree");
         return org.getOrgId();
     }
 
@@ -158,7 +157,6 @@ public class OrgService {
      * 操作者看不见的子女留在原地就等于把树拆断。缓存全清同 create,成员集合变了。
      */
     @Transactional
-    @CacheEvict(cacheNames = "orgSubtree", allEntries = true)
     public void move(Long orgId, Long newParentId) {
         SysOrg node = orgQueryService.requireOrg(orgId);
         requireOrgInScope(node.getOrgId());
@@ -191,6 +189,7 @@ public class OrgService {
                     .set(SysOrg::getAncestors, rewritten)
                     .eq(SysOrg::getOrgId, descendant.getOrgId()));
         }
+        cacheEvictor.evictAll("orgSubtree");
     }
 
     /**
@@ -199,7 +198,6 @@ public class OrgService {
      * 只清 orgSubtree:userSession 缓存的是组织名,而能删成的组织必然没挂用户,不存在还引用它的快照。
      */
     @Transactional
-    @CacheEvict(cacheNames = "orgSubtree", allEntries = true)
     public void delete(Long orgId) {
         orgQueryService.requireOrg(orgId);
         requireOrgInScope(orgId);
@@ -210,6 +208,7 @@ public class OrgService {
             throw BizException.badRequest("组织下存在用户,不能删除");
         }
         orgMapper.deleteById(orgId);
+        cacheEvictor.evictAll("orgSubtree");
     }
 
     /**

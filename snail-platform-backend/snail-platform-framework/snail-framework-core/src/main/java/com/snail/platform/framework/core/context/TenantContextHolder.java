@@ -1,5 +1,8 @@
 package com.snail.platform.framework.core.context;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * 职责:当前线程租户身份的唯一持有处。登录认证解析出租户后注入,
  * framework-db 的租户拦截器与 framework-log 的落库切面都只从这儿取值。
@@ -7,6 +10,8 @@ package com.snail.platform.framework.core.context;
  * 约束:异步线程(虚拟线程、日志落库线程)不会自动带值,必须在请求线程先捕获再显式恢复。
  */
 public final class TenantContextHolder {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantContextHolder.class);
 
     /** 当前请求的租户 ID;未认证线程为 null */
     private static final ThreadLocal<Long> TENANT_ID = new ThreadLocal<>();
@@ -37,10 +42,22 @@ public final class TenantContextHolder {
      * 只允许三类路径使用:登录按全局唯一键定位用户;新增/改名时按 username 做全表查重;
      * 平台面的跨租户检索(如公告列表、平台文件列表,平台管理动作的读侧豁免)。
      * 除此之外的业务 CRUD 严禁调用。
+     * 运行时护栏:开窗必落一条 debug 日志(调用点+当前租户),误用至少可事后追溯——
+     * 全租户裸奔的窗口不能既无编译期拦截也无运行时痕迹。
      */
     public static <T> T withoutTenant(java.util.function.Supplier<T> action) {
         boolean previous = BYPASS.get();
         BYPASS.set(true);
+        if (log.isDebugEnabled()) {
+            log.debug("租户过滤旁路窗口开启: tenantId={}, caller={}",
+                    TENANT_ID.get(), StackWalker.getInstance().walk(frames -> frames
+                            .skip(1)
+                            .map(StackWalker.StackFrame::getDeclaringClass)
+                            .filter(clazz -> !clazz.equals(TenantContextHolder.class))
+                            .findFirst()
+                            .map(Class::getName)
+                            .orElse("unknown")));
+        }
         try {
             return action.get();
         } finally {

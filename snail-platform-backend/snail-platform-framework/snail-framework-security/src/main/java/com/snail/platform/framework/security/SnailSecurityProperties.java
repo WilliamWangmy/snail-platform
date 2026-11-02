@@ -48,7 +48,7 @@ public class SnailSecurityProperties {
         /** HS256 签名密钥,至少 32 字符;启动即校验,短了就拒绝启动而不是运行到签发才炸 */
         private String secret;
 
-        /** 令牌有效期(分钟) */
+        /** 令牌有效期(分钟);正数校验在 JwtTokenService 构造期,与密钥校验同点拒绝 */
         private long expireMinutes = 120;
     }
 }

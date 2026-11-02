@@ -10,12 +10,13 @@ import com.snail.platform.framework.security.web.ForcePasswordChangeFilter;
 import com.snail.platform.framework.security.web.SnailAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -38,10 +39,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableConfigurationProperties(SnailSecurityProperties.class)
 public class SnailSecurityConfig {
 
-    /** 认证与文档白名单;登录相关窄开口,别扩 */
-    private static final String[] WHITELIST = {
+    /** 认证入口白名单;登录相关窄开口,别扩 */
+    private static final String[] AUTH_WHITELIST = {
             "/system/auth/captcha",
-            "/system/auth/login",
+            "/system/auth/login"
+    };
+
+    /** 接口文档白名单:仅在 springdoc 实际启用时拼入,生产忘关文档端点也不会裸奔 */
+    private static final String[] DOC_WHITELIST = {
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"
@@ -65,8 +70,13 @@ public class SnailSecurityConfig {
                                                         JwtTokenService jwtTokenService,
                                                         ObjectProvider<UserAuthorityProvider> authorityProviders,
                                                         ObjectProvider<LoginUserProvider> loginUserProviders,
-                                                        ObjectProvider<SessionHeartbeatPort> heartbeats)
+                                                        ObjectProvider<SessionHeartbeatPort> heartbeats,
+                                                        Environment environment)
             throws Exception {
+        List<String> whitelist = new ArrayList<>(List.of(AUTH_WHITELIST));
+        if (environment.getProperty("springdoc.api-docs.enabled", Boolean.class, true)) {
+            whitelist.addAll(List.of(DOC_WHITELIST));
+        }
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> {
                     CorsConfigurationSource corsSource = corsSource(properties.getCors());
@@ -76,8 +86,8 @@ public class SnailSecurityConfig {
                 })
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers(HttpMethod.GET, WHITELIST).permitAll()
-                        .requestMatchers(WHITELIST).permitAll()
+                        // 一条覆盖全部方法即可:GET 一条是冗余的白名单分裂,保持单点便于审计
+                        .requestMatchers(whitelist.toArray(String[]::new)).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(new SnailAuthFilter(jwtTokenService, authorityProviders, loginUserProviders, heartbeats),
                         UsernamePasswordAuthenticationFilter.class)
