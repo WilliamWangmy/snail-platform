@@ -1,0 +1,36 @@
+{
+  "name": "Flowable",
+  "uri": "http://flowable.org/bpmn",
+  "prefix": "flowable",
+  "xml": {
+    "tagAlias": "lowerCase"
+  },
+  "associations": [],
+  "types": [
+    {
+      "name": "UserTask",
+      "isAbstract": false,
+      "extends": ["bpmn:UserTask"],
+      "properties": [
+        { "name": "assignee", "isAttr": true, "type": "String" },
+        { "name": "candidateGroups", "isAttr": true, "type": "String" },
+        { "name": "candidateUsers", "isAttr": true, "type": "String" },
+        { "name": "actionButtons", "isAttr": true, "type": "String" },
+        { "name": "notifyType", "isAttr": true, "type": "String" },
+        { "name": "ccUsers", "isAttr": true, "type": "String" },
+        { "name": "ccGroups", "isAttr": true, "type": "String" },
+        { "name": "collection", "isAttr": true, "type": "String" },
+        { "name": "elementVariable", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
+      "name": "MultiInstanceLoopCharacteristics",
+      "isAbstract": false,
+      "extends": ["bpmn:MultiInstanceLoopCharacteristics"],
+      "properties": [
+        { "name": "collection", "isAttr": true, "type": "String" },
+        { "name": "elementVariable", "isAttr": true, "type": "String" }
+      ]
+    }
+  ]
+}

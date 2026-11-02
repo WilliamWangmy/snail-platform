@@ -16,8 +16,11 @@
   },
   "dependencies": {
     "axios": "^1.13.0",
+    "bpmn-js": "^18.31.1",
+    "diagram-js": "15.28.1",
     "element-plus": "^2.13.0",
     "pinia": "^3.0.3",
+    "tiny-svg": "4.1.4",
     "vue": "3.5.44",
     "vue-router": "^4.6.0"
   },

@@ -30,6 +30,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '流程建模' },
       },
       {
+        path: 'modeler/:modelId/edit',
+        name: 'modeler-designer',
+        component: () => import('@/views/modeler/designer/DesignerPage.vue'),
+        meta: { title: '流程建模' },
+      },
+      {
         path: 'definition',
         name: 'definition',
         component: () => import('@/views/definition/index.vue'),
