@@ -1,0 +1,55 @@
+@use './variables.scss';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    'PingFang SC',
+    'Microsoft YaHei',
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 14px;
+  color: var(--snail-text-primary);
+  background: var(--snail-bg-deep);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 全屏页面通用骨架（菜单对应的空壳页复用） */
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+}
+
+.page-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--snail-text-primary);
+}
+
+.page-placeholder {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--snail-text-secondary);
+  border: 1px dashed var(--snail-border);
+  border-radius: var(--snail-radius-lg);
+  background: var(--snail-bg-panel);
+}
