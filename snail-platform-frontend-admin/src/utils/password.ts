@@ -33,12 +33,17 @@ const SYMBOL = '!@#$%^&*()-_=+[]{};:,.?';
 function randomInt(maxExclusive: number): number {
   const buf = new Uint32Array(1);
   const limit = Math.floor(0xffffffff / maxExclusive) * maxExclusive;
-  let value = 0;
+  let value: number; // do-while 首轮必赋值,无需初始化
   do {
     crypto.getRandomValues(buf);
-    value = buf[0];
+    value = buf[0] ?? 0; // noUncheckedIndexedAccess:getRandomValues 后不可能 undefined
   } while (value >= limit);
   return value % maxExclusive;
+}
+
+/** 按索引取字符:noUncheckedIndexedAccess 下字符串下标是 string|undefined,越界(不可能发生)回退首字符 */
+function charAt(pool: string, index: number): string {
+  return pool[index] ?? pool[0] ?? '';
 }
 
 /** 命中的字符类别数:小写、大写、数字、其余各算一类,与后端 charClasses 同口径 */
@@ -102,15 +107,18 @@ export function passwordChecklist(password: string): PasswordChecklist {
 export function generatePassword(): string {
   const pools = [LOWER, UPPER, DIGIT, SYMBOL];
   for (;;) {
-    const chars: string[] = pools.map((pool) => pool[randomInt(pool.length)]);
+    const chars: string[] = pools.map((pool) => charAt(pool, randomInt(pool.length)));
     const all = pools.join('');
     while (chars.length < GENERATED_LENGTH) {
-      chars.push(all[randomInt(all.length)]);
+      chars.push(charAt(all, randomInt(all.length)));
     }
     // Fisher-Yates 洗牌,避免四类固定落在前四位
     for (let i = chars.length - 1; i > 0; i--) {
       const j = randomInt(i + 1);
-      [chars[i], chars[j]] = [chars[j], chars[i]];
+      const a = chars[i] ?? '';
+      const b = chars[j] ?? '';
+      chars[i] = b;
+      chars[j] = a;
     }
     const password = chars.join('');
     if (validatePassword(password) === null) {

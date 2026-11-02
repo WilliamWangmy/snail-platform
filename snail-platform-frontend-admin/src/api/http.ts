@@ -2,6 +2,8 @@ import axios, { AxiosError, type AxiosResponse } from 'axios';
 import { ElMessage } from 'element-plus';
 import type { Envelope } from './types';
 import { clearToken, getToken } from '@/utils/token';
+import router from '@/router';
+import { resetMenuRoutes } from '@/router/menuRoutes';
 
 /** 业务失败统一异常:code 为后端信封码,400 校验/401 未认证/403 无权限/500 服务端。 */
 export class ApiError extends Error {
@@ -61,12 +63,22 @@ async function envelopeOf(error: AxiosError<Envelope<unknown>>): Promise<Envelop
   return data;
 }
 
+/** 并发多个请求同时 401 时只提示与跳转一次 */
+let redirecting = false;
+
 function report(code: number, message: string): void {
   const onLoginPage = window.location.pathname.startsWith('/login');
   if (code === 401 && !onLoginPage) {
     clearToken();
-    ElMessage.warning('登录已过期，请重新登录');
-    window.location.assign(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+    // 动态路由随会话失效一并摘除:不清的话换账号登录后,上一账号的页面路由仍可直达(接口虽被 403,页面裸露)
+    resetMenuRoutes(router);
+    if (!redirecting) {
+      redirecting = true;
+      ElMessage.warning('登录已过期，请重新登录');
+      // 带上查询串,刷新后能回到带筛选参数的页面
+      const target = window.location.pathname + window.location.search;
+      window.location.assign(`/login?redirect=${encodeURIComponent(target)}`);
+    }
     return;
   }
   ElMessage.error(message || '请求失败');

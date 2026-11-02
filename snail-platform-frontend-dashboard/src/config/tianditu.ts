@@ -3,10 +3,16 @@ import { Credit, UrlTemplateImageryProvider } from 'cesium';
 /**
  * 天地图密钥：请在项目根目录创建 .env 文件并配置
  *   VITE_TIANDITU_KEY=你的天地图浏览器端密钥
- * 申请入口：https://console.tianditu.gov.cn/api/key （注册 → 创建应用 → 类型选“浏览器端”）
+ * 申请入口：https://console.tianditu.gov.cn/api/key （注册 → 创建应用 → 类型选"浏览器端"）
+ *
+ * 安全口径（必读）：VITE_ 前缀变量会被 Vite 静态内联进产物,密钥对任何访问者可见,
+ * 且每个瓦片 URL 都携带 tk= 参数（浏览器历史/代理日志/Referer 链路都有痕迹）。
+ * 因此该 key 必须在天地图控制台【绑定域名白名单】并开启配额告警——这是浏览器端 key
+ * 的唯一有效防线;被盗用刷配额由白名单挡,泄密本身不构成对后端系统的威胁。
+ * 高安全等级部署可改由后端代理瓦片请求注入 key,前端永不接触密钥。
  *
  * 注意：实测本 key 走 DataServer 接口可正常取图；WMTS 接口（/img_w/wmts）会被
- * 服务端以“此级别下无影像”占位图软拦截，因此这里统一使用 DataServer 瓦片模板。
+ * 服务端以"此级别下无影像"占位图软拦截，因此这里统一使用 DataServer 瓦片模板。
  */
 export const TIANDITU_KEY: string = import.meta.env.VITE_TIANDITU_KEY ?? '';
 

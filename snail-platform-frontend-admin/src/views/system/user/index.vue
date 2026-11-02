@@ -123,11 +123,16 @@ const rules = computed<FormRules<UserForm>>(() => ({
           { min: 3, max: 30, message: '登录名长度 3-30', trigger: 'blur' },
           { pattern: USERNAME_PATTERN, message: '登录名只允许字母、数字、下划线、点、@、连字符', trigger: 'blur' },
           {
-            // 失焦即查占用(全表口径,含已删行);保存时后端仍会再拦一次,防两人同时提交同名
-            validator: async (_rule: unknown, value: string, callback: (error?: Error) => void) => {
-              if (!value || !USERNAME_PATTERN.test(value)) return callback();
-              if (await checkUsername(value)) return callback(new Error('登录名已被占用'));
-              callback();
+            // 失焦即查占用(全表口径,含已删行);保存时后端仍会再拦一次,防两人同时提交同名。
+            // 用回调式而非 async:EP 的 FormItemRule 校验器签名是同步 void,Promise 返回值过不了类型
+            validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+              if (!value || !USERNAME_PATTERN.test(value)) {
+                callback();
+                return;
+              }
+              checkUsername(value)
+                .then((taken) => callback(taken ? new Error('登录名已被占用') : undefined))
+                .catch(() => callback());
             },
             trigger: 'blur',
           },

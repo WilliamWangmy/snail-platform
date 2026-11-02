@@ -26,14 +26,19 @@ export function usePageList<T>(
   const pageNum = ref(1);
   const size = ref(pageSize);
 
+  /** 竞态守卫:快速翻页/连续查询时,慢的旧请求后返回不得覆盖新数据 */
+  let sequence = 0;
+
   async function refresh(): Promise<void> {
+    const current = ++sequence;
     loading.value = true;
     try {
       const page = await fetch({ pageNum: pageNum.value, pageSize: size.value });
+      if (current !== sequence) return; // 已有更新的请求,丢弃这次过期响应
       rows.value = page.rows;
       total.value = page.total;
     } finally {
-      loading.value = false;
+      if (current === sequence) loading.value = false;
     }
   }
 
