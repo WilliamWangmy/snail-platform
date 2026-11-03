@@ -114,7 +114,7 @@ java -jar snail-platform-start/target/snail-platform.jar      # 加 --spring.pro
 | `SNAIL_DB_USERNAME` / `SNAIL_DB_PASSWORD` | 数据库账密 |
 | `SNAIL_REDIS_URL` | 缓存服务连接串 |
 | `SNAIL_JWT_SECRET` | JWT 签名密钥，长度 ≥ 32；dev 有开发占位默认值，**prod 必填，缺失启动即失败** |
-| `SNAIL_SEED_ADMIN_PASSWORD` | 内置 admin 种子口令的 **BCrypt 密文**（非明文，用 Hutool `BCrypt.hashpw` 离线生成）；**prod 必填**，V4 种子迁移用它写入 admin 初始口令，缺失启动被拦；dev 未提供时启动期现场生成随机口令并打印到控制台（仅首次初始化空库时生效），仓库中不存在可预测的种子口令 |
+| `SNAIL_SEED_ADMIN_PASSWORD` | 内置 admin 种子口令的 **BCrypt 密文**（非明文，用 Hutool `BCrypt.hashpw` 离线生成）；V4 种子迁移用它写入 admin 初始口令。dev 有默认值（`admin123` 的密文，首次登录强制改密兜底），设置后覆盖；**prod 必填**，缺失启动即失败；不生成随机口令、不打印到任何日志 |
 
 初始口令交付口径（P2-3）：新建用户/重置密码/开通租户的口令一律由管理员在表单自输或点"生成"，随 HTTPS 请求体提交，响应只回 ID、不再回传口令——"服务端生成口令加密回传"链路已整体退役，前端无需任何密钥环境变量。
 

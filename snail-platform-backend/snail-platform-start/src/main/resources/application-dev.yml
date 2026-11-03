@@ -9,9 +9,9 @@ spring:
       url: ${SNAIL_REDIS_URL:redis://127.0.0.1:6379}
   flyway:
     placeholders:
-      # V4 种子写入 admin 口令所需;未配置时由 DevSeedPasswordConfig 现场生成随机口令并打印到控制台,
-      # 仓库中不存在任何可预测的种子口令密文。要固定开发库口令,设置 SNAIL_SEED_ADMIN_PASSWORD(BCrypt 密文)。
-      "[seedAdminPassword]": ${SNAIL_SEED_ADMIN_PASSWORD:}
+      # V4 种子写入 admin 口令所需:BCrypt 密文(非明文)。默认是 admin123 的密文,由首次登录强制改密兜底;
+      # 可用 SNAIL_SEED_ADMIN_PASSWORD 环境变量覆盖。不生成随机口令、不打印到日志。
+      "[seedAdminPassword]": ${SNAIL_SEED_ADMIN_PASSWORD:$2a$10$DIo9lf8l8xeeBQPAsgZW0uexouQqyZ0TMR0XT6Yi3/m4Mye81/Hcu}
 
 logging:
   level:
@@ -21,7 +21,8 @@ snail:
   security:
     jwt:
       # 开发占位密钥只住 dev profile;生产密钥必须由 SNAIL_JWT_SECRET 提供,共享配置无默认可漏
-      secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}  storage:
+      secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}
+  storage:
     sftp:
       # 本机 SFTP 的开发默认连接;生产必须由环境变量提供,共享配置不放开任何默认口令
       host: ${SNAIL_SFTP_HOST:127.0.0.1}
