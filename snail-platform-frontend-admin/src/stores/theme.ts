@@ -29,7 +29,7 @@ export interface ThemeTokens {
   cb: boolean;
 }
 
-/** 五套主题:浅色/深色,色盲友好版以蓝橙紫青替代红绿并保留文字标记。 */
+/** 六套主题:浅色/深色,色盲友好版以蓝橙紫青替代红绿并保留文字标记。 */
 export const THEMES: ThemeTokens[] = [
   {
     id: 'light', name: '雾松青', desc: '浅色 · 默认', mode: 'light',
@@ -62,6 +62,15 @@ export const THEMES: ThemeTokens[] = [
     sidebarText: 'rgba(224,238,255,.68)', sidebarMuted: 'rgba(184,215,255,.44)', onPrimary: '#06182f',
     success: '#7cb8ff', warning: '#ffb454', danger: '#ffb454', info: '#b49bff',
     chart: ['#6fb3ff', '#ffb454', '#b49bff', '#5be2e8'], shadow: '0 18px 44px rgba(0,0,0,.38)', cb: true,
+  },
+  {
+    /* 取自流程工作台（snail-platform-frontend-workflow）浅色主题配色；侧栏沿用深底惯例（admin 菜单 hover 文字为白色）。 */
+    id: 'flow-light', name: '晨航青', desc: '浅色 · 流程控制台', mode: 'light',
+    primary: '#0da284', accent: '#a97524', bg: '#eef4f3', card: '#ffffff', soft: '#f6faf9', soft2: '#e8f0ee',
+    ink: '#14282a', muted: '#64807c', line: '#dee3e3', sidebar: '#071820', sidebar2: '#050f14',
+    sidebarText: 'rgba(232,243,240,.65)', sidebarMuted: 'rgba(169,191,188,.4)', onPrimary: '#ffffff',
+    success: '#0da284', warning: '#a97524', danger: '#d7544b', info: '#2377a8',
+    chart: ['#0da284', '#2377a8', '#a97524', '#6a58c9'], shadow: '0 14px 38px rgba(16,61,57,.07)', cb: false,
   },
   {
     /* 取自流程工作台（snail-platform-frontend-workflow）深色控制台配色。 */
