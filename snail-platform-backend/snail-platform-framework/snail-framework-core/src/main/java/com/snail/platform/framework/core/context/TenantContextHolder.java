@@ -50,7 +50,7 @@ public final class TenantContextHolder {
         BYPASS.set(true);
         if (log.isDebugEnabled()) {
             log.debug("租户过滤旁路窗口开启: tenantId={}, caller={}",
-                    TENANT_ID.get(), StackWalker.getInstance().walk(frames -> frames
+                    TENANT_ID.get(), StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).walk(frames -> frames
                             .skip(1)
                             .map(StackWalker.StackFrame::getDeclaringClass)
                             .filter(clazz -> !clazz.equals(TenantContextHolder.class))
