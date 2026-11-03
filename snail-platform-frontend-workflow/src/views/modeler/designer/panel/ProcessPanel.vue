@@ -11,11 +11,15 @@ const props = defineProps<{
   element: FlowElementLike;
   modelKey: string;
   modeling: ModelingLike;
+  revision: number;
 }>();
 
 const processId = computed(() => props.modelKey || String(props.element.businessObject.id ?? ''));
 const processName = computed({
-  get: () => String(props.element.businessObject.name ?? ''),
+  get: () => {
+    void props.revision;
+    return String(props.element.businessObject.name ?? '');
+  },
   set: (value: string) => props.modeling.updateProperties(props.element, { name: value }),
 });
 </script>

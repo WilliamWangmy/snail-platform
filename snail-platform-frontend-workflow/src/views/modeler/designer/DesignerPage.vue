@@ -3,7 +3,7 @@
  * 设计器页：顶栏（返回/模型信息/校验/保存/发布/全屏）+ 外部元素栏 + bpmn-js 画布 + 属性面板。
  * 数据流：draft 读取 → 编辑（本地实时校验）→ 保存/发布；离开脏守卫；Fullscreen API 全屏。
  */
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
@@ -21,6 +21,8 @@ import BpmnCanvas from './BpmnCanvas.vue';
 import { validateModel, validateXmlSize, type ValidationIssue } from './bpmnValidator';
 import { blankXml } from './flowType';
 import type { FlowElementLike } from './flowableExtension';
+import EventPanel from './panel/EventPanel.vue';
+import GatewayPanel from './panel/GatewayPanel.vue';
 import ProcessPanel from './panel/ProcessPanel.vue';
 import SequenceFlowPanel from './panel/SequenceFlowPanel.vue';
 import UserTaskPanel from './panel/UserTaskPanel.vue';
@@ -70,12 +72,15 @@ const model = ref<WorkflowModelVO>();
 const xml = ref('');
 const loading = ref(true);
 const dirty = ref(false);
+// 画布命令版本号：bpmn 业务对象不是响应式的，面板据此重算名称等字段
+const elementRevision = ref(0);
 const saving = ref(false);
 const publishing = ref(false);
 
 const selectedId = ref<string | null>(null);
 const selectedType = ref<string | null>(null);
-const services = ref<BpmnServices>();
+// bpmn-js 服务与模型对象不能被 Vue 深层代理，否则事件重绘时触发 Proxy 不变量错误
+const services = shallowRef<BpmnServices>();
 
 const issues = ref<ValidationIssue[]>([]);
 const validated = ref(false);
@@ -169,6 +174,7 @@ const processElement = computed<FlowElementLike | null>(() => {
 });
 
 const inspectorMeta = computed(() => {
+  void elementRevision.value;
   const element = selectedElement.value;
   const type = String(element?.businessObject.$type ?? '');
   const meta = TYPE_META[type] ?? { label: 'ELEMENT', title: '元素', icon: 'sliders' };
@@ -204,6 +210,7 @@ let validationTimer: number | undefined;
 
 function onChanged(): void {
   dirty.value = true;
+  elementRevision.value += 1;
   window.clearTimeout(validationTimer);
   validationTimer = window.setTimeout(() => {
     issues.value = runValidation();
@@ -694,18 +701,35 @@ function goBack(): void {
                 :element="selectedElement"
                 :model-key="model.modelKey"
                 :modeling="services.modeling"
+                :revision="elementRevision"
+              />
+              <EventPanel
+                v-else-if="(selectedElement?.businessObject.$type === 'bpmn:StartEvent' || selectedElement?.businessObject.$type === 'bpmn:EndEvent') && services"
+                :key="`event-${selectedElement.businessObject.id}`"
+                :element="selectedElement"
+                :modeling="services.modeling"
+                :revision="elementRevision"
+              />
+              <GatewayPanel
+                v-else-if="(selectedElement?.businessObject.$type === 'bpmn:ExclusiveGateway' || selectedElement?.businessObject.$type === 'bpmn:ParallelGateway') && services"
+                :key="`gateway-${selectedElement.businessObject.id}`"
+                :element="selectedElement"
+                :modeling="services.modeling"
+                :revision="elementRevision"
               />
               <UserTaskPanel
                 v-else-if="selectedElement?.businessObject.$type === 'bpmn:UserTask' && services"
                 :key="`task-${selectedElement.businessObject.id}`"
                 :element="selectedElement"
                 :services="services"
+                :revision="elementRevision"
               />
               <SequenceFlowPanel
                 v-else-if="selectedElement?.businessObject.$type === 'bpmn:SequenceFlow' && services"
                 :key="`flow-${selectedElement.businessObject.id}`"
                 :element="selectedElement"
                 :services="services"
+                :revision="elementRevision"
               />
               <div
                 v-else

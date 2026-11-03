@@ -14,17 +14,27 @@ const props = defineProps<{
     modeling: ModelingLike;
     bpmnFactory: { create: (type: string, props?: Record<string, unknown>) => Record<string, unknown> };
   };
+  revision: number;
 }>();
 
 /** 来源为网关时才显示条件区 */
-const fromGateway = computed(() => Boolean(props.element.source?.type?.includes('Gateway')));
+const fromGateway = computed(() => {
+  void props.revision;
+  return Boolean(props.element.source?.type?.includes('Gateway'));
+});
 
 const name = computed({
-  get: () => String(props.element.businessObject.name ?? ''),
+  get: () => {
+    void props.revision;
+    return String(props.element.businessObject.name ?? '');
+  },
   set: (v: string) => props.services.modeling.updateProperties(props.element, { name: v }),
 });
 
-const conditionBody = computed(() => readConditionBody(props.element));
+const conditionBody = computed(() => {
+  void props.revision;
+  return readConditionBody(props.element);
+});
 
 const flowType = computed<FlowType>(() =>
   detectFlowType(name.value, conditionBody.value),
@@ -214,6 +224,6 @@ function applyAdvanced(): void {
 .cond-error {
   margin-top: 4px;
   font-size: 10.5px;
-  color: #ff9c95;
+  color: var(--danger-bright);
 }
 </style>

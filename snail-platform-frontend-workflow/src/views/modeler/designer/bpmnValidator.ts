@@ -116,8 +116,11 @@ function validateUserTask(el: FlowElementLike, id: string, where: string, issues
     }
   }
   const notify = readFlowableAttr(el, 'notifyType');
-  if (!NOTIFY_CODES.has(notify)) {
-    issues.push({ level: 'error', target: id, message: `${where}：通知方式码值非法（${notify}）` });
+  if (notify) {
+    const invalid = notify.split(',').map((s) => s.trim()).filter((c) => c && !NOTIFY_CODES.has(c));
+    if (invalid.length > 0) {
+      issues.push({ level: 'error', target: id, message: `${where}：通知方式码值非法（${invalid.join(',')}）` });
+    }
   }
 
   if (mi) {
