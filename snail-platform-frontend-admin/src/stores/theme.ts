@@ -29,7 +29,7 @@ export interface ThemeTokens {
   cb: boolean;
 }
 
-/** 四套主题:浅色/深色各两列,色盲友好版以蓝橙紫青替代红绿并保留文字标记。 */
+/** 五套主题:浅色/深色,色盲友好版以蓝橙紫青替代红绿并保留文字标记。 */
 export const THEMES: ThemeTokens[] = [
   {
     id: 'light', name: '雾松青', desc: '浅色 · 默认', mode: 'light',
@@ -62,6 +62,15 @@ export const THEMES: ThemeTokens[] = [
     sidebarText: 'rgba(224,238,255,.68)', sidebarMuted: 'rgba(184,215,255,.44)', onPrimary: '#06182f',
     success: '#7cb8ff', warning: '#ffb454', danger: '#ffb454', info: '#b49bff',
     chart: ['#6fb3ff', '#ffb454', '#b49bff', '#5be2e8'], shadow: '0 18px 44px rgba(0,0,0,.38)', cb: true,
+  },
+  {
+    /* 取自流程工作台（snail-platform-frontend-workflow）深色控制台配色。 */
+    id: 'flow-dark', name: '夜航青', desc: '深色 · 流程控制台', mode: 'dark',
+    primary: '#1ec9a5', accent: '#e8ad55', bg: '#050f14', card: '#0b202a', soft: '#0a1f29', soft2: '#0d2731',
+    ink: '#e8f3f0', muted: '#a9bfbc', line: '#1d363f', sidebar: '#071820', sidebar2: '#050f14',
+    sidebarText: 'rgba(232,243,240,.65)', sidebarMuted: 'rgba(169,191,188,.4)', onPrimary: '#04211a',
+    success: '#1ec9a5', warning: '#e8ad55', danger: '#ef7269', info: '#67b6dc',
+    chart: ['#1ec9a5', '#67b6dc', '#e8ad55', '#a99bf0'], shadow: '0 18px 44px rgba(0,0,0,.4)', cb: false,
   },
 ];
 
