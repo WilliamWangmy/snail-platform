@@ -104,8 +104,8 @@ const filtered = computed(() => {
 });
 
 const paged = computed(() => {
-  const start = (pageNum.value - 1) * pageSize.value;
-  return filtered.value.slice(start, start + pageSize.value);
+  const start = (pageNum.value - 1) * pageSize;
+  return filtered.value.slice(start, start + pageSize);
 });
 
 watch([query, activeFilter, definitionKey], () => {
