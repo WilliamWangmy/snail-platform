@@ -1,6 +1,6 @@
 /**
- * bpmn-js 自定义模块：元素栏裁剪（v1 六项）、连线规则（仅 sequenceFlow、禁连开始事件）、
- * 驳回线红色虚线渲染。注册方式见 BpmnCanvas.vue 的 additionalModules。
+ * bpmn-js 自定义模块：元素栏裁剪（v1 六项）、ContextPad/ReplaceMenu 裁剪与中文化（2.1 白名单）、
+ * 连线规则（仅 sequenceFlow、禁连开始事件）、驳回线红色虚线渲染。注册方式见 BpmnCanvas.vue 的 additionalModules。
  */
 import BaseRenderer from 'diagram-js/lib/draw/BaseRenderer';
 import type { Connection } from 'diagram-js/lib/model/Types';
@@ -142,6 +142,127 @@ class FlowConnectRules {
   }
 }
 
+/* ------------------------- ContextPad / ReplaceMenu 裁剪与中文化 ------------------------- */
+
+/**
+ * 2.1 支持清单的扳手白名单：key = businessObject.$type，value = 保留条目（ReplaceOptions 的
+ * actionName id）。未命中类型不裁剪（无法经调色板/ContextPad 创建的类型本就不会出现）。
+ */
+const REPLACE_WHITELIST: Record<string, Set<string>> = {
+  'bpmn:Task': new Set(['replace-with-task', 'replace-with-user-task']),
+  'bpmn:UserTask': new Set(['replace-with-task', 'replace-with-user-task']),
+  'bpmn:StartEvent': new Set(['replace-with-none-start', 'replace-with-none-end', 'replace-with-timer-start', 'replace-with-message-start']),
+  'bpmn:EndEvent': new Set(['replace-with-none-start', 'replace-with-none-end', 'replace-with-terminate-end']),
+  'bpmn:ExclusiveGateway': new Set(['replace-with-parallel-gateway', 'replace-with-inclusive-gateway']),
+  'bpmn:ParallelGateway': new Set(['replace-with-exclusive-gateway', 'replace-with-inclusive-gateway']),
+  'bpmn:SequenceFlow': new Set(['replace-with-sequence-flow', 'replace-with-default-flow', 'replace-with-conditional-flow']),
+  'bpmn:IntermediateThrowEvent': new Set(['replace-with-timer-intermediate-catch']),
+  'bpmn:IntermediateCatchEvent': new Set(['replace-with-timer-intermediate-catch']),
+  'bpmn:BoundaryEvent': new Set(['replace-with-timer-boundary', 'replace-with-non-interrupting-timer-boundary']),
+};
+
+/** 扳手条目中文文案（待接入 = 运行端能力未跟上，见 2.1 配套机制③） */
+const REPLACE_LABELS: Record<string, string> = {
+  'replace-with-task': '任务',
+  'replace-with-user-task': '用户任务',
+  'replace-with-none-start': '开始事件',
+  'replace-with-none-end': '结束事件',
+  'replace-with-timer-start': '定时开始事件（待接入）',
+  'replace-with-message-start': '消息开始事件（待接入）',
+  'replace-with-terminate-end': '终止结束事件（待接入）',
+  'replace-with-exclusive-gateway': '排他网关',
+  'replace-with-parallel-gateway': '并行网关',
+  'replace-with-inclusive-gateway': '相容网关（待接入）',
+  'replace-with-sequence-flow': '普通连线',
+  'replace-with-default-flow': '默认分支（兜底）',
+  'replace-with-conditional-flow': '条件分支',
+  'replace-with-timer-intermediate-catch': '定时中间事件（待接入）',
+  'replace-with-timer-boundary': '定时边界事件（待接入）',
+  'replace-with-non-interrupting-timer-boundary': '非中断定时边界事件（待接入）',
+};
+
+const PAD_TITLES: Record<string, string> = {
+  'append.append-task': '追加任务',
+  'append.gateway': '追加网关',
+  'append.end-event': '追加结束事件',
+  'append.text-annotation': '追加文本注记',
+  replace: '改变元素类型',
+  connect: '连线到其他元素',
+  delete: '删除',
+};
+
+interface MenuEntry {
+  label?: string;
+  title?: string;
+  action?: unknown;
+}
+
+type MenuEntries = Record<string, MenuEntry>;
+
+/**
+ * 裁剪器：ContextPad 删「追加中间/边界事件」（none-throwing 属排除清单，定时中间事件
+ * 由后续批次以专用入口补回），扳手弹窗按 2.1 白名单裁剪；中英文文案就地覆盖，
+ * BpmnCanvas 的 contextPad.open 钩子保留兜底。
+ */
+class FlowPadTrimmer {
+  static $inject = ['contextPad', 'popupMenu'];
+
+  constructor(
+    contextPad: { registerProvider: (priority: number, provider: unknown) => void },
+    popupMenu: { registerProvider: (id: string, priority: number, provider: unknown) => void },
+  ) {
+    // 默认 provider 注册在 1000，此处 500 在其后执行，收到的是累积后的条目
+    contextPad.registerProvider(500, this);
+    popupMenu.registerProvider('bpmn-replace', 500, this);
+  }
+
+  getContextPadEntries(): (entries: MenuEntries) => MenuEntries {
+    return (entries) => {
+      delete entries['append.intermediate-event'];
+      for (const [id, entry] of Object.entries(entries)) {
+        const title = PAD_TITLES[id];
+        if (title) {
+          entry.title = title;
+        }
+      }
+      return entries;
+    };
+  }
+
+  getPopupMenuEntries(target: { businessObject?: { $type?: string } }): (entries: MenuEntries) => MenuEntries {
+    const allowed = REPLACE_WHITELIST[target?.businessObject?.$type ?? ''];
+    return (entries) => {
+      if (!allowed) {
+        return entries;
+      }
+      const next: MenuEntries = {};
+      for (const [id, entry] of Object.entries(entries)) {
+        if (!allowed.has(id)) {
+          continue;
+        }
+        const label = REPLACE_LABELS[id];
+        next[id] = label ? { ...entry, label } : entry;
+      }
+      return next;
+    };
+  }
+
+  getPopupMenuHeaderEntries(): (entries: MenuEntries) => MenuEntries {
+    return (entries) => {
+      const next: MenuEntries = {};
+      for (const [id, entry] of Object.entries(entries)) {
+        if (id === 'toggle-parallel-mi') {
+          next[id] = { ...entry, title: '并行多实例（每人一票，全部办完通过）' };
+        } else if (id === 'toggle-sequential-mi') {
+          next[id] = { ...entry, title: '串行多实例（依次办理）' };
+        }
+        // toggle-loop（Loop 循环）属 2.1 排除清单，丢弃
+      }
+      return next;
+    };
+  }
+}
+
 /* ---------------------------------- 驳回线渲染 ---------------------------------- */
 
 const REJECT_PRIORITY = 1500;
@@ -185,8 +306,9 @@ class RejectFlowRenderer extends BaseRenderer {
 }
 
 export const flowCustomModules = {
-  __init__: ['flowPaletteProvider', 'flowConnectRules', 'rejectFlowRenderer'],
+  __init__: ['flowPadTrimmer', 'flowPaletteProvider', 'flowConnectRules', 'rejectFlowRenderer'],
   flowConnectRules: ['type', FlowConnectRules],
+  flowPadTrimmer: ['type', FlowPadTrimmer],
   flowPaletteProvider: ['type', FlowPaletteProvider],
   rejectFlowRenderer: ['type', RejectFlowRenderer],
 };

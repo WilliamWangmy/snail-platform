@@ -78,6 +78,30 @@ const CANVAS_STYLE = {
   },
 };
 
+/* ContextPad（点选节点的浮动工具盘）悬浮提示中文化：按图标类名映射，条目集合仍是 bpmn-js 默认全量 */
+const CONTEXT_PAD_TITLES: Record<string, string> = {
+  'bpmn-icon-start-event-none': '追加开始事件',
+  'bpmn-icon-end-event-none': '追加结束事件',
+  'bpmn-icon-intermediate-event-none': '追加中间/边界事件',
+  'bpmn-icon-gateway-none': '追加网关',
+  'bpmn-icon-task': '追加任务',
+  'bpmn-icon-text-annotation': '追加文本注记',
+  'bpmn-icon-screw-wrench': '改变元素类型',
+  'bpmn-icon-trash': '删除',
+  'bpmn-icon-connection-multi': '连线到其他元素',
+};
+
+function localizeContextPad(event: { current?: { html?: HTMLElement } }): void {
+  const html = event.current?.html;
+  if (!html) return;
+  for (const el of Array.from(html.querySelectorAll('.entry'))) {
+    const icon = Array.from(el.classList).find((c) => CONTEXT_PAD_TITLES[c]);
+    if (icon) {
+      el.setAttribute('title', CONTEXT_PAD_TITLES[icon]);
+    }
+  }
+}
+
 const stageRef = ref<HTMLDivElement>();
 
 let diagram: Modeler | NavigatedViewer | null = null;
@@ -127,6 +151,8 @@ async function render(): Promise<void> {
         emit('changed');
       }
     });
+
+    diagram.on('contextPad.open', localizeContextPad);
 
     eventBus?.on('tool-manager.update', (event: { tool?: string | null }) => {
       emit('toolChanged', event.tool ? (TOOL_NAMES[event.tool] ?? 'pointer') : 'pointer');
