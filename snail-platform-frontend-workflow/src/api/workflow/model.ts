@@ -17,6 +17,9 @@ export interface WorkflowModelVO {
   hasDraft: boolean;
   processDefinitionId?: string;
   deployedVersion?: number;
+  publishTime?: string;
+  createTime?: string;
+  updateTime?: string;
 }
 
 /** WorkflowModelCreateRequest 镜像：draftXml 与 templateId 二选一 */
@@ -52,6 +55,8 @@ export interface WorkflowDefinitionVO {
   definitionName?: string;
   version: number;
   deploymentId?: string;
+  suspended: boolean;
+  deployed: boolean;
 }
 
 /** 模型分页 */
@@ -64,9 +69,9 @@ export function getModel(modelId: number): Promise<WorkflowModelVO> {
   return http<WorkflowModelVO>({ url: `/workflow/model/${modelId}`, method: 'GET' });
 }
 
-/** 新增模型（可直接给草稿，或从平台模板落地） */
-export function createModel(data: WorkflowModelCreateRequest): Promise<WorkflowModelVO> {
-  return http<WorkflowModelVO>({ url: '/workflow/model', method: 'POST', data });
+/** 新增模型（可直接给草稿，或从平台模板落地），返回新模型 ID */
+export function createModel(data: WorkflowModelCreateRequest): Promise<number> {
+  return http<number>({ url: '/workflow/model', method: 'POST', data });
 }
 
 /** 修改模型展示信息（流程标识不可改） */
@@ -90,8 +95,8 @@ export function saveModelDraft(modelId: number, xml: string): Promise<void> {
 }
 
 /** 发布模型（校验 + 部署 + 回写版本指针） */
-export function publishModel(modelId: number): Promise<void> {
-  return http<void>({ url: `/workflow/model/${modelId}/publish`, method: 'POST' });
+export function publishModel(modelId: number): Promise<WorkflowDefinitionVO> {
+  return http<WorkflowDefinitionVO>({ url: `/workflow/model/${modelId}/publish`, method: 'POST' });
 }
 
 /** 版本列表（当前指针标 deployed） */
