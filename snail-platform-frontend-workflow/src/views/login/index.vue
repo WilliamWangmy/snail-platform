@@ -487,7 +487,7 @@ onMounted(() => {
   padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: 9px;
-  background: #0b222b;
+  background: var(--panel-solid);
   cursor: pointer;
 
   img {

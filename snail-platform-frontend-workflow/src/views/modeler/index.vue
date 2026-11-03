@@ -561,7 +561,7 @@ const asModel = (row: unknown): WorkflowModelVO => row as WorkflowModelVO;
 .tile.tile--danger {
   border-color: var(--danger-line);
   background: var(--danger-soft);
-  color: #ff9c95;
+  color: var(--danger-bright);
 }
 
 .version-current {
@@ -592,7 +592,7 @@ const asModel = (row: unknown): WorkflowModelVO => row as WorkflowModelVO;
 }
 
 .menu-danger {
-  color: #ff9c95;
+  color: var(--danger-bright);
 }
 
 @media (max-width: 860px) {

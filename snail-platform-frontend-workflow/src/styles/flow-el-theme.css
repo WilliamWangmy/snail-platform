@@ -6,75 +6,75 @@
 
 html.dark {
   color-scheme: dark;
-  --el-color-primary: #1ec9a5;
-  --el-color-primary-light-3: #1a9c82;
-  --el-color-primary-light-5: #157a67;
-  --el-color-primary-light-7: #10594c;
-  --el-color-primary-light-8: #0d4a40;
-  --el-color-primary-light-9: #0a2f29;
-  --el-color-primary-dark-2: #4bd6b7;
-  --el-color-success: #1ec9a5;
-  --el-color-success-light-3: #1a9c82;
-  --el-color-success-light-5: #157a67;
-  --el-color-success-light-7: #10594c;
-  --el-color-success-light-8: #0d4a40;
-  --el-color-success-light-9: #0a2f29;
-  --el-color-success-dark-2: #4bd6b7;
-  --el-color-warning: #e8ad55;
-  --el-color-warning-light-3: #b38543;
-  --el-color-warning-light-5: #8b6838;
-  --el-color-warning-light-7: #5d4728;
-  --el-color-warning-light-8: #46361f;
-  --el-color-warning-light-9: #2a2318;
-  --el-color-warning-dark-2: #edbd77;
-  --el-color-danger: #ef7269;
-  --el-color-danger-light-3: #b85750;
-  --el-color-danger-light-5: #8f453f;
-  --el-color-danger-light-7: #5f2e2a;
-  --el-color-danger-light-8: #472422;
-  --el-color-danger-light-9: #2a1a18;
-  --el-color-danger-dark-2: #f28e87;
-  --el-color-error: #ef7269;
-  --el-color-error-light-3: #b85750;
-  --el-color-error-light-5: #8f453f;
-  --el-color-error-light-7: #5f2e2a;
-  --el-color-error-light-8: #472422;
-  --el-color-error-light-9: #2a1a18;
-  --el-color-error-dark-2: #f28e87;
-  --el-color-info: #7b9592;
+  --el-color-primary: var(--teal);
+  --el-color-primary-light-3: var(--teal-l3);
+  --el-color-primary-light-5: var(--teal-l5);
+  --el-color-primary-light-7: var(--teal-l7);
+  --el-color-primary-light-8: var(--teal-l8);
+  --el-color-primary-light-9: var(--teal-l9);
+  --el-color-primary-dark-2: var(--teal-d2);
+  --el-color-success: var(--teal);
+  --el-color-success-light-3: var(--teal-l3);
+  --el-color-success-light-5: var(--teal-l5);
+  --el-color-success-light-7: var(--teal-l7);
+  --el-color-success-light-8: var(--teal-l8);
+  --el-color-success-light-9: var(--teal-l9);
+  --el-color-success-dark-2: var(--teal-d2);
+  --el-color-warning: var(--amber);
+  --el-color-warning-light-3: var(--amber-l3);
+  --el-color-warning-light-5: var(--amber-l5);
+  --el-color-warning-light-7: var(--amber-l7);
+  --el-color-warning-light-8: var(--amber-l8);
+  --el-color-warning-light-9: var(--amber-l9);
+  --el-color-warning-dark-2: var(--amber-d2);
+  --el-color-danger: var(--danger);
+  --el-color-danger-light-3: var(--danger-l3);
+  --el-color-danger-light-5: var(--danger-l5);
+  --el-color-danger-light-7: var(--danger-l7);
+  --el-color-danger-light-8: var(--danger-l8);
+  --el-color-danger-light-9: var(--danger-l9);
+  --el-color-danger-dark-2: var(--danger-d2);
+  --el-color-error: var(--danger);
+  --el-color-error-light-3: var(--danger-l3);
+  --el-color-error-light-5: var(--danger-l5);
+  --el-color-error-light-7: var(--danger-l7);
+  --el-color-error-light-8: var(--danger-l8);
+  --el-color-error-light-9: var(--danger-l9);
+  --el-color-error-dark-2: var(--danger-d2);
+  --el-color-info: var(--text-3);
   --el-color-info-light-3: #5f736f;
   --el-color-info-light-5: #4a5a57;
   --el-color-info-light-7: #2f3a38;
   --el-color-info-light-8: #25302d;
   --el-color-info-light-9: #182020;
   --el-color-info-dark-2: #95aba8;
-  --el-bg-color-page: #050f14;
-  --el-bg-color: #0b202a;
-  --el-bg-color-overlay: #0d2731;
-  --el-text-color-primary: #e8f3f0;
-  --el-text-color-regular: #a9bfbc;
-  --el-text-color-secondary: #7b9592;
+  --el-bg-color-page: var(--bg-0);
+  --el-bg-color: var(--panel-solid);
+  --el-bg-color-overlay: var(--bg-3);
+  --el-text-color-primary: var(--text-1);
+  --el-text-color-regular: var(--text-2);
+  --el-text-color-secondary: var(--text-3);
   --el-text-color-placeholder: #6b8684;
   --el-text-color-disabled: #55706e;
-  --el-border-color: rgba(151, 199, 200, 0.13);
-  --el-border-color-light: rgba(151, 199, 200, 0.13);
-  --el-border-color-lighter: rgba(151, 199, 200, 0.075);
-  --el-border-color-extra-light: rgba(151, 199, 200, 0.06);
-  --el-border-color-dark: rgba(151, 199, 200, 0.3);
-  --el-border-color-darker: rgba(151, 199, 200, 0.36);
-  --el-fill-color: rgba(255, 255, 255, 0.03);
-  --el-fill-color-light: rgba(255, 255, 255, 0.035);
-  --el-fill-color-lighter: rgba(255, 255, 255, 0.02);
-  --el-fill-color-extra-light: rgba(255, 255, 255, 0.015);
-  --el-fill-color-dark: rgba(255, 255, 255, 0.06);
-  --el-fill-color-darker: rgba(255, 255, 255, 0.08);
+  --el-border-color: var(--line);
+  --el-border-color-light: var(--line);
+  --el-border-color-lighter: var(--line-a075);
+  --el-border-color-extra-light: var(--line-a06);
+  --el-border-color-dark: var(--line-a3);
+  --el-border-color-darker: var(--line-a36);
+  --el-fill-color: var(--wash-03);
+  --el-fill-color-light: var(--wash-035);
+  --el-fill-color-lighter: var(--wash-02);
+  --el-fill-color-extra-light: var(--wash-015);
+  --el-fill-color-dark: var(--wash-06);
+  --el-fill-color-darker: var(--wash-08);
   --el-fill-color-blank: transparent;
-  --el-mask-color: rgba(2, 10, 13, 0.7);
-  --el-mask-color-extra-light: rgba(2, 10, 13, 0.4);
-  --el-box-shadow: 0 26px 70px rgba(0, 0, 0, 0.52);
-  --el-box-shadow-light: 0 18px 48px rgba(0, 0, 0, 0.35);
-  --el-box-shadow-lighter: 0 10px 28px rgba(0, 0, 0, 0.28);
-  --el-box-shadow-dark: 0 26px 70px rgba(0, 0, 0, 0.6);
+  --el-mask-color: var(--scrim-deep-70);
+  --el-mask-color-extra-light: var(--scrim-deep-4);
+  --el-box-shadow: 0 26px 70px var(--shade-52);
+  --el-box-shadow-light: 0 18px 48px var(--shade-35);
+  --el-box-shadow-lighter: 0 10px 28px var(--shade-28);
+  --el-box-shadow-dark: 0 26px 70px var(--shade-60);
   --el-border-radius-base: 9px;
   --el-border-radius-small: 7px;
   --el-border-radius-round: 999px;
@@ -86,10 +86,10 @@ html.dark {
   --el-component-size: 38px;
   --el-component-size-small: 31px;
   --el-component-size-large: 44px;
-  --el-disabled-bg-color: rgba(255, 255, 255, 0.03);
+  --el-disabled-bg-color: var(--wash-03);
   --el-disabled-text-color: #55706e;
-  --el-disabled-border-color: rgba(151, 199, 200, 0.1);
-  --el-overlay-color-lighter: rgba(2, 10, 13, 0.7);
+  --el-disabled-border-color: var(--line-a10);
+  --el-overlay-color-lighter: var(--scrim-deep-70);
 }
 
 /* ---------------------------------------------------------------- buttons */
@@ -159,13 +159,13 @@ html.dark {
 }
 
 .el-button:not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info):not(.is-text):not(.is-link) {
-  --el-button-bg-color: rgba(255, 255, 255, 0.03);
+  --el-button-bg-color: var(--wash-03);
   --el-button-border-color: var(--line-strong);
   --el-button-text-color: var(--text-1);
-  --el-button-hover-bg-color: rgba(255, 255, 255, 0.055);
-  --el-button-hover-border-color: rgba(151, 199, 200, 0.36);
+  --el-button-hover-bg-color: var(--wash-055);
+  --el-button-hover-border-color: var(--line-a36);
   --el-button-hover-text-color: var(--text-1);
-  --el-button-active-bg-color: rgba(255, 255, 255, 0.07);
+  --el-button-active-bg-color: var(--wash-07);
   --el-button-active-border-color: var(--line-strong);
   --el-button-active-text-color: var(--text-1);
 }
@@ -174,10 +174,10 @@ html.dark {
 .el-button--primary:hover,
 .el-button--primary:focus,
 .el-button--primary:active {
-  border-color: rgba(30, 201, 165, 0.55);
-  background: linear-gradient(180deg, #29d7b2, #12aa8c);
-  box-shadow: 0 10px 24px rgba(30, 201, 165, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  color: #031512;
+  border-color: var(--teal-a55);
+  background: linear-gradient(180deg, var(--teal-bright), var(--teal-deep));
+  box-shadow: 0 10px 24px var(--teal-a16), inset 0 1px 0 var(--wash-28);
+  color: var(--ink);
 }
 
 .el-button--primary:hover {
@@ -187,12 +187,12 @@ html.dark {
 .el-button--danger:not(.is-text):not(.is-link) {
   --el-button-bg-color: var(--danger-soft);
   --el-button-border-color: var(--danger-line);
-  --el-button-text-color: #ffaaa3;
-  --el-button-hover-bg-color: rgba(239, 114, 105, 0.16);
-  --el-button-hover-border-color: rgba(239, 114, 105, 0.45);
-  --el-button-hover-text-color: #ffc3be;
-  --el-button-active-bg-color: rgba(239, 114, 105, 0.2);
-  --el-button-active-border-color: rgba(239, 114, 105, 0.5);
+  --el-button-text-color: var(--danger-light);
+  --el-button-hover-bg-color: var(--danger-a16);
+  --el-button-hover-border-color: var(--danger-a45);
+  --el-button-hover-text-color: var(--danger-pale);
+  --el-button-active-bg-color: var(--danger-a2);
+  --el-button-active-border-color: var(--danger-a5);
   --el-button-active-text-color: #ffd0cc;
 }
 
@@ -216,8 +216,8 @@ html.dark {
 
 .el-button.is-text.el-button--danger,
 .el-button.is-link.el-button--danger {
-  --el-button-text-color: #ff9c95;
-  --el-button-hover-text-color: #ffc3be;
+  --el-button-text-color: var(--danger-bright);
+  --el-button-hover-text-color: var(--danger-pale);
   --el-button-hover-bg-color: var(--danger-soft);
 }
 
@@ -227,15 +227,15 @@ html.dark {
 .el-button.is-link:not([class*='el-button--']) {
   --el-button-text-color: var(--text-2);
   --el-button-hover-text-color: var(--text-1);
-  --el-button-hover-bg-color: rgba(255, 255, 255, 0.04);
+  --el-button-hover-bg-color: var(--wash-04);
 }
 
 .el-button.is-text.ghost-btn,
 .el-button.is-link.ghost-btn {
   --el-button-text-color: var(--text-2);
   --el-button-hover-text-color: var(--text-1);
-  --el-button-hover-bg-color: rgba(255, 255, 255, 0.035);
-  --el-button-active-bg-color: rgba(255, 255, 255, 0.05);
+  --el-button-hover-bg-color: var(--wash-035);
+  --el-button-active-bg-color: var(--wash-05);
 }
 
 .el-button.is-circle,
@@ -256,9 +256,9 @@ html.dark {
 }
 
 .el-button--primary.is-plain {
-  background: rgba(30, 201, 165, 0.1);
-  color: #79e6d0;
-  border-color: rgba(30, 201, 165, 0.28);
+  background: var(--teal-soft);
+  color: var(--teal-pale);
+  border-color: var(--teal-line);
   box-shadow: none;
 }
 
@@ -268,9 +268,9 @@ html.dark {
   --el-input-height: 38px;
   --el-input-inner-height: 36px;
   --el-input-border-radius: 9px;
-  --el-input-bg-color: rgba(3, 13, 17, 0.6);
+  --el-input-bg-color: var(--scrim-60);
   --el-input-border-color: var(--line-strong);
-  --el-input-hover-border-color: rgba(151, 199, 200, 0.34);
+  --el-input-hover-border-color: var(--line-a34);
   --el-input-focus-border-color: var(--teal);
   --el-input-text-color: var(--text-1);
   --el-input-placeholder-color: var(--text-3);
@@ -282,13 +282,13 @@ html.dark {
 .el-input__wrapper {
   padding: 0 12px;
   border-radius: 9px;
-  background-color: rgba(3, 13, 17, 0.6);
+  background-color: var(--scrim-60);
   transition: box-shadow 0.18s, background-color 0.18s;
 }
 
 .el-input__wrapper.is-focus {
-  background-color: rgba(3, 13, 17, 0.74);
-  box-shadow: 0 0 0 1px var(--teal) inset, 0 0 0 3px rgba(30, 201, 165, 0.1);
+  background-color: var(--scrim-74);
+  box-shadow: 0 0 0 1px var(--teal) inset, 0 0 0 3px var(--teal-soft);
 }
 
 .el-input__inner {
@@ -327,7 +327,7 @@ html.dark {
 }
 
 .el-input.is-disabled .el-input__wrapper {
-  background-color: rgba(255, 255, 255, 0.028);
+  background-color: var(--wash-028);
   box-shadow: 0 0 0 1px var(--line) inset;
 }
 
@@ -335,7 +335,7 @@ html.dark {
   min-height: 82px;
   padding: 10px 12px;
   border-radius: 9px;
-  background-color: rgba(3, 13, 17, 0.6);
+  background-color: var(--scrim-60);
   box-shadow: 0 0 0 1px var(--line-strong) inset;
   color: var(--text-1);
   font-family: var(--font-sans);
@@ -344,11 +344,11 @@ html.dark {
 }
 
 .el-textarea__inner:hover {
-  box-shadow: 0 0 0 1px rgba(151, 199, 200, 0.34) inset;
+  box-shadow: 0 0 0 1px var(--line-a34) inset;
 }
 
 .el-textarea__inner:focus {
-  box-shadow: 0 0 0 1px var(--teal) inset, 0 0 0 3px rgba(30, 201, 165, 0.1);
+  box-shadow: 0 0 0 1px var(--teal) inset, 0 0 0 3px var(--teal-soft);
 }
 
 .el-textarea .el-input__count,
@@ -359,7 +359,7 @@ html.dark {
 }
 
 .el-select {
-  --el-select-border-color-hover: rgba(151, 199, 200, 0.34);
+  --el-select-border-color-hover: var(--line-a34);
   --el-select-input-focus-border-color: var(--teal);
   font-size: 12.5px;
 }
@@ -368,7 +368,7 @@ html.dark {
   min-height: 38px;
   padding: 0 12px;
   border-radius: 9px;
-  background-color: rgba(3, 13, 17, 0.6);
+  background-color: var(--scrim-60);
   box-shadow: 0 0 0 1px var(--line-strong) inset;
   font-size: 12.5px;
   line-height: 1.4;
@@ -376,12 +376,12 @@ html.dark {
 }
 
 .el-select__wrapper:hover {
-  box-shadow: 0 0 0 1px rgba(151, 199, 200, 0.34) inset;
+  box-shadow: 0 0 0 1px var(--line-a34) inset;
 }
 
 .el-select__wrapper.is-focused {
-  background-color: rgba(3, 13, 17, 0.74);
-  box-shadow: 0 0 0 1px var(--teal) inset, 0 0 0 3px rgba(30, 201, 165, 0.1);
+  background-color: var(--scrim-74);
+  box-shadow: 0 0 0 1px var(--teal) inset, 0 0 0 3px var(--teal-soft);
 }
 
 .el-select__selected-item {
@@ -432,7 +432,7 @@ html.dark {
 
 .el-form-item__error {
   padding-top: 4px;
-  color: #ff9c95;
+  color: var(--danger-bright);
   font-size: 10.5px;
   line-height: 1.45;
 }
@@ -452,7 +452,7 @@ html.dark {
 .el-dropdown__popper.el-popper {
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background: #0d2731;
+  background: var(--bg-3);
   box-shadow: var(--shadow-pop);
 }
 
@@ -460,7 +460,7 @@ html.dark {
 .el-select__popper .el-popper__arrow::before,
 .el-dropdown__popper .el-popper__arrow::before {
   border-color: var(--line-strong);
-  background: #0d2731;
+  background: var(--bg-3);
 }
 
 .el-select-dropdown__wrap {
@@ -478,7 +478,7 @@ html.dark {
 }
 
 .el-select-dropdown__item.is-hovering {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--wash-045);
   color: var(--text-1);
 }
 
@@ -512,7 +512,7 @@ html.dark {
 
 .el-dropdown-menu__item:not(.is-disabled):focus,
 .el-dropdown-menu__item:not(.is-disabled):hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--wash-045);
   color: var(--text-1);
 }
 
@@ -528,13 +528,13 @@ html.dark {
 /* ------------------------------------------------------------------ table */
 
 .el-table.flow-table {
-  --el-table-border-color: rgba(151, 199, 200, 0.075);
+  --el-table-border-color: var(--line-a075);
   --el-table-border: 1px solid var(--el-table-border-color);
   --el-table-text-color: var(--text-2);
   --el-table-header-text-color: var(--text-3);
-  --el-table-row-hover-bg-color: rgba(30, 201, 165, 0.032);
-  --el-table-current-row-bg-color: rgba(30, 201, 165, 0.05);
-  --el-table-header-bg-color: rgba(255, 255, 255, 0.014);
+  --el-table-row-hover-bg-color: var(--teal-a032);
+  --el-table-current-row-bg-color: var(--teal-a05);
+  --el-table-header-bg-color: var(--wash-014);
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-table-expanded-cell-bg-color: transparent;
@@ -550,7 +550,7 @@ html.dark {
 .el-table.flow-table th.el-table__cell {
   padding: 11px 0;
   border-bottom: 1px solid var(--line);
-  background-color: rgba(255, 255, 255, 0.014);
+  background-color: var(--wash-014);
   color: var(--text-3);
   font-family: var(--font-mono);
   font-size: 9px;
@@ -561,7 +561,7 @@ html.dark {
 
 .el-table.flow-table td.el-table__cell {
   padding: 13px 0;
-  border-bottom: 1px solid rgba(151, 199, 200, 0.075);
+  border-bottom: 1px solid var(--line-a075);
   color: var(--text-2);
 }
 
@@ -593,7 +593,7 @@ html.dark {
 }
 
 .el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell {
-  background-color: rgba(30, 201, 165, 0.032);
+  background-color: var(--teal-a032);
 }
 
 /* ------------------------------------------------------------------- tabs */
@@ -636,7 +636,7 @@ html.dark {
   height: 2px;
   border-radius: 2px;
   background-color: var(--teal);
-  box-shadow: 0 0 12px rgba(30, 201, 165, 0.7);
+  box-shadow: 0 0 12px var(--teal-a70);
 }
 
 .el-tabs.flow-tabs > .el-tabs__content {
@@ -673,7 +673,7 @@ html.dark {
 /* -------------------------------------------------------------------- tag */
 
 .el-tag.flow-tag {
-  --el-tag-bg-color: rgba(255, 255, 255, 0.025);
+  --el-tag-bg-color: var(--wash-025);
   --el-tag-border-color: var(--line);
   --el-tag-text-color: var(--text-3);
   height: 21px;
@@ -686,33 +686,33 @@ html.dark {
 }
 
 .el-tag.flow-tag.el-tag--primary {
-  --el-tag-bg-color: rgba(30, 201, 165, 0.08);
-  --el-tag-border-color: rgba(30, 201, 165, 0.24);
-  --el-tag-text-color: #79e6d0;
+  --el-tag-bg-color: var(--teal-a08);
+  --el-tag-border-color: var(--teal-a24);
+  --el-tag-text-color: var(--teal-pale);
 }
 
 .el-tag.flow-tag.el-tag--warning {
-  --el-tag-bg-color: rgba(232, 173, 85, 0.08);
-  --el-tag-border-color: rgba(232, 173, 85, 0.24);
+  --el-tag-bg-color: var(--amber-a08);
+  --el-tag-border-color: var(--amber-a24);
   --el-tag-text-color: var(--amber);
 }
 
 .el-tag.flow-tag.el-tag--danger {
-  --el-tag-bg-color: rgba(239, 114, 105, 0.08);
-  --el-tag-border-color: rgba(239, 114, 105, 0.24);
-  --el-tag-text-color: #ff9c95;
+  --el-tag-bg-color: var(--danger-a08);
+  --el-tag-border-color: var(--danger-a24);
+  --el-tag-text-color: var(--danger-bright);
 }
 
 .el-tag.flow-tag.el-tag--info {
-  --el-tag-bg-color: rgba(151, 199, 200, 0.06);
-  --el-tag-border-color: rgba(151, 199, 200, 0.18);
+  --el-tag-bg-color: var(--line-a06);
+  --el-tag-border-color: var(--line-a18);
   --el-tag-text-color: var(--text-2);
 }
 
 .el-tag.flow-tag.el-tag--success {
-  --el-tag-bg-color: rgba(30, 201, 165, 0.08);
-  --el-tag-border-color: rgba(30, 201, 165, 0.24);
-  --el-tag-text-color: #79e6d0;
+  --el-tag-bg-color: var(--teal-a08);
+  --el-tag-border-color: var(--teal-a24);
+  --el-tag-text-color: var(--teal-pale);
 }
 
 .el-tag.status-tag {
@@ -745,7 +745,7 @@ html.dark {
 .el-tag.status-tag--teal {
   border-color: var(--teal-line);
   background: var(--teal-soft);
-  color: #60e3c8;
+  color: var(--teal-tint);
 }
 
 .el-tag.status-tag--amber {
@@ -755,27 +755,27 @@ html.dark {
 }
 
 .el-tag.status-tag--slate {
-  border-color: rgba(151, 199, 200, 0.18);
-  background: rgba(151, 199, 200, 0.06);
+  border-color: var(--line-a18);
+  background: var(--line-a06);
   color: var(--text-2);
 }
 
 .el-tag.status-tag--danger {
   border-color: var(--danger-line);
   background: var(--danger-soft);
-  color: #ff9c95;
+  color: var(--danger-bright);
 }
 
 .el-tag.status-tag--blue {
   border-color: var(--blue-line);
   background: var(--blue-soft);
-  color: #8fd3ef;
+  color: var(--blue-bright);
 }
 
 .el-tag.status-tag--violet {
-  border-color: rgba(169, 155, 240, 0.26);
+  border-color: var(--violet-a26);
   background: var(--violet-soft);
-  color: #c4b9f8;
+  color: var(--violet-bright);
 }
 
 /* -------------------------------------------------------------- pagination */
@@ -809,7 +809,7 @@ html.dark {
 }
 
 .flow-pager .el-pager li:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--wash-04);
   color: var(--text-1);
 }
 
@@ -832,7 +832,7 @@ html.dark {
 
 .flow-pager .btn-prev:hover,
 .flow-pager .btn-next:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--wash-04);
   color: var(--text-1);
 }
 
@@ -882,7 +882,7 @@ html.dark {
   place-items: center;
   border: 1px dashed var(--line-strong);
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--wash-02);
   color: var(--text-3);
 }
 
@@ -955,13 +955,13 @@ html.dark {
 .flow-timeline .el-timeline-item.is-done .tl-dot {
   border-color: var(--teal);
   background: var(--teal);
-  box-shadow: 0 0 10px rgba(30, 201, 165, 0.35);
+  box-shadow: 0 0 10px var(--teal-a35);
 }
 
 .flow-timeline .el-timeline-item.is-current .tl-dot {
   border-color: var(--amber);
   background: var(--amber);
-  box-shadow: 0 0 0 4px rgba(232, 173, 85, 0.1), 0 0 10px rgba(232, 173, 85, 0.35);
+  box-shadow: 0 0 0 4px var(--amber-soft), 0 0 10px var(--amber-a35);
 }
 
 .flow-timeline .el-timeline-item__content {
@@ -971,8 +971,24 @@ html.dark {
 /* ----------------------------------------------------------------- dialog */
 
 .el-overlay {
-  background-color: rgba(2, 10, 13, 0.7);
+  background-color: var(--scrim-deep-70);
   backdrop-filter: blur(5px);
+}
+
+/* message-box（函数式调用）与 flow-dialog 保持同一深色观感 */
+.el-message-box {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--panel-grad-t), var(--panel-grad-b));
+  box-shadow: var(--shadow-pop);
+}
+
+.el-message-box .el-message-box__title {
+  color: var(--text-1);
+}
+
+.el-message-box .el-message-box__content {
+  color: var(--text-2);
 }
 
 .flow-dialog.el-dialog {
@@ -984,7 +1000,7 @@ html.dark {
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: 18px;
-  background: linear-gradient(180deg, #0d2530, #091a22);
+  background: linear-gradient(180deg, var(--panel-grad-t), var(--panel-grad-b));
   box-shadow: var(--shadow-pop);
 }
 
@@ -1005,7 +1021,7 @@ html.dark {
 .flow-dialog .el-dialog__footer {
   padding: 15px 24px;
   border-top: 1px solid var(--line);
-  background: rgba(4, 15, 19, 0.35);
+  background: var(--scrim-soft-35);
 }
 
 .flow-dialog .dialog-foot {
@@ -1031,9 +1047,9 @@ html.dark {
 .flow-drawer.el-drawer {
   --el-drawer-padding-primary: 0;
   --el-drawer-bg-color: transparent;
-  background: linear-gradient(180deg, #0b202a, #071820);
+  background: linear-gradient(180deg, var(--panel-solid), var(--bg-1));
   border-left: 1px solid var(--line-strong);
-  box-shadow: -28px 0 80px rgba(0, 0, 0, 0.42);
+  box-shadow: -28px 0 80px var(--shade-42);
 }
 
 .flow-drawer .el-drawer__header {
@@ -1049,7 +1065,7 @@ html.dark {
 .flow-drawer .el-drawer__footer {
   padding: 14px 22px;
   border-top: 1px solid var(--line);
-  background: rgba(4, 15, 19, 0.35);
+  background: var(--scrim-soft-35);
 }
 
 .flow-drawer .el-drawer__close-btn {
@@ -1073,7 +1089,7 @@ html.dark {
   padding: 11px 14px;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  background: #0d2731;
+  background: var(--bg-3);
   box-shadow: var(--shadow-pop);
   color: var(--text-1);
   font-size: 11.5px;
@@ -1112,7 +1128,7 @@ html.dark {
 /* --------------------------------------------------------------- feedback */
 
 .el-alert.flow-alert {
-  --el-alert-bg-color: rgba(30, 201, 165, 0.06);
+  --el-alert-bg-color: var(--teal-a06);
   --el-alert-border-color: var(--teal-line);
   --el-alert-text-color: var(--text-2);
   padding: 11px 13px;
@@ -1159,12 +1175,12 @@ html.dark {
 /* -------------------------------------------------------------- segmented */
 
 .el-segmented.flow-segmented {
-  --el-segmented-bg-color: rgba(3, 13, 17, 0.55);
+  --el-segmented-bg-color: var(--scrim-55);
   --el-segmented-color: var(--text-3);
-  --el-segmented-item-selected-color: #8cf1db;
-  --el-segmented-item-selected-bg-color: rgba(30, 201, 165, 0.14);
+  --el-segmented-item-selected-color: var(--teal-glow);
+  --el-segmented-item-selected-bg-color: var(--teal-a14);
   --el-segmented-item-hover-color: var(--text-2);
-  --el-segmented-item-hover-bg-color: rgba(255, 255, 255, 0.035);
+  --el-segmented-item-hover-bg-color: var(--wash-035);
   --el-segmented-padding: 3px;
   min-height: 38px;
   border: 1px solid var(--line);
@@ -1179,7 +1195,7 @@ html.dark {
 }
 
 .el-segmented.flow-segmented .el-segmented__item.is-selected {
-  box-shadow: inset 0 0 0 1px rgba(30, 201, 165, 0.22);
+  box-shadow: inset 0 0 0 1px var(--teal-a22);
 }
 
 .el-segmented.flow-segmented .el-segmented__item-selected {
@@ -1213,7 +1229,7 @@ html.dark {
   padding: 0 10px;
   border: 1px solid var(--line) !important;
   border-radius: 7px !important;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--wash-02);
   box-shadow: none !important;
   color: var(--text-3);
   font-size: 11.5px;
@@ -1229,16 +1245,16 @@ html.dark {
 
 .flow-choices .el-radio-button.is-active .el-radio-button__inner,
 .flow-choices .el-checkbox-button.is-checked .el-checkbox-button__inner {
-  border-color: rgba(30, 201, 165, 0.34) !important;
-  background: rgba(30, 201, 165, 0.1);
-  color: #8cf1db;
+  border-color: var(--teal-a34) !important;
+  background: var(--teal-soft);
+  color: var(--teal-glow);
 }
 
 .flow-choices .el-radio-button.is-active .el-radio-button__original-radio:not(:disabled) + .el-radio-button__inner {
-  border-color: rgba(30, 201, 165, 0.34) !important;
-  background: rgba(30, 201, 165, 0.1) !important;
+  border-color: var(--teal-a34) !important;
+  background: var(--teal-soft) !important;
   box-shadow: none !important;
-  color: #8cf1db !important;
+  color: var(--teal-glow) !important;
 }
 
 .flow-choices .el-radio-button.is-active .el-radio-button__inner::before,
@@ -1275,7 +1291,7 @@ html.dark {
 .el-checkbox__inner,
 .el-radio__inner {
   border-color: var(--line-strong);
-  background: rgba(3, 13, 17, 0.6);
+  background: var(--scrim-60);
 }
 
 .el-checkbox__input.is-checked .el-checkbox__inner,
@@ -1293,7 +1309,7 @@ html.dark {
 
 .el-switch {
   --el-switch-on-color: var(--teal);
-  --el-switch-off-color: rgba(151, 199, 200, 0.22);
+  --el-switch-off-color: var(--line-a22);
   height: 20px;
 }
 
@@ -1312,7 +1328,7 @@ html.dark {
 }
 
 .el-switch.is-checked .el-switch__core .el-switch__action {
-  background: #031512;
+  background: var(--ink);
 }
 
 .el-switch__label {
@@ -1358,7 +1374,7 @@ html.dark {
 /* ------------------------------------------------------------- misc / EP */
 
 .el-loading-mask {
-  background-color: rgba(5, 15, 20, 0.72);
+  background-color: var(--scrim-72);
   backdrop-filter: blur(2px);
 }
 
@@ -1367,7 +1383,7 @@ html.dark {
 }
 
 .el-scrollbar__thumb {
-  background-color: rgba(151, 199, 200, 0.24);
+  background-color: var(--line-a24);
   opacity: 0.7;
 }
 
@@ -1376,11 +1392,11 @@ html.dark {
 }
 
 .el-progress-bar__outer {
-  background-color: rgba(255, 255, 255, 0.06);
+  background-color: var(--wash-06);
 }
 
 .el-progress-bar__inner {
-  background: linear-gradient(90deg, #12aa8c, #29d7b2);
+  background: linear-gradient(90deg, var(--teal-deep), var(--teal-bright));
 }
 
 .el-divider {
@@ -1405,7 +1421,7 @@ html.dark {
 .el-tooltip__popper.is-dark,
 .el-popper.is-dark {
   border: 1px solid var(--line-strong);
-  background: #0d2731;
+  background: var(--bg-3);
   color: var(--text-1);
   font-size: 10.5px;
   box-shadow: var(--shadow-pop);
@@ -1413,7 +1429,7 @@ html.dark {
 
 .el-popper.is-dark .el-popper__arrow::before {
   border-color: var(--line-strong);
-  background: #0d2731;
+  background: var(--bg-3);
 }
 
 /* --------------------------------------------------------------- helpers */

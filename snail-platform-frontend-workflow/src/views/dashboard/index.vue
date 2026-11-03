@@ -970,7 +970,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .chart-grid line {
-  stroke: rgba(151, 199, 200, 0.09);
+  stroke: var(--line-a09);
   stroke-width: 1;
 }
 
@@ -1003,7 +1003,7 @@ onMounted(() => {
 }
 
 .chart-marker {
-  fill: #071820;
+  fill: var(--bg-1);
   stroke: var(--teal);
   stroke-width: 2;
 }
@@ -1030,49 +1030,49 @@ onMounted(() => {
 }
 
 .rank-progress :deep(.el-progress-bar__outer) {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--wash-055);
   border-radius: 99px;
 }
 
 .rank-progress :deep(.el-progress-bar__inner) {
-  background: linear-gradient(90deg, rgba(30, 201, 165, 0.5), var(--teal));
+  background: linear-gradient(90deg, var(--teal-a50), var(--teal));
   border-radius: 99px;
 }
 
 .rank-progress--amber :deep(.el-progress-bar__inner) {
-  background: linear-gradient(90deg, rgba(232, 173, 85, 0.45), var(--amber));
+  background: linear-gradient(90deg, var(--amber-a45), var(--amber));
 }
 
 .spark .spark-line {
-  stroke: rgba(30, 201, 165, 0.65);
+  stroke: var(--teal-a65);
 }
 
 .spark .spark-fill {
-  fill: rgba(30, 201, 165, 0.07);
+  fill: var(--teal-a07);
 }
 
 .spark--amber .spark-line {
-  stroke: rgba(232, 173, 85, 0.65);
+  stroke: var(--amber-a65);
 }
 
 .spark--amber .spark-fill {
-  fill: rgba(232, 173, 85, 0.07);
+  fill: var(--amber-a07);
 }
 
 .spark--blue .spark-line {
-  stroke: rgba(103, 182, 220, 0.6);
+  stroke: var(--blue-a6);
 }
 
 .spark--blue .spark-fill {
-  fill: rgba(103, 182, 220, 0.06);
+  fill: var(--blue-a06);
 }
 
 .spark--violet .spark-line {
-  stroke: rgba(169, 155, 240, 0.55);
+  stroke: var(--violet-a55);
 }
 
 .spark--violet .spark-fill {
-  fill: rgba(169, 155, 240, 0.06);
+  fill: var(--violet-a06);
 }
 
 .dash-empty {

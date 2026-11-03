@@ -1247,7 +1247,7 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
 .tile.tile--danger {
   border-color: var(--danger-line);
   background: var(--danger-soft);
-  color: #ff9c95;
+  color: var(--danger-bright);
 }
 
 .task-drawer-actions {
