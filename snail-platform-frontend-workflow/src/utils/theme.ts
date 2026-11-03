@@ -1,16 +1,88 @@
-export type FlowTheme = 'dark' | 'light';
+export type FlowTheme = 'dark' | 'light' | 'mist-light' | 'obsidian-dark' | 'cb-light' | 'cb-dark';
+
+export interface FlowThemePreview {
+  /** 缩略图：页面底色 */
+  bg: string;
+  /** 缩略图：边框线 */
+  line: string;
+  /** 缩略图：左侧深色条（对应 admin 侧栏位） */
+  sidebar: string;
+  /** 缩略图：主色条 */
+  primary: string;
+  /** 缩略图：内容卡色块 */
+  card: string;
+}
+
+export interface FlowThemeMeta {
+  id: FlowTheme;
+  name: string;
+  desc: string;
+  mode: 'light' | 'dark';
+  /** 色盲友好主题在面板中单独标记。 */
+  cb: boolean;
+  preview: FlowThemePreview;
+}
+
+/** 六套主题：晨航青/夜航青为控制台原生配色，其余四套取自管理端（snail-platform-frontend-admin stores/theme.ts）；preview 色值与管理端 THEMES 一致。 */
+export const FLOW_THEMES: FlowThemeMeta[] = [
+  {
+    id: 'light', name: '晨航青', desc: '浅色', mode: 'light', cb: false,
+    preview: { bg: '#eef4f3', line: '#dee3e3', sidebar: '#071820', primary: '#0da284', card: '#ffffff' },
+  },
+  {
+    id: 'dark', name: '夜航青', desc: '深色 · 默认', mode: 'dark', cb: false,
+    preview: { bg: '#050f14', line: '#1d363f', sidebar: '#071820', primary: '#1ec9a5', card: '#0b202a' },
+  },
+  {
+    id: 'mist-light', name: '雾松青', desc: '浅色 · 管理端', mode: 'light', cb: false,
+    preview: { bg: '#f3f7f7', line: '#e5eeed', sidebar: '#0a302c', primary: '#0f9f82', card: '#ffffff' },
+  },
+  {
+    id: 'obsidian-dark', name: '曜石黑', desc: '深色 · 管理端', mode: 'dark', cb: false,
+    preview: { bg: '#07110f', line: '#1b322e', sidebar: '#08211e', primary: '#35d6b5', card: '#0b1b19' },
+  },
+  {
+    id: 'cb-light', name: '海盐蓝', desc: '浅色 · 色盲友好', mode: 'light', cb: true,
+    preview: { bg: '#f3f6fb', line: '#dfe7f2', sidebar: '#0a2140', primary: '#2563c9', card: '#ffffff' },
+  },
+  {
+    id: 'cb-dark', name: '深海蓝', desc: '深色 · 色盲友好', mode: 'dark', cb: true,
+    preview: { bg: '#060d19', line: '#1b304b', sidebar: '#081426', primary: '#7cb8ff', card: '#0a1728' },
+  },
+];
 
 const STORAGE_KEY = 'snail-flow-theme';
 
-export function currentTheme(): FlowTheme {
-  return localStorage.getItem(STORAGE_KEY) === 'light' ? 'light' : 'dark';
+function isFlowTheme(value: unknown): value is FlowTheme {
+  return typeof value === 'string' && FLOW_THEMES.some((item) => item.id === value);
 }
 
+export function themeMeta(theme: FlowTheme): FlowThemeMeta {
+  return FLOW_THEMES.find((item) => item.id === theme) ?? FLOW_THEMES[0]!;
+}
+
+export function currentTheme(): FlowTheme {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (isFlowTheme(stored)) return stored;
+  } catch {
+    /* ignore */
+  }
+  return 'dark';
+}
+
+/** 模式类驱动明暗（html.dark/html.light），data-flow-theme 驱动四套扩展配色。 */
 export function applyTheme(theme: FlowTheme): void {
+  const meta = themeMeta(theme);
   const root = document.documentElement;
-  root.classList.toggle('dark', theme === 'dark');
-  root.classList.toggle('light', theme === 'light');
-  localStorage.setItem(STORAGE_KEY, theme);
+  root.classList.toggle('dark', meta.mode === 'dark');
+  root.classList.toggle('light', meta.mode === 'light');
+  root.dataset.flowTheme = meta.id;
+  try {
+    localStorage.setItem(STORAGE_KEY, meta.id);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function initTheme(): FlowTheme {
@@ -19,8 +91,7 @@ export function initTheme(): FlowTheme {
   return theme;
 }
 
-export function toggleTheme(): FlowTheme {
-  const theme = currentTheme() === 'dark' ? 'light' : 'dark';
+export function setTheme(theme: FlowTheme): FlowTheme {
   applyTheme(theme);
   return theme;
 }

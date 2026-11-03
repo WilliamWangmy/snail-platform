@@ -356,6 +356,307 @@ html.light {
   --shadow-pop: 0 20px 56px rgba(15, 40, 43, 0.2);
 }
 
+/* —— 扩展主题：色值取自管理端（snail-platform-frontend-admin/src/stores/theme.ts）——
+   data-flow-theme 承载配色，html.dark/html.light 仍负责明暗模式与 EP 映射。 */
+
+/* 四套扩展主题共享的透明色板：以 var() 派生，自动跟随各主题主色/语义色 */
+html[data-flow-theme='mist-light'],
+html[data-flow-theme='obsidian-dark'],
+html[data-flow-theme='cb-light'],
+html[data-flow-theme='cb-dark'] {
+  --teal-soft: color-mix(in srgb, var(--teal) 10%, transparent);
+  --teal-line: color-mix(in srgb, var(--teal) 28%, transparent);
+  --amber-soft: color-mix(in srgb, var(--amber) 10%, transparent);
+  --amber-line: color-mix(in srgb, var(--amber) 28%, transparent);
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, transparent);
+  --danger-line: color-mix(in srgb, var(--danger) 28%, transparent);
+  --blue-soft: color-mix(in srgb, var(--blue) 10%, transparent);
+  --blue-line: color-mix(in srgb, var(--blue) 26%, transparent);
+  --violet-soft: color-mix(in srgb, var(--violet) 10%, transparent);
+
+  --teal-a02: color-mix(in srgb, var(--teal) 2%, transparent);
+  --teal-a03: color-mix(in srgb, var(--teal) 3%, transparent);
+  --teal-a032: color-mix(in srgb, var(--teal) 3.2%, transparent);
+  --teal-a035: color-mix(in srgb, var(--teal) 3.5%, transparent);
+  --teal-a05: color-mix(in srgb, var(--teal) 5%, transparent);
+  --teal-a06: color-mix(in srgb, var(--teal) 6%, transparent);
+  --teal-a065: color-mix(in srgb, var(--teal) 6.5%, transparent);
+  --teal-a07: color-mix(in srgb, var(--teal) 7%, transparent);
+  --teal-a075: color-mix(in srgb, var(--teal) 7.5%, transparent);
+  --teal-a08: color-mix(in srgb, var(--teal) 8%, transparent);
+  --teal-a09: color-mix(in srgb, var(--teal) 9%, transparent);
+  --teal-a12: color-mix(in srgb, var(--teal) 12%, transparent);
+  --teal-a13: color-mix(in srgb, var(--teal) 13%, transparent);
+  --teal-a14: color-mix(in srgb, var(--teal) 14%, transparent);
+  --teal-a16: color-mix(in srgb, var(--teal) 16%, transparent);
+  --teal-a17: color-mix(in srgb, var(--teal) 17%, transparent);
+  --teal-a2: color-mix(in srgb, var(--teal) 20%, transparent);
+  --teal-a22: color-mix(in srgb, var(--teal) 22%, transparent);
+  --teal-a24: color-mix(in srgb, var(--teal) 24%, transparent);
+  --teal-a25: color-mix(in srgb, var(--teal) 25%, transparent);
+  --teal-a3: color-mix(in srgb, var(--teal) 30%, transparent);
+  --teal-a34: color-mix(in srgb, var(--teal) 34%, transparent);
+  --teal-a35: color-mix(in srgb, var(--teal) 35%, transparent);
+  --teal-a4: color-mix(in srgb, var(--teal) 40%, transparent);
+  --teal-a45: color-mix(in srgb, var(--teal) 45%, transparent);
+  --teal-a5: color-mix(in srgb, var(--teal) 50%, transparent);
+  --teal-a55: color-mix(in srgb, var(--teal) 55%, transparent);
+  --teal-a6: color-mix(in srgb, var(--teal) 60%, transparent);
+  --teal-a65: color-mix(in srgb, var(--teal) 65%, transparent);
+  --teal-a7: color-mix(in srgb, var(--teal) 70%, transparent);
+  --teal-a8: color-mix(in srgb, var(--teal) 80%, transparent);
+  --teal-a92: color-mix(in srgb, var(--teal) 92%, transparent);
+
+  --danger-a08: color-mix(in srgb, var(--danger) 8%, transparent);
+  --danger-a12: color-mix(in srgb, var(--danger) 12%, transparent);
+  --danger-a16: color-mix(in srgb, var(--danger) 16%, transparent);
+  --danger-a18: color-mix(in srgb, var(--danger) 18%, transparent);
+  --danger-a2: color-mix(in srgb, var(--danger) 20%, transparent);
+  --danger-a24: color-mix(in srgb, var(--danger) 24%, transparent);
+  --danger-a25: color-mix(in srgb, var(--danger) 25%, transparent);
+  --danger-a4: color-mix(in srgb, var(--danger) 40%, transparent);
+  --danger-a45: color-mix(in srgb, var(--danger) 45%, transparent);
+  --danger-a5: color-mix(in srgb, var(--danger) 50%, transparent);
+
+  --amber-a045: color-mix(in srgb, var(--amber) 4.5%, transparent);
+  --amber-a05: color-mix(in srgb, var(--amber) 5%, transparent);
+  --amber-a055: color-mix(in srgb, var(--amber) 5.5%, transparent);
+  --amber-a07: color-mix(in srgb, var(--amber) 7%, transparent);
+  --amber-a08: color-mix(in srgb, var(--amber) 8%, transparent);
+  --amber-a11: color-mix(in srgb, var(--amber) 11%, transparent);
+  --amber-a17: color-mix(in srgb, var(--amber) 17%, transparent);
+  --amber-a18: color-mix(in srgb, var(--amber) 18%, transparent);
+  --amber-a24: color-mix(in srgb, var(--amber) 24%, transparent);
+  --amber-a25: color-mix(in srgb, var(--amber) 25%, transparent);
+  --amber-a3: color-mix(in srgb, var(--amber) 30%, transparent);
+  --amber-a35: color-mix(in srgb, var(--amber) 35%, transparent);
+  --amber-a45: color-mix(in srgb, var(--amber) 45%, transparent);
+  --amber-a60: color-mix(in srgb, var(--amber) 60%, transparent);
+  --amber-a65: color-mix(in srgb, var(--amber) 65%, transparent);
+  --amber-a7: color-mix(in srgb, var(--amber) 70%, transparent);
+
+  --blue-a06: color-mix(in srgb, var(--blue) 6%, transparent);
+  --blue-a11: color-mix(in srgb, var(--blue) 11%, transparent);
+  --blue-a6: color-mix(in srgb, var(--blue) 60%, transparent);
+
+  --violet-a06: color-mix(in srgb, var(--violet) 6%, transparent);
+  --violet-a26: color-mix(in srgb, var(--violet) 26%, transparent);
+  --violet-a55: color-mix(in srgb, var(--violet) 55%, transparent);
+}
+
+/* 深色扩展主题（曜石黑/深海蓝）共享派生色阶：淡阶向页面底色收敛，亮阶向白提亮 */
+html.dark[data-flow-theme='obsidian-dark'],
+html.dark[data-flow-theme='cb-dark'] {
+  --teal-strong: color-mix(in srgb, var(--teal) 88%, #000000);
+  --teal-bright: color-mix(in srgb, var(--teal) 88%, #ffffff);
+  --teal-deep: color-mix(in srgb, var(--teal) 82%, #000000);
+  --teal-pale: color-mix(in srgb, var(--teal) 62%, #ffffff);
+  --teal-glow: color-mix(in srgb, var(--teal) 45%, #ffffff);
+  --teal-tint: color-mix(in srgb, var(--teal) 72%, #ffffff);
+  --teal-l3: color-mix(in srgb, var(--teal) 70%, var(--bg-0));
+  --teal-l5: color-mix(in srgb, var(--teal) 52%, var(--bg-0));
+  --teal-l7: color-mix(in srgb, var(--teal) 34%, var(--bg-0));
+  --teal-l8: color-mix(in srgb, var(--teal) 26%, var(--bg-0));
+  --teal-l9: color-mix(in srgb, var(--teal) 14%, var(--bg-0));
+  --teal-d2: color-mix(in srgb, var(--teal) 80%, #ffffff);
+
+  --danger-bright: color-mix(in srgb, var(--danger) 78%, #ffffff);
+  --danger-light: color-mix(in srgb, var(--danger) 68%, #ffffff);
+  --danger-pale: color-mix(in srgb, var(--danger) 48%, #ffffff);
+  --danger-d2: color-mix(in srgb, var(--danger) 90%, #ffffff);
+  --danger-l3: color-mix(in srgb, var(--danger) 70%, var(--bg-0));
+  --danger-l5: color-mix(in srgb, var(--danger) 52%, var(--bg-0));
+  --danger-l7: color-mix(in srgb, var(--danger) 34%, var(--bg-0));
+  --danger-l8: color-mix(in srgb, var(--danger) 26%, var(--bg-0));
+  --danger-l9: color-mix(in srgb, var(--danger) 14%, var(--bg-0));
+
+  --amber-d2: color-mix(in srgb, var(--amber) 80%, #ffffff);
+  --amber-l3: color-mix(in srgb, var(--amber) 70%, var(--bg-0));
+  --amber-l5: color-mix(in srgb, var(--amber) 52%, var(--bg-0));
+  --amber-l7: color-mix(in srgb, var(--amber) 34%, var(--bg-0));
+  --amber-l8: color-mix(in srgb, var(--amber) 26%, var(--bg-0));
+  --amber-l9: color-mix(in srgb, var(--amber) 14%, var(--bg-0));
+
+  --blue-bright: color-mix(in srgb, var(--blue) 80%, #ffffff);
+  --violet-bright: color-mix(in srgb, var(--violet) 80%, #ffffff);
+}
+
+/* 浅色扩展主题（雾松青/海盐蓝）共享派生色阶：淡阶向白提亮，深阶向黑收敛 */
+html.light[data-flow-theme='mist-light'],
+html.light[data-flow-theme='cb-light'] {
+  --teal-strong: color-mix(in srgb, var(--teal) 88%, #000000);
+  --teal-bright: color-mix(in srgb, var(--teal) 85%, #000000);
+  --teal-deep: var(--teal);
+  --teal-pale: color-mix(in srgb, var(--teal) 94%, #ffffff);
+  --teal-glow: color-mix(in srgb, var(--teal) 85%, #000000);
+  --teal-tint: color-mix(in srgb, var(--teal) 94%, #ffffff);
+
+  --danger-bright: color-mix(in srgb, var(--danger) 88%, #000000);
+  --danger-light: color-mix(in srgb, var(--danger) 96%, #000000);
+  --danger-pale: color-mix(in srgb, var(--danger) 95%, #ffffff);
+  --danger-d2: color-mix(in srgb, var(--danger) 82%, #000000);
+
+  --amber-d2: color-mix(in srgb, var(--amber) 82%, #000000);
+  --blue-bright: color-mix(in srgb, var(--blue) 90%, #000000);
+  --violet-bright: color-mix(in srgb, var(--violet) 90%, #000000);
+}
+
+/* 雾松青：取自管理端 light（浅色 · 默认） */
+html.light[data-flow-theme='mist-light'] {
+  --bg-0: #f3f7f7;
+  --bg-1: #f7fbfa;
+  --bg-2: #fbfdfd;
+  --bg-3: #ffffff;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-solid: #ffffff;
+  --panel-soft: rgba(23, 48, 47, 0.04);
+  --bg-deep: #dfe9e8;
+  --panel-grad-t: #ffffff;
+  --panel-grad-b: #f0f5f5;
+
+  --text-1: #17302f;
+  --text-2: #405857;
+  --text-3: #728583;
+  --text-faint: #869795;
+  --text-disabled: #a3b1af;
+  --icon-muted: #7f908e;
+
+  --line: rgba(23, 48, 47, 0.13);
+  --line-strong: rgba(23, 48, 47, 0.25);
+
+  --teal: #0f9f82;
+  --amber: #b77a29;
+  --danger: #dc655f;
+  --blue: #4b7fa9;
+
+  --canvas-surface: #ffffff;
+  --canvas-surface-subtle: #f0f6f5;
+  --canvas-line: #7d9a96;
+  --canvas-text: #17302f;
+  --canvas-text-dim: #728583;
+
+  --nav-active-text: #0b7f6a;
+}
+
+/* 曜石黑：取自管理端 dark（深色 · 夜间） */
+html.dark[data-flow-theme='obsidian-dark'] {
+  --bg-0: #07110f;
+  --bg-1: #0d211e;
+  --bg-2: #102622;
+  --bg-3: #0f231f;
+  --panel: rgba(11, 27, 25, 0.86);
+  --panel-solid: #0b1b19;
+  --panel-soft: rgba(255, 255, 255, 0.025);
+  --bg-deep: #050b0a;
+  --panel-grad-t: #0e201c;
+  --panel-grad-b: #091512;
+
+  --text-1: #e7f5f2;
+  --text-2: #bfd0cd;
+  --text-3: #8ea6a2;
+  --text-faint: #788c89;
+  --text-disabled: #5f716f;
+  --icon-muted: #5e7472;
+
+  --line: rgba(150, 196, 189, 0.13);
+  --line-strong: rgba(150, 196, 189, 0.23);
+
+  --teal: #35d6b5;
+  --amber: #f4b45f;
+  --danger: #ff8d86;
+  --blue: #8bbde6;
+
+  --ink: #04211c;
+  --ink-deep: #051814;
+
+  --canvas-surface: #0b1b19;
+  --canvas-surface-subtle: #091715;
+  --canvas-line: #7a938f;
+  --canvas-text: #dcebe8;
+  --canvas-text-dim: #859b97;
+
+  --nav-active-text: #d5fbee;
+}
+
+/* 海盐蓝：取自管理端 cb-light（浅色 · 色盲友好，蓝橙替代红绿） */
+html.light[data-flow-theme='cb-light'] {
+  --bg-0: #f3f6fb;
+  --bg-1: #f7f9fd;
+  --bg-2: #fbfcfe;
+  --bg-3: #ffffff;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-solid: #ffffff;
+  --panel-soft: rgba(24, 40, 66, 0.04);
+  --bg-deep: #e1e8f3;
+  --panel-grad-t: #ffffff;
+  --panel-grad-b: #eff3f9;
+
+  --text-1: #182842;
+  --text-2: #394f63;
+  --text-3: #62748c;
+  --text-faint: #7d8da1;
+  --text-disabled: #9dabb9;
+  --icon-muted: #7b8ba0;
+
+  --line: rgba(24, 40, 66, 0.13);
+  --line-strong: rgba(24, 40, 66, 0.25);
+
+  --teal: #2563c9;
+  --amber: #b45309;
+  --danger: #b45309;
+  --blue: #0891b2;
+  --violet: #7c3aed;
+
+  --canvas-surface: #ffffff;
+  --canvas-surface-subtle: #f1f5fb;
+  --canvas-line: #8093ad;
+  --canvas-text: #182842;
+  --canvas-text-dim: #62748c;
+
+  --nav-active-text: #1a4fb0;
+}
+
+/* 深海蓝：取自管理端 cb-dark（深色 · 色盲友好，蓝橙替代红绿） */
+html.dark[data-flow-theme='cb-dark'] {
+  --bg-0: #060d19;
+  --bg-1: #0d1d32;
+  --bg-2: #10233b;
+  --bg-3: #0e2136;
+  --panel: rgba(10, 23, 40, 0.86);
+  --panel-solid: #0a1728;
+  --panel-soft: rgba(255, 255, 255, 0.025);
+  --bg-deep: #040911;
+  --panel-grad-t: #0d2036;
+  --panel-grad-b: #081524;
+
+  --text-1: #eaf3ff;
+  --text-2: #b7cfe2;
+  --text-3: #92a8c4;
+  --text-faint: #7e91ac;
+  --text-disabled: #5f6f88;
+  --icon-muted: #5e7089;
+
+  --line: rgba(143, 176, 216, 0.13);
+  --line-strong: rgba(143, 176, 216, 0.23);
+
+  --teal: #7cb8ff;
+  --amber: #ffb454;
+  --danger: #ffb454;
+  --blue: #5be2e8;
+  --violet: #b49bff;
+
+  --ink: #06182f;
+  --ink-deep: #04101f;
+
+  --canvas-surface: #0a1728;
+  --canvas-surface-subtle: #081220;
+  --canvas-line: #7a92b4;
+  --canvas-text: #dfe9f5;
+  --canvas-text-dim: #8fa2bd;
+
+  --nav-active-text: #d8eaff;
+}
+
 *,
 *::before,
 *::after {

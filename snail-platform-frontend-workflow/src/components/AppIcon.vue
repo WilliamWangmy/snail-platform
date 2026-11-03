@@ -98,6 +98,8 @@ const ICONS: Record<string, string> = {
   sun:
     '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  palette:
+    '<path d="M12 3a9 9 0 1 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a2 2 0 0 1 0-4h5a4 4 0 0 0 4-4c0-2.2-4-5-9-5M7.5 10.5h.01M9.5 6.5h.01M14 6.5h.01"/>',
   'trend-up': '<path d="m3 17 6-6 4 4 8-9"/><path d="M14 6h7v7"/>',
   'trend-down': '<path d="m3 7 6 6 4-4 8 9"/><path d="M14 18h7v-7"/>'
 };
