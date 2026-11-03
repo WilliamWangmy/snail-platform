@@ -84,125 +84,136 @@ function applyAdvanced(): void {
 </script>
 
 <template>
-  <div class="panel">
-    <h4 class="panel-title">
-      连线
-    </h4>
-    <el-form
-      label-position="top"
-      size="default"
-    >
-      <el-form-item label="连线标识">
+  <div class="flow-panel">
+    <section class="inspector-section">
+      <h3 class="inspector-section-title">
+        基础信息
+      </h3>
+      <div class="field">
+        <label class="field-label">连线标识</label>
         <el-input
           :model-value="element.id"
+          aria-label="连线标识"
           disabled
         />
-      </el-form-item>
-      <el-form-item label="连线名称">
+      </div>
+      <div class="field">
+        <label class="field-label">连线名称</label>
         <el-input
           :model-value="name"
+          aria-label="连线名称"
           maxlength="64"
           placeholder="如：驳回"
           @update:model-value="(v: string) => (name = v)"
         />
-      </el-form-item>
+      </div>
+    </section>
 
-      <!-- 流转类型（仅网关出线） -->
-      <div
-        v-if="fromGateway"
-        class="panel-section"
+    <section
+      v-if="fromGateway"
+      class="inspector-section"
+    >
+      <h3 class="inspector-section-title">
+        流转类型
+      </h3>
+      <el-radio-group
+        class="flow-choices"
+        :model-value="flowType"
+        @update:model-value="(v: string | number | boolean | undefined) => switchFlowType(v as FlowType)"
       >
-        <p class="section-title">
-          流转类型
-        </p>
-        <el-radio-group
-          :model-value="flowType"
-          @update:model-value="(v: string | number | boolean | undefined) => switchFlowType(v as FlowType)"
+        <el-radio-button
+          v-for="(label, key) in FLOW_TYPE_LABELS"
+          :key="key"
+          :value="key"
         >
-          <el-radio-button
-            v-for="(label, key) in FLOW_TYPE_LABELS"
-            :key="key"
-            :value="key"
-          >
-            {{ label }}
-          </el-radio-button>
-        </el-radio-group>
-        <div class="form-tip">
-          正常提交写入 ${approved}；驳回写入 ${!approved} 并渲染红色虚线。语义与任务办理动作绑定：通过=true、驳回=false
-        </div>
+          {{ label }}
+        </el-radio-button>
+      </el-radio-group>
+      <p class="field-hint section-hint">
+        正常提交写入 ${approved}；驳回写入 ${!approved} 并渲染红色虚线。语义与任务办理动作绑定：通过=true、驳回=false。
+      </p>
 
-        <div
-          v-if="!advanced"
-          class="adv-row"
+      <div
+        v-if="!advanced"
+        class="adv-row"
+      >
+        <el-button
+          size="small"
+          text
+          type="primary"
+          @click="openAdvanced"
         >
+          高级模式：手写表达式
+        </el-button>
+        <span
+          v-if="conditionBody"
+          class="cond-preview"
+        >{{ conditionBody }}</span>
+      </div>
+      <template v-else>
+        <el-input
+          v-model="conditionInput"
+          class="field-gap"
+          type="textarea"
+          :rows="2"
+          aria-label="条件表达式"
+          placeholder="${approved} 或 ${amount > 100}"
+          @input="onConditionInput"
+        />
+        <div
+          v-if="conditionError"
+          class="cond-error"
+        >
+          {{ conditionError }}
+        </div>
+        <div class="adv-row">
           <el-button
             size="small"
-            text
             type="primary"
-            @click="openAdvanced"
+            :disabled="Boolean(conditionError)"
+            @click="applyAdvanced"
           >
-            高级模式：手写表达式
+            应用
           </el-button>
-          <span
-            v-if="conditionBody"
-            class="cond-preview"
-          >{{ conditionBody }}</span>
-        </div>
-        <template v-else>
-          <el-input
-            v-model="conditionInput"
-            type="textarea"
-            :rows="2"
-            placeholder="${approved} 或 ${amount > 100}"
-            @input="onConditionInput"
-          />
-          <div
-            v-if="conditionError"
-            class="cond-error"
+          <el-button
+            size="small"
+            @click="advanced = false"
           >
-            {{ conditionError }}
-          </div>
-          <div class="adv-row">
-            <el-button
-              size="small"
-              type="primary"
-              :disabled="Boolean(conditionError)"
-              @click="applyAdvanced"
-            >
-              应用
-            </el-button>
-            <el-button
-              size="small"
-              @click="advanced = false"
-            >
-              取消
-            </el-button>
-          </div>
-        </template>
-      </div>
-    </el-form>
+            取消
+          </el-button>
+        </div>
+      </template>
+    </section>
   </div>
 </template>
 
 <style scoped lang="scss">
-@use './panel-base' as *;
+.field-gap {
+  margin-top: 9px;
+}
 
-.adv-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.section-hint {
   margin-top: 8px;
 }
 
+.adv-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+
 .cond-preview {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  font-family: monospace;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  word-break: break-all;
 }
 
 .cond-error {
   margin-top: 4px;
-  font-size: 12px;
-  color: var(--el-color-danger);
+  font-size: 10.5px;
+  color: #ff9c95;
 }
 </style>

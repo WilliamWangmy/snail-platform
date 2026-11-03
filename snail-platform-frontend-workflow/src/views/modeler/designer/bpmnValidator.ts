@@ -164,13 +164,20 @@ function readCondition(flow: FlowElementLike): string {
   return cond?.body?.trim() ?? '';
 }
 
+/** 外部标签是独立图形元素，businessObject 复用被标注元素，校验与计数都要排除 */
+function isDiagramLabel(el: FlowElementLike): boolean {
+  return el.type === 'label';
+}
+
 /** 画布内联校验：结构 + 白名单 + 表达式 + 分支 */
 export function validateModel(modeler: ModelerLike): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const registry = modeler.get('elementRegistry').getAll();
 
   for (const el of registry) {
-    validateElement(el, issues);
+    if (!isDiagramLabel(el)) {
+      validateElement(el, issues);
+    }
   }
 
   // 结构闸门
@@ -178,7 +185,7 @@ export function validateModel(modeler: ModelerLike): ValidationIssue[] {
   const process = roots.find((el) => el.businessObject.$type === 'bpmn:Process');
   if (process) {
     const children = ((process as unknown as { children?: FlowElementLike[] }).children ?? []).filter(
-      (el) => typeof el.businessObject?.$type === 'string',
+      (el) => typeof el.businessObject?.$type === 'string' && !isDiagramLabel(el),
     );
     const count = (type: string) => children.filter((el) => el.businessObject.$type === type).length;
     if (count('bpmn:StartEvent') !== 1) {
@@ -208,15 +215,12 @@ export function validateModel(modeler: ModelerLike): ValidationIssue[] {
     }
   }
 
-  if (registry.length + (childrenCount(process)) > MAX_ELEMENT_COUNT) {
+  const elementCount = registry.filter((el) => !isDiagramLabel(el)).length;
+  if (elementCount > MAX_ELEMENT_COUNT) {
     issues.push({ level: 'error', message: `元素总数超过 ${MAX_ELEMENT_COUNT}` });
   }
 
   return issues;
-}
-
-function childrenCount(process?: FlowElementLike): number {
-  return (process as unknown as { children?: unknown[] } | undefined)?.children?.length ?? 0;
 }
 
 /** XML 预检：体积（2MB 上限，与后端一致） */

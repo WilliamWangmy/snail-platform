@@ -42,6 +42,11 @@ const props = defineProps<{
   services: BpmnServices;
 }>();
 
+const APPROVE_MODE_OPTIONS = [
+  { label: '单人审批', value: 'single' },
+  { label: '多人审批', value: 'multi' },
+];
+
 /* ------------------------------ 状态派生（自 businessObject 回显） ------------------------------ */
 
 const multiInstance = computed(() => getMultiInstance(props.element));
@@ -259,270 +264,274 @@ const candidateUsers = computed(() => readFlowableAttr(props.element, 'candidate
 </script>
 
 <template>
-  <div class="panel">
-    <h4 class="panel-title">
-      用户任务
-    </h4>
-    <el-form
-      label-position="top"
-      size="default"
-    >
-      <el-form-item label="节点标识">
+  <div class="task-panel">
+    <section class="inspector-section">
+      <h3 class="inspector-section-title">
+        基础信息
+      </h3>
+      <div class="field">
+        <label class="field-label">节点标识</label>
         <el-input
           :model-value="element.id"
+          aria-label="节点标识"
           disabled
         />
-      </el-form-item>
-      <el-form-item label="节点名称">
+      </div>
+      <div class="field">
+        <label class="field-label">节点名称</label>
         <el-input
           :model-value="String(element.businessObject.name ?? '')"
+          aria-label="节点名称"
           maxlength="64"
+          placeholder="请输入节点名称"
           @update:model-value="(v: string) => services.modeling.updateProperties(element, { name: v })"
         />
-      </el-form-item>
+      </div>
+    </section>
 
-      <!-- 维度一：审批模式 -->
-      <el-form-item label="审批模式">
-        <el-radio-group
-          :model-value="approveMode"
-          @update:model-value="(v: string | number | boolean | undefined) => switchApproveMode(v as ApproveMode)"
-        >
-          <el-radio-button value="single">
-            单人审批
-          </el-radio-button>
-          <el-radio-button value="multi">
-            多人审批
-          </el-radio-button>
-        </el-radio-group>
-        <div class="form-tip">
-          单人：节点生成一条任务；多人：按执行方式生成多条任务
-        </div>
-      </el-form-item>
+    <section class="inspector-section">
+      <h3 class="inspector-section-title">
+        审批模式
+      </h3>
+      <el-segmented
+        class="flow-segmented flow-segmented--block"
+        :options="APPROVE_MODE_OPTIONS"
+        :model-value="approveMode"
+        @change="(v: string | number | boolean) => switchApproveMode(v as ApproveMode)"
+      />
+      <p class="field-hint section-hint">
+        单人：节点生成一条任务；多人：按执行方式生成多条任务。
+      </p>
+    </section>
 
-      <!-- 单人：审批人绑定 -->
-      <div
-        v-if="approveMode === 'single'"
-        class="panel-section"
+    <section
+      v-if="approveMode === 'single'"
+      class="inspector-section"
+    >
+      <h3 class="inspector-section-title">
+        审批人绑定
+      </h3>
+      <el-radio-group
+        class="flow-choices"
+        :model-value="bindingMode"
+        @update:model-value="(v: string | number | boolean | undefined) => switchBinding(v as 'assignee' | 'groups' | 'none')"
       >
-        <p class="section-title">
-          审批人绑定
+        <el-radio-button value="assignee">
+          指定人员
+        </el-radio-button>
+        <el-radio-button value="groups">
+          候选组（角色）
+        </el-radio-button>
+        <el-radio-button value="none">
+          未绑定
+        </el-radio-button>
+      </el-radio-group>
+
+      <el-select
+        v-if="bindingMode === 'assignee'"
+        class="block field-gap"
+        :model-value="assignee"
+        filterable
+        remote
+        clearable
+        reserve-keyword
+        placeholder="远程搜索用户"
+        aria-label="选择审批人"
+        :remote-method="assigneeSearch.remoteMethod"
+        :loading="false"
+        @update:model-value="(v: string) => (assignee = v ?? '')"
+      >
+        <el-option
+          v-for="o in assigneeSearch.options.value"
+          :key="o.value"
+          :label="o.label"
+          :value="o.value"
+        />
+      </el-select>
+
+      <el-select
+        v-if="bindingMode === 'groups'"
+        class="block field-gap"
+        :model-value="candidateGroups"
+        multiple
+        filterable
+        remote
+        reserve-keyword
+        placeholder="远程搜索角色"
+        aria-label="选择候选组"
+        :remote-method="groupSearch.remoteMethod"
+        @update:model-value="(v: string[]) => (candidateGroups = v)"
+      >
+        <el-option
+          v-for="o in groupSearch.options.value"
+          :key="o.value"
+          :label="o.label"
+          :value="o.value"
+        />
+      </el-select>
+
+      <el-alert
+        v-if="bindingMode === 'none'"
+        class="flow-alert flow-alert--warning section-alert"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="该任务无审批人"
+        description="发布不会被拦截，但流程无法流转。"
+      />
+    </section>
+
+    <section
+      v-if="approveMode === 'multi'"
+      class="inspector-section"
+    >
+      <h3 class="inspector-section-title">
+        执行方式
+      </h3>
+      <el-radio-group
+        class="flow-choices"
+        :model-value="execMode"
+        @update:model-value="(v: string | number | boolean | undefined) => switchExecMode(v as ExecMode)"
+      >
+        <el-radio-button
+          v-for="(label, key) in EXEC_MODE_LABELS"
+          :key="key"
+          :value="key"
+        >
+          {{ label }}
+        </el-radio-button>
+      </el-radio-group>
+
+      <template v-if="isCompetitive">
+        <p class="field-hint section-hint">
+          单条任务多人可见，谁先签收谁处理，一人完成即结束。
         </p>
-        <el-radio-group
-          :model-value="bindingMode"
-          @update:model-value="(v: string | number | boolean | undefined) => switchBinding(v as 'assignee' | 'groups' | 'none')"
-        >
-          <el-radio value="assignee">
-            指定人员
-          </el-radio>
-          <el-radio value="groups">
-            候选组（角色）
-          </el-radio>
-          <el-radio value="none">
-            未绑定
-          </el-radio>
-        </el-radio-group>
-
         <el-select
-          v-if="bindingMode === 'assignee'"
-          class="block"
-          :model-value="assignee"
-          filterable
-          remote
-          clearable
-          reserve-keyword
-          placeholder="远程搜索用户"
-          :remote-method="assigneeSearch.remoteMethod"
-          :loading="false"
-          @update:model-value="(v: string) => (assignee = v ?? '')"
-        >
-          <el-option
-            v-for="o in assigneeSearch.options.value"
-            :key="o.value"
-            :label="o.label"
-            :value="o.value"
-          />
-        </el-select>
-
-        <el-select
-          v-if="bindingMode === 'groups'"
-          class="block"
-          :model-value="candidateGroups"
+          class="block field-gap"
+          :model-value="candidateUsers"
           multiple
           filterable
           remote
           reserve-keyword
-          placeholder="远程搜索角色"
-          :remote-method="groupSearch.remoteMethod"
-          @update:model-value="(v: string[]) => (candidateGroups = v)"
+          placeholder="选择抢签人员"
+          aria-label="选择抢签人员"
+          :remote-method="candidateUserSearch.remoteMethod"
+          @update:model-value="(v: string[]) => writeFlowableAttrs(services.modeling, element, { candidateUsers: v.join(',') })"
         >
           <el-option
-            v-for="o in groupSearch.options.value"
+            v-for="o in candidateUserSearch.options.value"
             :key="o.value"
             :label="o.label"
             :value="o.value"
           />
         </el-select>
+      </template>
 
-        <div
-          v-if="bindingMode === 'none'"
-          class="panel-warning"
-        >
-          该任务无审批人，发布不会被拦截，但流程无法流转
-        </div>
-      </div>
-
-      <!-- 多人：执行方式 -->
-      <div
-        v-if="approveMode === 'multi'"
-        class="panel-section"
-      >
-        <p class="section-title">
-          执行方式
-        </p>
-        <el-radio-group
-          :model-value="execMode"
-          @update:model-value="(v: string | number | boolean | undefined) => switchExecMode(v as ExecMode)"
-        >
-          <el-radio-button
-            v-for="(label, key) in EXEC_MODE_LABELS"
-            :key="key"
-            :value="key"
-          >
-            {{ label }}
-          </el-radio-button>
-        </el-radio-group>
-
-        <template v-if="isCompetitive">
-          <div class="form-tip block-tip">
-            单条任务多人可见，谁先签收谁处理，一人完成即结束
-          </div>
-          <el-select
-            class="block"
-            :model-value="candidateUsers"
-            multiple
-            filterable
-            remote
-            reserve-keyword
-            placeholder="选择抢签人员"
-            :remote-method="candidateUserSearch.remoteMethod"
-            @update:model-value="(v: string[]) => writeFlowableAttrs(services.modeling, element, { candidateUsers: v.join(',') })"
-          >
-            <el-option
-              v-for="o in candidateUserSearch.options.value"
-              :key="o.value"
-              :label="o.label"
-              :value="o.value"
-            />
-          </el-select>
-        </template>
-
-        <template v-if="isMultiInstance">
-          <el-form-item
-            label="人员集合变量"
-            class="block-item"
-          >
-            <el-input
-              :model-value="collection"
-              maxlength="64"
-              @update:model-value="(v: string) => (collection = v)"
-            />
-            <div class="form-tip">
-              发起流程时需传入该变量（用户标识集合）
-            </div>
-          </el-form-item>
-        </template>
-      </div>
-
-      <!-- 多人（并行/串行）：通过条件 -->
       <div
         v-if="isMultiInstance"
-        class="panel-section"
+        class="field field-gap"
       >
-        <p class="section-title">
-          通过条件
-        </p>
-        <el-radio-group
-          :model-value="passCondition"
-          @update:model-value="(v: string | number | boolean | undefined) => onPassCondition(v as PassCondition)"
-        >
-          <el-radio value="all">
-            全员通过
-          </el-radio>
-          <el-radio value="any">
-            一人通过即结束
-          </el-radio>
-          <el-radio value="ratio">
-            达到比例
-          </el-radio>
-          <el-radio value="votes">
-            达到票数
-          </el-radio>
-          <el-radio value="veto">
-            一票否决
-          </el-radio>
-        </el-radio-group>
+        <label class="field-label">人员集合变量</label>
+        <el-input
+          :model-value="collection"
+          aria-label="人员集合变量"
+          maxlength="64"
+          @update:model-value="(v: string) => (collection = v)"
+        />
+        <span class="field-hint">发起流程时需传入该变量（用户标识集合）</span>
+      </div>
+    </section>
 
+    <section
+      v-if="isMultiInstance"
+      class="inspector-section"
+    >
+      <h3 class="inspector-section-title">
+        通过条件
+      </h3>
+      <el-radio-group
+        class="flow-choices"
+        :model-value="passCondition"
+        @update:model-value="(v: string | number | boolean | undefined) => onPassCondition(v as PassCondition)"
+      >
+        <el-radio-button value="all">
+          全员通过
+        </el-radio-button>
+        <el-radio-button value="any">
+          一人通过即结束
+        </el-radio-button>
+        <el-radio-button value="ratio">
+          达到比例
+        </el-radio-button>
+        <el-radio-button value="votes">
+          达到票数
+        </el-radio-button>
+        <el-radio-button value="veto">
+          一票否决
+        </el-radio-button>
+      </el-radio-group>
+
+      <template v-if="passCondition === 'ratio'">
         <el-input-number
-          v-if="passCondition === 'ratio'"
-          class="block"
+          class="block field-gap"
           :model-value="conditionValue"
           :min="1"
           :max="100"
           @change="onConditionValueChange"
         />
-        <div
-          v-if="passCondition === 'ratio'"
-          class="form-tip"
-        >
+        <p class="field-hint">
           达到 X% 即通过
-        </div>
+        </p>
+      </template>
 
+      <template v-if="passCondition === 'votes'">
         <el-input-number
-          v-if="passCondition === 'votes'"
-          class="block"
+          class="block field-gap"
           :model-value="conditionValue"
           :min="1"
           @change="onConditionValueChange"
         />
-        <div
-          v-if="passCondition === 'votes'"
-          class="form-tip"
-        >
+        <p class="field-hint">
           达到 N 票即通过
-        </div>
-
-        <div
-          v-if="passCondition === 'veto'"
-          class="form-tip"
-        >
-          任一实例办理为驳回即终止剩余实例，流程走驳回线
-        </div>
-      </div>
-
-      <!-- 通知方式 -->
-      <div class="panel-section">
-        <p class="section-title">
-          通知方式
         </p>
-        <el-radio-group
-          :model-value="notifyType"
-          @update:model-value="(v: string | number | boolean | undefined) => (notifyType = String(v ?? ''))"
-        >
-          <el-radio
-            v-for="n in NOTIFY_TYPES"
-            :key="n.code"
-            :value="n.code"
-          >
-            {{ n.label }}{{ n.pending ? '（待后端支持）' : '' }}
-          </el-radio>
-        </el-radio-group>
-      </div>
+      </template>
 
-      <!-- 抄送人 -->
-      <div class="panel-section">
-        <p class="section-title">
-          抄送人
-        </p>
+      <p
+        v-if="passCondition === 'veto'"
+        class="field-hint section-hint"
+      >
+        任一实例办理为驳回即终止剩余实例，流程走驳回线。
+      </p>
+    </section>
+
+    <section class="inspector-section">
+      <h3 class="inspector-section-title">
+        通知方式
+      </h3>
+      <el-radio-group
+        class="flow-choices"
+        :model-value="notifyType"
+        @update:model-value="(v: string | number | boolean | undefined) => (notifyType = String(v ?? ''))"
+      >
+        <el-radio-button
+          v-for="n in NOTIFY_TYPES"
+          :key="n.code"
+          :value="n.code"
+        >
+          {{ n.label }}{{ n.pending ? '·待接入' : '' }}
+        </el-radio-button>
+      </el-radio-group>
+      <p class="field-hint section-hint">
+        标注「待接入」的方式暂不会实际发送通知。
+      </p>
+    </section>
+
+    <section class="inspector-section">
+      <h3 class="inspector-section-title">
+        抄送人
+      </h3>
+      <div class="field">
+        <label class="field-label">指定人员</label>
         <el-select
           class="block"
           :model-value="ccUsers"
@@ -531,6 +540,7 @@ const candidateUsers = computed(() => readFlowableAttr(props.element, 'candidate
           remote
           reserve-keyword
           placeholder="指定人员（多选）"
+          aria-label="抄送人员"
           :remote-method="ccUserSearch.remoteMethod"
           @update:model-value="(v: string[]) => (ccUsers = v)"
         >
@@ -541,6 +551,9 @@ const candidateUsers = computed(() => readFlowableAttr(props.element, 'candidate
             :value="o.value"
           />
         </el-select>
+      </div>
+      <div class="field">
+        <label class="field-label">候选组（角色）</label>
         <el-select
           class="block"
           :model-value="ccGroups"
@@ -549,6 +562,7 @@ const candidateUsers = computed(() => readFlowableAttr(props.element, 'candidate
           remote
           reserve-keyword
           placeholder="候选组（角色，多选）"
+          aria-label="抄送候选组"
           :remote-method="ccGroupSearch.remoteMethod"
           @update:model-value="(v: string[]) => (ccGroups = v)"
         >
@@ -560,46 +574,50 @@ const candidateUsers = computed(() => readFlowableAttr(props.element, 'candidate
           />
         </el-select>
       </div>
+      <p class="field-hint">
+        支持指定人员与候选组，两者可同时配置。
+      </p>
+    </section>
 
-      <!-- 办理按钮设置 -->
-      <div class="panel-section">
-        <p class="section-title">
-          办理按钮设置
-        </p>
-        <el-checkbox-group
-          :model-value="selectedButtons"
-          @update:model-value="(v: Array<string | number | boolean>) => (selectedButtons = v.map(String))"
+    <section class="inspector-section">
+      <h3 class="inspector-section-title">
+        办理按钮
+      </h3>
+      <el-checkbox-group
+        class="flow-choices"
+        :model-value="selectedButtons"
+        @update:model-value="(v: Array<string | number | boolean>) => (selectedButtons = v.map(String))"
+      >
+        <el-checkbox-button
+          v-for="b in ACTION_BUTTONS"
+          :key="b.code"
+          :value="b.code"
+          :disabled="b.fixed"
         >
-          <el-checkbox
-            v-for="b in ACTION_BUTTONS"
-            :key="b.code"
-            :value="b.code"
-            :disabled="b.fixed"
-          >
-            {{ b.label }}{{ b.pending ? '（待后端支持）' : '' }}
-          </el-checkbox>
-        </el-checkbox-group>
-        <div class="form-tip">
-          审批恒定不可取消；标注"待后端支持"的按钮任务中心暂不渲染
-        </div>
-      </div>
-    </el-form>
+          {{ b.label }}{{ b.pending ? '·待接入' : '' }}
+        </el-checkbox-button>
+      </el-checkbox-group>
+      <p class="field-hint section-hint">
+        审批恒在；标注「待接入」的按钮任务中心暂不渲染。
+      </p>
+    </section>
   </div>
 </template>
 
 <style scoped lang="scss">
-@use './panel-base' as *;
-
 .block {
   width: 100%;
-  margin-top: 6px;
 }
 
-.block-item {
-  margin-top: 10px;
+.field-gap {
+  margin-top: 9px;
 }
 
-.block-tip {
+.section-hint {
   margin-top: 8px;
+}
+
+.section-alert {
+  margin-top: 9px;
 }
 </style>

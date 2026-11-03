@@ -32,7 +32,11 @@ export function useUserRemoteSearch(initial: string[] = []): RemoteSearch {
   return {
     options,
     remoteMethod: async (keyword: string) => {
-      const page = await pageUsers({ pageNum: 1, pageSize: 50, keyword });
+      // 用户接口没有统一 keyword：先按昵称模糊匹配，无结果再按登录名匹配
+      let page = await pageUsers({ pageNum: 1, pageSize: 50, nickname: keyword });
+      if (page.rows.length === 0 && keyword) {
+        page = await pageUsers({ pageNum: 1, pageSize: 50, username: keyword });
+      }
       options.value = toUserOptions(page.rows);
     },
   };

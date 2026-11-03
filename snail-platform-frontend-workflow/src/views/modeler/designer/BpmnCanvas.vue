@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * bpmn-js 画布封装：编辑（Modeler）/ 只读（NavigatedViewer）双模式。
- * 监听 stage 尺寸变化（全屏切换/窗口缩放）自动 canvas.resized()；选中元素经 selection-changed 抛出。
+ * 对外暴露外部元素栏所需的工具切换、建元素、缩放能力；缩放与工具状态经事件回传。
+ * 监听容器尺寸变化（全屏切换/窗口缩放）自动 canvas.resized()。
  */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Modeler from 'bpmn-js/lib/Modeler';
@@ -26,7 +27,56 @@ const emit = defineEmits<{
   selectionChanged: [element: { id: string; $type: string } | null];
   /** 本地编辑发生（脏标记来源） */
   changed: [];
+  /** 画布缩放百分比（100 = 原始比例） */
+  zoomChanged: [percent: number];
+  /** 当前工具：pointer / hand / lasso / space / connect / create */
+  toolChanged: [tool: string];
 }>();
+
+type ToolName = 'pointer' | 'hand' | 'lasso' | 'space' | 'connect';
+
+interface CanvasService {
+  zoom(): number;
+  zoom(target: number | string): number | string;
+  viewbox(): { scale: number };
+}
+interface ToggleTool {
+  isActive: () => boolean;
+  toggle: () => void;
+}
+interface HandService extends ToggleTool {
+  activateHand: (event: Event) => void;
+}
+interface SelectionToolService extends ToggleTool {
+  activateSelection: (event: Event) => void;
+}
+interface ConnectService extends ToggleTool {
+  start: (event: Event) => void;
+}
+interface CreateService {
+  start: (event: Event, shape: unknown) => void;
+}
+interface ElementFactoryService {
+  createShape: (attrs: { type: string }) => unknown;
+}
+interface EventBusService {
+  on: (events: string | string[], handler: (event: never) => void) => void;
+}
+
+/* 深色画布：形状/描边/外置标签由渲染器配置控制，其余组件观感由 --bio-* 变量控制 */
+const LABEL_FONT = '"PingFang SC", "Microsoft YaHei", sans-serif';
+const CANVAS_STYLE = {
+  // renderer/text 的配置按模块名注入，放顶层不生效
+  bpmnRenderer: {
+    defaultFillColor: '#0c222c',
+    defaultStrokeColor: '#6f8d8e',
+    defaultLabelColor: '#d8e8e5',
+  },
+  textRenderer: {
+    defaultStyle: { fontFamily: LABEL_FONT, fontSize: 12 },
+    externalStyle: { fontFamily: LABEL_FONT, fontSize: 12 },
+  },
+};
 
 const stageRef = ref<HTMLDivElement>();
 
@@ -34,22 +84,42 @@ let diagram: Modeler | NavigatedViewer | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let imported = false;
 
+function getService<T>(name: string): T | null {
+  return diagram ? (diagram.get(name) as T) : null;
+}
+
+const TOOL_NAMES: Record<string, string> = {
+  hand: 'hand',
+  lasso: 'lasso',
+  space: 'space',
+  'global-connect': 'connect',
+};
+
+function emitZoom(): void {
+  const canvas = getService<CanvasService>('canvas');
+  if (!canvas) return;
+  emit('zoomChanged', Math.round(canvas.viewbox().scale * 100));
+}
+
 async function render(): Promise<void> {
   if (!stageRef.value || !props.xml) return;
 
   diagram?.destroy();
+  const options = {
+    container: stageRef.value,
+    moddleExtensions: { flowable: FLOWABLE_MODDLE_DESCRIPTOR },
+    ...CANVAS_STYLE,
+  };
   diagram = props.readonly
-    ? new NavigatedViewer({ container: stageRef.value, moddleExtensions: { flowable: FLOWABLE_MODDLE_DESCRIPTOR } })
-    : new Modeler({
-        container: stageRef.value,
-        moddleExtensions: { flowable: FLOWABLE_MODDLE_DESCRIPTOR },
-        additionalModules: [flowCustomModules],
-      });
+    ? new NavigatedViewer(options)
+    : new Modeler({ ...options, additionalModules: [flowCustomModules] });
 
   diagram.on('selection.changed', (event: { newSelection?: Array<{ id: string; businessObject: { $type: string } }> }) => {
     const first = event.newSelection?.[0];
     emit('selectionChanged', first ? { id: first.id, $type: first.businessObject.$type } : null);
   });
+
+  const eventBus = getService<EventBusService>('eventBus');
 
   if (!props.readonly) {
     diagram.on('commandStack.changed', () => {
@@ -57,13 +127,24 @@ async function render(): Promise<void> {
         emit('changed');
       }
     });
+
+    eventBus?.on('tool-manager.update', (event: { tool?: string | null }) => {
+      emit('toolChanged', event.tool ? (TOOL_NAMES[event.tool] ?? 'pointer') : 'pointer');
+    });
+    eventBus?.on('create.end', () => emit('toolChanged', 'pointer'));
+    eventBus?.on('create.cancel', () => emit('toolChanged', 'pointer'));
   }
+
+  eventBus?.on('canvas.viewbox.changed', (event: { viewbox?: { scale?: number } }) => {
+    emit('zoomChanged', Math.round((event.viewbox?.scale ?? 1) * 100));
+  });
 
   try {
     await diagram.importXML(props.xml);
     imported = true;
     currentXml = props.xml;
-    (diagram.get('canvas') as { zoom: (viewbox: string) => void }).zoom('fit-viewport');
+    getService<CanvasService>('canvas')?.zoom('fit-viewport');
+    emitZoom();
     emit('imported');
   } catch (error) {
     emit('importError', error instanceof Error ? error.message : '流程图导入失败');
@@ -75,7 +156,7 @@ let currentXml = '';
 onMounted(() => {
   void render();
 
-  // 尺寸变化（全屏切换 / ScaleContainer 缩放 / 窗口变化）→ 画布自适应
+  // 尺寸变化（全屏切换 / 窗口变化）→ 画布自适应
   resizeObserver = new ResizeObserver(() => {
     if (diagram && stageRef.value && stageRef.value.clientWidth > 0) {
       (diagram.get('canvas') as { resized: () => void }).resized();
@@ -102,6 +183,70 @@ watch(() => props.readonly, () => {
   void render();
 });
 
+/* ---------------------------------- 外部元素栏 ---------------------------------- */
+
+function deactivateTools(): void {
+  for (const name of ['handTool', 'lassoTool', 'spaceTool', 'globalConnect']) {
+    const tool = getService<ToggleTool>(name);
+    if (tool?.isActive()) {
+      tool.toggle();
+    }
+  }
+}
+
+/** 工具切换：pointer 回到选择；再次点击当前工具则取消 */
+function setTool(tool: ToolName, event: Event): void {
+  if (props.readonly || !diagram) return;
+
+  if (tool === 'pointer') {
+    deactivateTools();
+    emit('toolChanged', 'pointer');
+    return;
+  }
+
+  const hand = getService<HandService>('handTool');
+  const lasso = getService<SelectionToolService>('lassoTool');
+  const space = getService<SelectionToolService>('spaceTool');
+  const connect = getService<ConnectService>('globalConnect');
+  const current = tool === 'hand' ? hand : tool === 'lasso' ? lasso : tool === 'space' ? space : connect;
+
+  if (current?.isActive()) {
+    current.toggle();
+    emit('toolChanged', 'pointer');
+    return;
+  }
+
+  deactivateTools();
+  if (tool === 'hand') hand?.activateHand(event);
+  if (tool === 'lasso') lasso?.activateSelection(event);
+  if (tool === 'space') space?.activateSelection(event);
+  if (tool === 'connect') connect?.start(event);
+  emit('toolChanged', tool);
+}
+
+/** 从外部面板创建元素（bpmn-js create 工具） */
+function startCreate(type: string, event: Event): void {
+  if (props.readonly || !diagram) return;
+  const create = getService<CreateService>('create');
+  const elementFactory = getService<ElementFactoryService>('elementFactory');
+  if (!create || !elementFactory) return;
+  deactivateTools();
+  create.start(event, elementFactory.createShape({ type }));
+  emit('toolChanged', 'create');
+}
+
+function zoomBy(step: number): void {
+  const canvas = getService<CanvasService>('canvas');
+  if (!canvas) return;
+  const next = Math.min(4, Math.max(0.2, canvas.zoom() + step / 100));
+  canvas.zoom(next);
+}
+
+function fitCanvas(): void {
+  getService<CanvasService>('canvas')?.zoom('fit-viewport');
+  emitZoom();
+}
+
 /** 导出 XML（保存/发布前调用） */
 async function exportXml(): Promise<string> {
   if (!diagram || props.readonly) {
@@ -114,7 +259,7 @@ async function exportXml(): Promise<string> {
   return result.xml;
 }
 
-defineExpose({ exportXml, getModeler: () => diagram });
+defineExpose({ exportXml, getModeler: () => diagram, setTool, startCreate, zoomBy, fitCanvas });
 </script>
 
 <template>
@@ -129,8 +274,11 @@ defineExpose({ exportXml, getModeler: () => diagram });
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background: transparent;
 
-  // 大屏深色主题下的画布底色（bpmn-js 默认白底，网格由内部样式控制）
-  background: var(--el-bg-color);
+  // 元素栏由设计器外壳统一渲染，隐藏 bpmn-js 自带调色板
+  :deep(.djs-palette) {
+    display: none;
+  }
 }
 </style>

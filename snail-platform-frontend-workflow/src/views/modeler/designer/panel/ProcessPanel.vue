@@ -21,34 +21,27 @@ const processName = computed({
 </script>
 
 <template>
-  <div class="panel">
-    <h4 class="panel-title">
-      流程
-    </h4>
-    <el-form
-      label-position="top"
-      size="default"
-    >
-      <el-form-item label="流程标识">
-        <el-input
-          :model-value="processId"
-          disabled
-        />
-        <div class="form-tip">
-          与模型标识一致，发布时后端核对，不可修改
-        </div>
-      </el-form-item>
-      <el-form-item label="流程名称">
-        <el-input
-          v-model="processName"
-          placeholder="请输入流程名称"
-          maxlength="64"
-        />
-      </el-form-item>
-    </el-form>
-  </div>
+  <section class="inspector-section">
+    <h3 class="inspector-section-title">
+      基础信息
+    </h3>
+    <div class="field">
+      <label class="field-label">流程标识</label>
+      <el-input
+        :model-value="processId"
+        aria-label="流程标识"
+        disabled
+      />
+      <span class="field-hint">与模型标识一致，发布时后端核对，不可修改</span>
+    </div>
+    <div class="field">
+      <label class="field-label">流程名称</label>
+      <el-input
+        v-model="processName"
+        aria-label="流程名称"
+        maxlength="64"
+        placeholder="请输入流程名称"
+      />
+    </div>
+  </section>
 </template>
-
-<style scoped lang="scss">
-@use './panel-base' as *;
-</style>

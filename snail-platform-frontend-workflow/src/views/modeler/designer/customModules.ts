@@ -11,7 +11,7 @@ import { detectFlowType } from './flowType';
 
 /* ---------------------------------- 元素栏 ---------------------------------- */
 
-const REJECT_COLOR = '#f56c6c';
+const REJECT_COLOR = '#ef7269';
 
 interface PaletteDeps {
   create: { start: (event: Event, shape: unknown) => void };
