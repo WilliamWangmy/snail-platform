@@ -1,53 +1,51 @@
 <script setup lang="ts">
-/**
- * 版本列表对话框：展示某模型的历史发布版本 + 已发布 XML 只读预览（内嵌 viewer）。
- */
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 
 import {
   getDefinitionXml,
   listModelDefinitions,
   type WorkflowDefinitionVO,
+  type WorkflowModelVO,
 } from '@/api/workflow/model';
+import AppIcon from '@/components/AppIcon.vue';
+
 import BpmnCanvas from '../designer/BpmnCanvas.vue';
+
+const router = useRouter();
 
 const visible = ref(false);
 const loading = ref(false);
-const modelKey = ref('');
+const model = ref<WorkflowModelVO | null>(null);
 const definitions = ref<WorkflowDefinitionVO[]>([]);
-const currentVersion = ref<number | null>(null);
 
-/* 只读预览 */
 const previewVisible = ref(false);
 const previewVersion = ref<number | null>(null);
 const previewXml = ref('');
 const previewLoading = ref(false);
 
-async function open(key: string, modelId: number, deployedVersion: number | undefined): Promise<void> {
+const currentVersion = computed(() => model.value?.deployedVersion ?? null);
+
+async function open(target: WorkflowModelVO): Promise<void> {
   visible.value = true;
-  modelKey.value = key;
-  currentVersion.value = deployedVersion ?? null;
+  model.value = target;
   definitions.value = [];
   loading.value = true;
   try {
-    definitions.value = await listModelDefinitions(modelId);
+    definitions.value = await listModelDefinitions(target.modelId);
   } finally {
     loading.value = false;
   }
 }
 
-/** el-table 插槽 row 为 DefaultRow，一次性收窄 */
-const asDefinition = (row: unknown): WorkflowDefinitionVO => row as WorkflowDefinitionVO;
-
-async function openPreview(rawRow: unknown): Promise<void> {
-  const row = asDefinition(rawRow);
+async function openPreview(item: WorkflowDefinitionVO): Promise<void> {
   previewVisible.value = true;
-  previewVersion.value = row.version;
+  previewVersion.value = item.version;
   previewXml.value = '';
   previewLoading.value = true;
   try {
-    previewXml.value = (await getDefinitionXml(row.definitionId)).xml;
+    previewXml.value = (await getDefinitionXml(item.definitionId)).xml;
   } catch {
     ElMessage.error('版本 XML 读取失败');
     previewVisible.value = false;
@@ -56,101 +54,245 @@ async function openPreview(rawRow: unknown): Promise<void> {
   }
 }
 
+async function copyXml(): Promise<void> {
+  if (!previewXml.value) return;
+  try {
+    await navigator.clipboard.writeText(previewXml.value);
+    ElMessage.success('已复制定义 XML');
+  } catch {
+    ElMessage.warning('复制失败，请手动选择文本复制');
+  }
+}
+
+function openDesigner(): void {
+  if (!model.value) return;
+  visible.value = false;
+  void router.push(`/modeler/${model.value.modelId}/edit`);
+}
+
 defineExpose({ open });
 </script>
 
 <template>
   <el-dialog
     v-model="visible"
-    :title="`版本列表 - ${modelKey}`"
-    width="640px"
-    destroy-on-close
+    class="flow-dialog"
+    width="780px"
+    align-center
+    :show-close="false"
   >
-    <el-table
-      v-loading="loading"
-      :data="definitions"
-      size="default"
-      max-height="380"
-    >
-      <el-table-column
-        prop="version"
-        label="版本"
-        width="80"
-      >
-        <template #default="{ row }">
-          v{{ row.version }}
-          <el-tag
-            v-if="row.version === currentVersion"
-            size="small"
-            type="success"
-            effect="plain"
-          >
-            当前
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column
-        prop="definitionName"
-        label="定义名称"
-        min-width="140"
-        show-overflow-tooltip
-      />
-      <el-table-column
-        prop="definitionKey"
-        label="定义标识"
-        min-width="140"
-        show-overflow-tooltip
-      >
-        <template #default="{ row }">
-          <span class="mono">{{ row.definitionKey }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column
-        label="操作"
-        width="90"
-        fixed="right"
-      >
-        <template #default="{ row }">
-          <el-button
-            text
-            type="primary"
-            size="small"
-            @click="openPreview(row)"
-          >
-            预览
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <template #header>
+      <div class="dialog-head">
+        <div class="dialog-head-copy">
+          <div class="dialog-kicker">VERSION HISTORY</div>
+          <h2 class="dialog-title">版本列表 · {{ model?.name ?? '' }}</h2>
+          <p class="dialog-desc">
+            流程标识 {{ model?.modelKey ?? '' }} · 当前发布指针 {{ model?.deployedVersion ? `v${model.deployedVersion}` : '—' }}
+          </p>
+        </div>
+        <button
+          class="icon-btn dialog-close"
+          type="button"
+          aria-label="关闭"
+          @click="visible = false"
+        >
+          <AppIcon name="x" />
+        </button>
+      </div>
+    </template>
 
-    <el-dialog
-      v-model="previewVisible"
-      :title="`流程图预览 - v${previewVersion}`"
-      width="860px"
-      append-to-body
-      destroy-on-close
+    <el-alert
+      class="flow-alert"
+      type="info"
+      :closable="false"
+      show-icon
+    >
+      已发布版本为只读快照。预览会打开该版本部署时的 BPMN 原文，不受当前草稿修改影响。
+    </el-alert>
+
+    <div
+      v-loading="loading"
+      class="version-list"
+      style="margin-top: 14px"
     >
       <div
-        v-loading="previewLoading"
-        class="preview-stage"
+        v-for="item in definitions"
+        :key="item.definitionId"
+        class="version-row"
       >
-        <BpmnCanvas
-          v-if="previewXml"
-          :xml="previewXml"
-          :readonly="true"
-        />
+        <span class="version-no">{{ item.version }}</span>
+        <div class="version-main">
+          <b>
+            {{ item.definitionName || model?.name }}
+            <el-tag
+              v-if="item.deployed"
+              class="flow-tag version-current"
+              type="success"
+              disable-transitions
+            >
+              当前
+            </el-tag>
+            <el-tag
+              v-else-if="item.suspended"
+              class="flow-tag version-current"
+              type="warning"
+              disable-transitions
+            >
+              已挂起
+            </el-tag>
+          </b>
+          <span class="version-key">{{ item.definitionKey }} · {{ item.deploymentId || item.definitionId }}</span>
+        </div>
+        <span
+          class="version-state"
+          :class="{ 'is-off': item.suspended }"
+        >{{ item.suspended ? '已挂起' : item.deployed ? '在用版本' : '历史版本' }}</span>
+        <div class="version-action">
+          <el-button
+            link
+            size="small"
+            @click="openPreview(item)"
+          >
+            <AppIcon name="eye" />预览
+          </el-button>
+        </div>
       </div>
-    </el-dialog>
+    </div>
+
+    <el-empty
+      v-if="!loading && !definitions.length"
+      class="flow-empty"
+      description="暂无已发布版本"
+    >
+      <template #image>
+        <span class="empty-icon"><AppIcon name="layers" /></span>
+      </template>
+      <p class="empty-hint">
+        发布模型后，这里会保留每个版本的只读快照。
+      </p>
+    </el-empty>
+
+    <template #footer>
+      <div class="dialog-foot">
+        <span class="foot-note">共 {{ definitions.length }} 个已发布版本</span>
+        <el-button @click="visible = false">
+          关闭
+        </el-button>
+        <el-button
+          type="primary"
+          @click="openDesigner"
+        >
+          打开设计器<AppIcon name="arrow-right" />
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
+  <el-dialog
+    v-model="previewVisible"
+    class="flow-dialog preview-dialog"
+    width="900px"
+    align-center
+    :show-close="false"
+    append-to-body
+  >
+    <template #header>
+      <div class="dialog-head">
+        <div class="dialog-head-copy">
+          <div class="dialog-kicker">DEFINITION XML · READ ONLY</div>
+          <h2 class="dialog-title">流程图预览 · v{{ previewVersion ?? '—' }}</h2>
+          <p class="dialog-desc">
+            已部署定义快照 · {{ model?.modelKey ?? '' }} · {{ model?.name ?? '' }}
+          </p>
+        </div>
+        <button
+          class="icon-btn dialog-close"
+          type="button"
+          aria-label="关闭"
+          @click="previewVisible = false"
+        >
+          <AppIcon name="x" />
+        </button>
+      </div>
+    </template>
+
+    <div
+      v-loading="previewLoading"
+      class="diagram-preview preview-stage"
+    >
+      <div class="preview-toolbar">
+        <el-tag
+          class="flow-tag"
+          disable-transitions
+        >
+          V{{ previewVersion ?? '—' }} · READ ONLY
+        </el-tag>
+        <button
+          class="icon-btn"
+          type="button"
+          aria-label="复制定义 XML"
+          :disabled="!previewXml"
+          @click="copyXml"
+        >
+          <AppIcon name="copy" />
+        </button>
+      </div>
+      <BpmnCanvas
+        v-if="previewXml"
+        :xml="previewXml"
+        :readonly="true"
+      />
+    </div>
+
+    <template #footer>
+      <div class="dialog-foot">
+        <span class="foot-note">只读预览 · 关闭后可继续查看其他版本</span>
+        <el-button @click="previewVisible = false">
+          关闭
+        </el-button>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
 <style scoped lang="scss">
-.mono {
-  font-family: monospace;
-  font-size: 12px;
+.version-current {
+  margin-left: 6px;
+}
+
+.version-key {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+.version-state {
+  color: var(--text-3);
+  font-size: 10.5px;
+}
+
+.version-state.is-off {
+  color: var(--amber);
+}
+
+.version-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.flow-empty {
+  padding: 24px 0 8px;
+}
+
+.preview-dialog :deep(.el-dialog__body) {
+  padding: 0;
+}
+
+.preview-dialog .diagram-preview {
+  border: 0;
+  border-radius: 0;
 }
 
 .preview-stage {
-  height: 560px;
+  height: 480px;
 }
 </style>

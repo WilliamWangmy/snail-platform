@@ -1,15 +1,13 @@
 <script setup lang="ts">
-/**
- * 新建模型对话框：字段镜像 WorkflowModelCreateRequest，来源支持空白 / 模板落地（模板可先预览 XML）。
- */
 import { computed, reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 
-import { createModel, type WorkflowModelVO } from '@/api/workflow/model';
+import { createModel } from '@/api/workflow/model';
 import { getTemplateXml, listTemplateOptions, type WorkflowTemplateOptionVO } from '@/api/workflow/template';
+import AppIcon from '@/components/AppIcon.vue';
 
-const emit = defineEmits<{ success: [model: WorkflowModelVO] }>();
+const emit = defineEmits<{ success: [modelId: number] }>();
 
 const visible = ref(false);
 const submitting = ref(false);
@@ -33,7 +31,6 @@ const rules: FormRules = {
   templateId: [{ required: true, message: '请选择模板', trigger: 'change' }],
 };
 
-/* 模板数据 */
 const templates = ref<WorkflowTemplateOptionVO[]>([]);
 const templateXml = ref('');
 const previewLoading = ref(false);
@@ -73,13 +70,15 @@ const submitPayload = computed(() => ({
 }));
 
 async function onSubmit(): Promise<void> {
-  await formRef.value?.validate().catch(() => Promise.reject());
+  const valid = await formRef.value?.validate().catch(() => false);
+  if (!valid) return;
+
   submitting.value = true;
   try {
-    const model = await createModel(submitPayload.value);
-    ElMessage.success('模型已创建');
+    const modelId = await createModel(submitPayload.value);
+    ElMessage.success('模型已创建，正在打开设计器');
     visible.value = false;
-    emit('success', model);
+    emit('success', modelId);
   } finally {
     submitting.value = false;
   }
@@ -91,144 +90,251 @@ defineExpose({ open });
 <template>
   <el-dialog
     v-model="visible"
-    title="新建流程模型"
-    width="560px"
-    destroy-on-close
+    class="flow-dialog"
+    width="720px"
+    align-center
+    :show-close="false"
   >
+    <template #header>
+      <div class="dialog-head">
+        <div class="dialog-head-copy">
+          <div class="dialog-kicker">
+            NEW MODEL
+          </div>
+          <h2 class="dialog-title">
+            新建流程模型
+          </h2>
+          <p class="dialog-desc">
+            模型标识是流程在引擎中的唯一键，创建后不可修改。
+          </p>
+        </div>
+        <button
+          class="icon-btn dialog-close"
+          type="button"
+          aria-label="关闭"
+          @click="visible = false"
+        >
+          <AppIcon name="x" />
+        </button>
+      </div>
+    </template>
+
+    <el-alert
+      class="flow-alert flow-alert--warning"
+      type="warning"
+      :closable="false"
+      show-icon
+    >
+      流程标识需以小写字母开头，仅允许字母、数字与下划线，最长 64 位；发布时后端会再次核对标识一致性。
+    </el-alert>
+
     <el-form
       ref="formRef"
       :model="form"
       :rules="rules"
-      label-width="88px"
+      label-position="top"
+      style="margin-top: 16px"
+      @submit.prevent
     >
-      <el-form-item
-        label="模型标识"
-        prop="modelKey"
+      <div class="form-grid">
+        <el-form-item
+          prop="modelKey"
+          label="模型标识"
+          required
+        >
+          <el-input
+            v-model="form.modelKey"
+            placeholder="如 expense_approval"
+            maxlength="64"
+          />
+          <span class="field-hint">创建后不可修改</span>
+        </el-form-item>
+        <el-form-item
+          prop="name"
+          label="模型名称"
+          required
+        >
+          <el-input
+            v-model="form.name"
+            placeholder="请输入模型名称"
+            maxlength="64"
+          />
+        </el-form-item>
+        <el-form-item label="分类">
+          <el-input
+            v-model="form.category"
+            placeholder="选填，如 采购 / 财务"
+            maxlength="64"
+          />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="form.remark"
+            placeholder="选填，一句话说明用途"
+            maxlength="200"
+          />
+        </el-form-item>
+      </div>
+
+      <div
+        class="field"
+        style="margin-top: 16px"
       >
-        <el-input
-          v-model="form.modelKey"
-          placeholder="小写字母开头，如 expense_approval"
-          maxlength="64"
-        />
-      </el-form-item>
-      <el-form-item
-        label="模型名称"
-        prop="name"
-      >
-        <el-input
-          v-model="form.name"
-          placeholder="请输入模型名称"
-          maxlength="64"
-        />
-      </el-form-item>
-      <el-form-item label="分类">
-        <el-input
-          v-model="form.category"
-          placeholder="选填"
-          maxlength="64"
-        />
-      </el-form-item>
-      <el-form-item label="备注">
-        <el-input
-          v-model="form.remark"
-          type="textarea"
-          :rows="2"
-          placeholder="选填"
-          maxlength="200"
-        />
-      </el-form-item>
-      <el-form-item label="初始内容">
-        <el-radio-group v-model="form.source">
-          <el-radio value="blank">
-            空白模型
+        <span class="field-label">初始内容</span>
+        <el-radio-group
+          v-model="form.source"
+          class="source-cards"
+        >
+          <el-radio
+            value="blank"
+            class="source-card"
+            border
+          >
+            <span class="source-copy">
+              <b>空白模型</b>
+              <small>预置开始、审批、结束骨架，适合从零编排。</small>
+            </span>
           </el-radio>
-          <el-radio value="template">
-            从模板落地
+          <el-radio
+            value="template"
+            class="source-card"
+            border
+          >
+            <span class="source-copy">
+              <b>从模板落地</b>
+              <small>复用平台模板并立即进入设计器调整。</small>
+            </span>
           </el-radio>
         </el-radio-group>
-      </el-form-item>
-      <el-form-item
-        v-if="form.source === 'template'"
-        label="选择模板"
-        prop="templateId"
-      >
-        <el-select
-          v-model="form.templateId"
-          class="block"
-          placeholder="请选择模板"
-          filterable
+
+        <div
+          v-if="form.source === 'template'"
+          class="template-stage"
         >
-          <el-option
-            v-for="t in templates"
-            :key="t.templateId"
-            :label="t.name"
-            :value="t.templateId"
+          <el-form-item
+            label="选择模板"
+            prop="templateId"
+            style="margin-top: 12px"
           >
-            <span>{{ t.name }}</span>
-            <span class="tpl-key">{{ t.templateKey }}</span>
-          </el-option>
-        </el-select>
-      </el-form-item>
+            <el-select
+              v-model="form.templateId"
+              style="width: 100%"
+              placeholder="请选择模板"
+              filterable
+            >
+              <el-option
+                v-for="item in templates"
+                :key="item.templateId"
+                :label="item.name"
+                :value="item.templateId"
+              >
+                <span>{{ item.name }}</span>
+                <span class="template-option-key">{{ item.templateKey }}</span>
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <div
+            v-loading="previewLoading"
+            class="template-preview"
+          >
+            <div class="template-preview-head">
+              <span>TEMPLATE XML PREVIEW</span>
+              <el-tag
+                class="flow-tag"
+                disable-transitions
+              >
+                READ ONLY
+              </el-tag>
+            </div>
+            <pre><code>{{ templateXml || '选择模板后展示原文' }}</code></pre>
+          </div>
+        </div>
+      </div>
     </el-form>
 
-    <div
-      v-if="form.source === 'template'"
-      v-loading="previewLoading"
-      class="xml-preview"
-    >
-      <div class="xml-preview-title">
-        模板 XML 预览
-      </div>
-      <pre class="xml-preview-body">{{ templateXml || '选择模板后展示原文' }}</pre>
-    </div>
-
     <template #footer>
-      <el-button @click="visible = false">
-        取消
-      </el-button>
-      <el-button
-        type="primary"
-        :loading="submitting"
-        @click="onSubmit"
-      >
-        创建并进入设计器
-      </el-button>
+      <div class="dialog-foot">
+        <span class="foot-note">创建后将直接进入 BPMN 设计器</span>
+        <el-button @click="visible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="submitting"
+          @click="onSubmit"
+        >
+          创建并进入设计器<AppIcon name="arrow-right" />
+        </el-button>
+      </div>
     </template>
   </el-dialog>
 </template>
 
 <style scoped lang="scss">
-.block {
-  width: 100%;
-}
-
-.tpl-key {
+.template-option-key {
   float: right;
-  font-family: monospace;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
 }
 
-.xml-preview {
-  margin: 0 0 8px 88px;
+.source-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 3px;
 }
 
-.xml-preview-title {
-  margin-bottom: 4px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.xml-preview-body {
-  max-height: 220px;
+.source-cards :deep(.el-radio.source-card) {
+  display: flex;
+  height: auto;
+  align-items: flex-start;
   margin: 0;
-  padding: 8px;
-  overflow: auto;
-  font-family: monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  background: var(--el-fill-color-light);
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  white-space: normal;
+}
+
+.source-cards :deep(.el-radio.source-card.is-checked) {
+  border-color: var(--teal-line);
+  background: rgba(30, 201, 165, 0.065);
+}
+
+.source-cards :deep(.el-radio.source-card .el-radio__input) {
+  margin-top: 2px;
+}
+
+.source-cards :deep(.el-radio.source-card .el-radio__label) {
+  padding-left: 10px;
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+
+.source-copy b {
+  display: block;
+  color: var(--text-1);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.source-copy small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-3);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 6px;
+}
+
+@media (max-width: 560px) {
+  .source-cards {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
