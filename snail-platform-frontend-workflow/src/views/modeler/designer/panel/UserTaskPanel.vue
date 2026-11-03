@@ -411,7 +411,7 @@ const candidateUsers = computed(() => {
           aria-label="选择审批人"
           :remote-method="assigneeSearch.remoteMethod"
           :loading="false"
-          @update:model-value="(v: string) => (assignee = v ?? '')"
+          @update:model-value="(v: string) => { assigneeSearch.select(v ? [v] : []); assignee = v ?? ''; }"
         >
           <el-option
             v-for="o in assigneeSearch.options.value"
@@ -432,7 +432,7 @@ const candidateUsers = computed(() => {
           placeholder="远程搜索角色"
           aria-label="选择候选组"
           :remote-method="groupSearch.remoteMethod"
-          @update:model-value="(v: string[]) => (candidateGroups = v)"
+          @update:model-value="(v: string[]) => { groupSearch.select(v); candidateGroups = v; }"
         >
           <el-option
             v-for="o in groupSearch.options.value"
@@ -488,7 +488,7 @@ const candidateUsers = computed(() => {
             placeholder="选择抢签人员"
             aria-label="选择抢签人员"
             :remote-method="candidateUserSearch.remoteMethod"
-            @update:model-value="(v: string[]) => writeFlowableAttrs(services.modeling, element, { candidateUsers: v.join(',') })"
+            @update:model-value="(v: string[]) => { candidateUserSearch.select(v); writeFlowableAttrs(services.modeling, element, { candidateUsers: v.join(',') }); }"
           >
             <el-option
               v-for="o in candidateUserSearch.options.value"
@@ -593,7 +593,7 @@ const candidateUsers = computed(() => {
           placeholder="指定人员（多选）"
           aria-label="抄送人员"
           :remote-method="ccUserSearch.remoteMethod"
-          @update:model-value="(v: string[]) => (ccUsers = v)"
+          @update:model-value="(v: string[]) => { ccUserSearch.select(v); ccUsers = v; }"
         >
           <el-option
             v-for="o in ccUserSearch.options.value"
@@ -615,7 +615,7 @@ const candidateUsers = computed(() => {
           placeholder="候选组（角色，多选）"
           aria-label="抄送候选组"
           :remote-method="ccGroupSearch.remoteMethod"
-          @update:model-value="(v: string[]) => (ccGroups = v)"
+          @update:model-value="(v: string[]) => { ccGroupSearch.select(v); ccGroups = v; }"
         >
           <el-option
             v-for="o in ccGroupSearch.options.value"
