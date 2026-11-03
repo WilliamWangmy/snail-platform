@@ -1,33 +1,40 @@
 <script setup lang="ts">
-/**
- * 大屏框架：顶栏（固定像素，不缩放）+ 内容区（ScaleContainer 等比缩放）。
- */
-import ScaleContainer from '@/layout/components/ScaleContainer.vue';
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+
 import TopNav from '@/layout/components/TopNav.vue';
+
+const route = useRoute();
+const fullBleed = computed(() => route.meta.fullBleed === true);
 </script>
 
 <template>
-  <div class="app-layout">
+  <div class="shell">
     <TopNav />
-    <main class="app-content">
-      <ScaleContainer>
+    <div class="main">
+      <main
+        class="content"
+        :class="{ 'content--full': fullBleed }"
+      >
         <RouterView />
-      </ScaleContainer>
-    </main>
+      </main>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
-.app-layout {
-  display: flex;
-  flex-direction: column;
-  width: 100vw;
-  height: 100vh;
+.content--full {
+  height: calc(100vh - var(--header-h));
+  min-height: 0;
+  flex: none;
+  padding: 0;
   overflow: hidden;
 }
 
-.app-content {
-  flex: 1;
-  min-height: 0;
+@media (max-width: 860px) {
+  .content--full {
+    height: auto;
+    overflow: visible;
+  }
 }
 </style>

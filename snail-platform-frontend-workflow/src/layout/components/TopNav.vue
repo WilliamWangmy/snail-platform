@@ -1,25 +1,58 @@
 <script setup lang="ts">
-/**
- * 顶栏：Logo + 一级菜单（路由 meta 驱动）+ 租户/用户/登出。
- * 固定 56px 高，不参与内容区缩放。
- */
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 
+import AppIcon from '@/components/AppIcon.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 
-/** 顶部一级菜单 = 根路由 '/' 的子路由（有 title 即视为菜单项） */
+const ICONS: Record<string, string> = {
+  dashboard: 'layout-dashboard',
+  modeler: 'workflow',
+  definition: 'layers',
+  instance: 'activity',
+  task: 'task'
+};
+
 const menus = computed(() => {
   const root = router.options.routes.find((item) => item.path === '/');
-  return (root?.children ?? []).filter((child) => child.meta?.title);
+  return (root?.children ?? [])
+    .filter((child) => child.meta?.title && !child.meta?.fullBleed)
+    .map((child) => ({
+      key: String(child.name ?? child.path),
+      path: `/${String(child.path)}`,
+      title: String(child.meta?.title ?? ''),
+      icon: ICONS[String(child.name)] ?? 'workflow'
+    }));
 });
 
-const activeMenu = computed(() => `/${route.path.split('/')[1] ?? ''}`);
+const activeKey = computed(() => {
+  if (route.name === 'modeler-designer') return 'modeler';
+  return String(route.name ?? '');
+});
+
+const today = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  weekday: 'short'
+})
+  .format(new Date())
+  .replace(/\//g, '.');
+
+const env = import.meta.env.PROD ? 'PROD' : 'DEV';
+
+const avatarText = computed(() => {
+  const name = auth.displayName.trim();
+  if (!name) return 'SF';
+  const parts = name.split(/\s+/);
+  if (parts.length > 1) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+});
 
 async function handleLogout(): Promise<void> {
   await ElMessageBox.confirm('确定退出登录？', '提示', { type: 'warning' });
@@ -29,114 +62,95 @@ async function handleLogout(): Promise<void> {
 </script>
 
 <template>
-  <header class="top-nav">
-    <div class="brand">
-      <span class="brand-mark"></span>
-      <span class="brand-name">Snail 流程管理平台</span>
-    </div>
-
-    <nav class="menu">
+  <header class="app-header">
+    <div class="app-header-inner">
       <RouterLink
-        v-for="menu in menus"
-        :key="menu.path"
-        class="menu-item"
-        :class="{ active: activeMenu === `/${String(menu.path)}` }"
-        :to="`/${String(menu.path)}`"
+        class="brand"
+        to="/dashboard"
+        aria-label="Snail Flow 首页"
       >
-        {{ menu.meta?.title }}
+        <span class="brand-mark">
+          <svg
+            width="21"
+            height="21"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M17.8 6.2A7.2 7.2 0 1 0 18 17.4"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+            />
+            <circle
+              cx="7.6"
+              cy="9.2"
+              r="2.1"
+              stroke="currentColor"
+              stroke-width="1.5"
+            />
+            <circle
+              cx="14.4"
+              cy="14.6"
+              r="1.6"
+              fill="currentColor"
+            />
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <span class="brand-name">Snail<span>.</span>Flow</span>
+          <span class="brand-sub">FLOW CONTROL ROOM</span>
+        </span>
       </RouterLink>
-    </nav>
 
-    <div class="user-area">
-      <span
-        v-if="auth.tenantName"
-        class="tenant"
-      >{{ auth.tenantName }}</span>
-      <span class="username">{{ auth.displayName }}</span>
-      <el-button
-        link
-        type="danger"
-        @click="handleLogout"
+      <nav
+        class="top-nav"
+        aria-label="主导航"
       >
-        登出
-      </el-button>
+        <RouterLink
+          v-for="item in menus"
+          :key="item.key"
+          class="nav-item"
+          :class="{ active: item.key === activeKey }"
+          :to="item.path"
+          :aria-current="item.key === activeKey ? 'page' : undefined"
+        >
+          <AppIcon :name="item.icon" />
+          <span>{{ item.title }}</span>
+        </RouterLink>
+      </nav>
+
+      <div class="header-tools">
+        <span
+          class="header-workspace"
+          :title="`工作区 · ${auth.tenantName || '默认租户'}`"
+        >
+          <span class="live-dot">ONLINE</span>
+        </span>
+        <span class="top-date">{{ today }}</span>
+        <span class="env-pill">{{ env }}</span>
+        <span
+          class="header-divider"
+          aria-hidden="true"
+        ></span>
+        <div class="header-user">
+          <span class="avatar">{{ avatarText }}</span>
+          <span class="header-user-copy">
+            <span class="header-user-name">{{ auth.displayName }}</span>
+            <span class="header-user-role">{{ auth.tenantName || '流程管理员' }}</span>
+          </span>
+          <button
+            class="icon-btn"
+            type="button"
+            title="退出登录"
+            aria-label="退出登录"
+            @click="handleLogout"
+          >
+            <AppIcon name="log-out" />
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 </template>
-
-<style scoped lang="scss">
-.top-nav {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 32px;
-  height: 56px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--snail-border);
-  background: var(--snail-bg-nav);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  .brand-mark {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    background: var(--snail-accent);
-  }
-
-  .brand-name {
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--snail-text-primary);
-  }
-}
-
-.menu {
-  display: flex;
-  flex: 1;
-  gap: 8px;
-  height: 100%;
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 0 18px;
-    font-size: 14px;
-    color: var(--snail-text-secondary);
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    transition: color 0.2s;
-
-    &:hover,
-    &.active {
-      color: var(--snail-text-primary);
-    }
-
-    &.active {
-      border-bottom-color: var(--snail-accent);
-    }
-  }
-}
-
-.user-area {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 13px;
-
-  .tenant {
-    padding: 2px 10px;
-    color: var(--snail-accent);
-    border: 1px solid var(--snail-accent-dim);
-    border-radius: 999px;
-  }
-
-  .username {
-    color: var(--snail-text-primary);
-  }
-}
-</style>
