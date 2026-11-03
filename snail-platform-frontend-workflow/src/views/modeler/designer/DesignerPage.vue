@@ -1035,7 +1035,7 @@ function goBack(): void {
 
   :deep(.palette-btn.el-button:hover) {
     border-color: var(--line);
-    background: rgba(255, 255, 255, 0.035);
+    background: var(--wash-03);
     color: var(--text-1);
     transform: none;
   }
@@ -1069,7 +1069,7 @@ function goBack(): void {
   }
 
   :deep(.zoom-btn.el-button:hover) {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--wash-05);
     color: var(--text-1);
     transform: none;
   }

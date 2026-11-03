@@ -343,8 +343,8 @@ const statusSegments = computed<StatusSegment[]>(() => {
     { key: 'APPROVED', label: '已完成', color: 'var(--teal)', count: counts.APPROVED },
     { key: 'RUNNING', label: '运行中', color: 'var(--blue)', count: counts.RUNNING },
     { key: 'REJECTED', label: '已驳回', color: 'var(--danger)', count: counts.REJECTED },
-    { key: 'WITHDRAWN', label: '已撤销', color: '#4b666a', count: counts.WITHDRAWN },
-    { key: 'NONE', label: '未启动', color: '#38545a', count: counts.NONE },
+    { key: 'WITHDRAWN', label: '已撤销', color: 'var(--state-withdrawn)', count: counts.WITHDRAWN },
+    { key: 'NONE', label: '未启动', color: 'var(--state-idle)', count: counts.NONE },
   ];
 });
 
@@ -352,7 +352,7 @@ const visibleSegments = computed(() => statusSegments.value.filter((item) => ite
 
 const donutStyle = computed(() => {
   const total = started.value.length;
-  if (!total) return { background: 'conic-gradient(#38545a 0 100%)' };
+  if (!total) return { background: 'conic-gradient(var(--state-idle) 0 100%)' };
   let offset = 0;
   const stops = visibleSegments.value.map((segment) => {
     const from = (offset / total) * 100;
@@ -732,7 +732,7 @@ onMounted(() => {
                 :cx="chart.peak.x"
                 :cy="chart.peak.endedY"
                 r="3"
-                fill="#071820"
+                fill="var(--bg-1)"
                 stroke="var(--amber)"
                 stroke-width="1.5"
               />
@@ -743,20 +743,20 @@ onMounted(() => {
                   width="152"
                   height="44"
                   rx="8"
-                  fill="#0d2731"
-                  stroke="rgba(151,199,200,.2)"
+                  fill="var(--bg-3)"
+                  stroke="var(--line-strong)"
                 />
                 <text
                   :x="chart.peak.tooltipLeft + 12"
                   y="44"
-                  fill="#7b9592"
+                  fill="var(--text-3)"
                   font-size="8.5"
                   font-family="'JetBrains Mono', Consolas, monospace"
                 >{{ chart.peak.label }} · 峰值</text>
                 <text
                   :x="chart.peak.tooltipLeft + 12"
                   y="60"
-                  fill="#e8f3f0"
+                  fill="var(--text-1)"
                   font-size="10"
                   font-family="'PingFang SC', 'Microsoft YaHei', sans-serif"
                 >发起 {{ chart.peak.started }} · 结束 {{ chart.peak.ended }}</text>
@@ -975,7 +975,7 @@ onMounted(() => {
 }
 
 .chart-label text {
-  fill: #6f8b88;
+  fill: var(--text-faint);
   font-family: var(--font-mono);
   font-size: 8.5px;
 }
@@ -1035,12 +1035,12 @@ onMounted(() => {
 }
 
 .rank-progress :deep(.el-progress-bar__inner) {
-  background: linear-gradient(90deg, var(--teal-a50), var(--teal));
+  background: var(--teal);
   border-radius: 99px;
 }
 
 .rank-progress--amber :deep(.el-progress-bar__inner) {
-  background: linear-gradient(90deg, var(--amber-a45), var(--amber));
+  background: var(--amber);
 }
 
 .spark .spark-line {

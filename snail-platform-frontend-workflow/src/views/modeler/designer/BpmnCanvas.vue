@@ -63,14 +63,14 @@ interface EventBusService {
   on: (events: string | string[], handler: (event: never) => void) => void;
 }
 
-/* 深色画布：形状/描边/外置标签由渲染器配置控制，其余组件观感由 --bio-* 变量控制 */
+/* 画布随主题：形状/描边/外置标签经渲染器写入内联 style，用 var() 引用画布 token（随 html.dark/light 切换） */
 const LABEL_FONT = '"PingFang SC", "Microsoft YaHei", sans-serif';
 const CANVAS_STYLE = {
   // renderer/text 的配置按模块名注入，放顶层不生效
   bpmnRenderer: {
-    defaultFillColor: '#0c222c',
-    defaultStrokeColor: '#6f8d8e',
-    defaultLabelColor: '#d8e8e5',
+    defaultFillColor: 'var(--canvas-surface)',
+    defaultStrokeColor: 'var(--canvas-line)',
+    defaultLabelColor: 'var(--canvas-text)',
   },
   textRenderer: {
     defaultStyle: { fontFamily: LABEL_FONT, fontSize: 12 },

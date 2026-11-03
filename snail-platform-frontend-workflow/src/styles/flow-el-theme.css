@@ -92,6 +92,95 @@ html.dark {
   --el-overlay-color-lighter: var(--scrim-deep-70);
 }
 
+/* 浅色主题：映射结构与 html.dark 相同，值由 html.light 覆盖后的 flow token 决定 */
+html.light {
+  color-scheme: light;
+  --el-color-primary: var(--teal);
+  --el-color-primary-light-3: var(--teal-l3);
+  --el-color-primary-light-5: var(--teal-l5);
+  --el-color-primary-light-7: var(--teal-l7);
+  --el-color-primary-light-8: var(--teal-l8);
+  --el-color-primary-light-9: var(--teal-l9);
+  --el-color-primary-dark-2: var(--teal-d2);
+  --el-color-success: var(--teal);
+  --el-color-success-light-3: var(--teal-l3);
+  --el-color-success-light-5: var(--teal-l5);
+  --el-color-success-light-7: var(--teal-l7);
+  --el-color-success-light-8: var(--teal-l8);
+  --el-color-success-light-9: var(--teal-l9);
+  --el-color-success-dark-2: var(--teal-d2);
+  --el-color-warning: var(--amber);
+  --el-color-warning-light-3: var(--amber-l3);
+  --el-color-warning-light-5: var(--amber-l5);
+  --el-color-warning-light-7: var(--amber-l7);
+  --el-color-warning-light-8: var(--amber-l8);
+  --el-color-warning-light-9: var(--amber-l9);
+  --el-color-warning-dark-2: var(--amber-d2);
+  --el-color-danger: var(--danger);
+  --el-color-danger-light-3: var(--danger-l3);
+  --el-color-danger-light-5: var(--danger-l5);
+  --el-color-danger-light-7: var(--danger-l7);
+  --el-color-danger-light-8: var(--danger-l8);
+  --el-color-danger-light-9: var(--danger-l9);
+  --el-color-danger-dark-2: var(--danger-d2);
+  --el-color-error: var(--danger);
+  --el-color-error-light-3: var(--danger-l3);
+  --el-color-error-light-5: var(--danger-l5);
+  --el-color-error-light-7: var(--danger-l7);
+  --el-color-error-light-8: var(--danger-l8);
+  --el-color-error-light-9: var(--danger-l9);
+  --el-color-error-dark-2: var(--danger-d2);
+  --el-color-info: var(--text-3);
+  --el-color-info-light-3: color-mix(in srgb, var(--text-3) 70%, #ffffff);
+  --el-color-info-light-5: color-mix(in srgb, var(--text-3) 52%, #ffffff);
+  --el-color-info-light-7: color-mix(in srgb, var(--text-3) 34%, #ffffff);
+  --el-color-info-light-8: color-mix(in srgb, var(--text-3) 26%, #ffffff);
+  --el-color-info-light-9: color-mix(in srgb, var(--text-3) 14%, #ffffff);
+  --el-color-info-dark-2: color-mix(in srgb, var(--text-3) 75%, #000000);
+  --el-bg-color-page: var(--bg-0);
+  --el-bg-color: var(--panel-solid);
+  --el-bg-color-overlay: var(--bg-3);
+  --el-text-color-primary: var(--text-1);
+  --el-text-color-regular: var(--text-2);
+  --el-text-color-secondary: var(--text-3);
+  --el-text-color-placeholder: var(--text-faint);
+  --el-text-color-disabled: var(--text-disabled);
+  --el-border-color: var(--line);
+  --el-border-color-light: var(--line);
+  --el-border-color-lighter: var(--line-a075);
+  --el-border-color-extra-light: var(--line-a06);
+  --el-border-color-dark: var(--line-a3);
+  --el-border-color-darker: var(--line-a36);
+  --el-fill-color: var(--wash-03);
+  --el-fill-color-light: var(--wash-035);
+  --el-fill-color-lighter: var(--wash-02);
+  --el-fill-color-extra-light: var(--wash-015);
+  --el-fill-color-dark: var(--wash-06);
+  --el-fill-color-darker: var(--wash-08);
+  --el-fill-color-blank: transparent;
+  --el-mask-color: var(--scrim-72);
+  --el-mask-color-extra-light: var(--scrim-soft-35);
+  --el-box-shadow: 0 26px 70px var(--shade-52);
+  --el-box-shadow-light: 0 18px 48px var(--shade-35);
+  --el-box-shadow-lighter: 0 10px 28px var(--shade-28);
+  --el-box-shadow-dark: 0 26px 70px var(--shade-60);
+  --el-border-radius-base: 9px;
+  --el-border-radius-small: 7px;
+  --el-border-radius-round: 999px;
+  --el-font-family: var(--font-sans);
+  --el-font-size-base: 12.5px;
+  --el-font-size-small: 11.5px;
+  --el-font-size-extra-small: 10.5px;
+  --el-transition-duration: 0.18s;
+  --el-component-size: 38px;
+  --el-component-size-small: 31px;
+  --el-component-size-large: 44px;
+  --el-disabled-bg-color: var(--wash-03);
+  --el-disabled-text-color: var(--text-disabled);
+  --el-disabled-border-color: var(--line-a10);
+  --el-overlay-color-lighter: var(--scrim-72);
+}
+
 /* ---------------------------------------------------------------- buttons */
 
 .el-button {
@@ -175,7 +264,7 @@ html.dark {
 .el-button--primary:focus,
 .el-button--primary:active {
   border-color: var(--teal-a55);
-  background: linear-gradient(180deg, var(--teal-bright), var(--teal-deep));
+  background: var(--teal);
   box-shadow: 0 10px 24px var(--teal-a16), inset 0 1px 0 var(--wash-28);
   color: var(--ink);
 }
@@ -193,7 +282,7 @@ html.dark {
   --el-button-hover-text-color: var(--danger-pale);
   --el-button-active-bg-color: var(--danger-a2);
   --el-button-active-border-color: var(--danger-a5);
-  --el-button-active-text-color: #ffd0cc;
+  --el-button-active-text-color: var(--danger-pale);
 }
 
 .el-button.is-text,
@@ -203,7 +292,7 @@ html.dark {
   border-radius: 6px;
   font-size: 12px;
   --el-button-text-color: var(--teal);
-  --el-button-hover-text-color: #6ce9d2;
+  --el-button-hover-text-color: var(--teal-pale);
   --el-button-hover-bg-color: var(--teal-soft);
   --el-button-active-bg-color: var(--teal-soft);
 }
@@ -979,7 +1068,7 @@ html.dark {
 .el-message-box {
   border: 1px solid var(--line-strong);
   border-radius: 14px;
-  background: linear-gradient(180deg, var(--panel-grad-t), var(--panel-grad-b));
+  background: var(--panel-grad-t);
   box-shadow: var(--shadow-pop);
 }
 
@@ -1000,7 +1089,7 @@ html.dark {
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: 18px;
-  background: linear-gradient(180deg, var(--panel-grad-t), var(--panel-grad-b));
+  background: var(--panel-grad-t);
   box-shadow: var(--shadow-pop);
 }
 
@@ -1047,7 +1136,7 @@ html.dark {
 .flow-drawer.el-drawer {
   --el-drawer-padding-primary: 0;
   --el-drawer-bg-color: transparent;
-  background: linear-gradient(180deg, var(--panel-solid), var(--bg-1));
+  background: var(--panel-solid);
   border-left: 1px solid var(--line-strong);
   box-shadow: -28px 0 80px var(--shade-42);
 }
@@ -1323,6 +1412,32 @@ html.dark {
   background: #cfdfdc;
 }
 
+html.light .el-switch__core .el-switch__action {
+  background: #ffffff;
+}
+
+/* 浅色主题：控件底色从深色透明改为浅色实底 */
+html.light .el-input__wrapper,
+html.light .el-select__wrapper,
+html.light .el-textarea__inner {
+  background-color: var(--bg-2);
+}
+
+html.light .el-input__wrapper.is-focus,
+html.light .el-select__wrapper.is-focused,
+html.light .el-textarea__inner:focus {
+  background-color: var(--bg-2);
+}
+
+html.light .el-input {
+  --el-input-bg-color: var(--bg-2);
+}
+
+html.light .el-checkbox__inner,
+html.light .el-radio__inner {
+  background: #ffffff;
+}
+
 .el-switch.is-checked .el-switch__core {
   border-color: var(--teal-line);
 }
@@ -1396,7 +1511,7 @@ html.dark {
 }
 
 .el-progress-bar__inner {
-  background: linear-gradient(90deg, var(--teal-deep), var(--teal-bright));
+  background: var(--teal);
 }
 
 .el-divider {

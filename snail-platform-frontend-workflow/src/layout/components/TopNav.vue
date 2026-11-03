@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 
 import AppIcon from '@/components/AppIcon.vue';
 import { useAuthStore } from '@/stores/auth';
+import { currentTheme, toggleTheme, type FlowTheme } from '@/utils/theme';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+
+const theme = ref<FlowTheme>(currentTheme());
+
+function onToggleTheme(): void {
+  theme.value = toggleTheme();
+}
 
 const ICONS: Record<string, string> = {
   dashboard: 'layout-dashboard',
@@ -130,6 +137,15 @@ async function handleLogout(): Promise<void> {
         </span>
         <span class="top-date">{{ today }}</span>
         <span class="env-pill">{{ env }}</span>
+        <button
+          class="icon-btn"
+          type="button"
+          :title="theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'"
+          :aria-label="theme === 'dark' ? '切换为浅色主题' : '切换为深色主题'"
+          @click="onToggleTheme"
+        >
+          <AppIcon :name="theme === 'dark' ? 'sun' : 'moon'" />
+        </button>
         <span
           class="header-divider"
           aria-hidden="true"

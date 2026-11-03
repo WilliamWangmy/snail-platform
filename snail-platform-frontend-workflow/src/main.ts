@@ -15,8 +15,10 @@ import '@/styles/flow-ui.css';
 import '@/styles/flow-el-theme.css';
 import '@/styles/index.scss';
 
-// 大屏深色主题：html 挂 dark class 激活 Element 暗色变量
-document.documentElement.classList.add('dark');
+import { initTheme } from '@/utils/theme';
+
+// 主题：localStorage 记忆，缺省深色；html 挂 dark/light class 分别激活两套变量
+initTheme();
 
 const app = createApp(App);
 
