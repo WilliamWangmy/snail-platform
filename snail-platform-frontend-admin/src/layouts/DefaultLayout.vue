@@ -3,10 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppIcon from '@/components/AppIcon.vue';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
+import NotifyToast from '@/components/NotifyToast.vue';
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import ThemePicker from '@/components/ThemePicker.vue';
 import { fetchUnreadCount, pageInbox, type NotifyInboxItem } from '@/api/notify';
+import { useNotifyPush } from '@/composables/useNotifyPush';
 import { useAuthStore } from '@/stores/auth';
 import { resetMenuRoutes } from '@/router/menuRoutes';
 
@@ -65,6 +67,7 @@ function handleSelect(index: string): void {
 }
 
 async function signOut(): Promise<void> {
+  notifyPush.stop();
   await auth.signOutEverywhere();
   resetMenuRoutes(router);
   void router.push('/login');
@@ -99,11 +102,15 @@ function handleUserCommand(command: string | number | object): void {
   else if (command === 'password') passwordVisible.value = true;
 }
 
-/* ------------------------- 通知:30s 轮询未读数,面板展开时拉最新未读 ------------------------- */
+/* ------------------------- 通知:30s 轮询未读数(兜底),SSE 推送(加速) ------------------------- */
 
 const unread = ref(0);
 const latestUnread = ref<NotifyInboxItem[]>([]);
 let unreadTimer: number | undefined;
+
+/** 推送到达时铃铛抖一下:纯视觉提示,不依赖 toast(收件箱页内到达时 toast 被降噪) */
+const bellShake = ref(false);
+let bellShakeTimer: number | undefined;
 
 async function pollUnread(): Promise<void> {
   try {
@@ -111,6 +118,19 @@ async function pollUnread(): Promise<void> {
   } catch {
     // 轮询失败静默:通知角标是辅助信息,不因网络抖动打断主流程
   }
+}
+
+/** 每帧到达:立即重取未读数(推送 payload 不带计数,以数据库口径为准) */
+const notifyPush = useNotifyPush({ onFrame: () => void pollUnread() });
+
+function onPushed(): void {
+  bellShake.value = false;
+  window.clearTimeout(bellShakeTimer);
+  // 双 rAF 强制重启动画:连发多条推送时每次都要抖
+  requestAnimationFrame(() => {
+    bellShake.value = true;
+    bellShakeTimer = window.setTimeout(() => (bellShake.value = false), 700);
+  });
 }
 
 /** 顶栏只预览最新几条,正文与清已读仍在通知中心页做。 */
@@ -133,15 +153,20 @@ function openInbox(): void {
 
 onMounted(() => {
   window.addEventListener('resize', handleResize);
+  window.addEventListener('notify:pushed', onPushed);
   if (auth.has('system:notify:list')) {
     void pollUnread();
     unreadTimer = window.setInterval(() => void pollUnread(), 30_000);
+    notifyPush.start();
   }
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize);
+  window.removeEventListener('notify:pushed', onPushed);
   if (unreadTimer !== undefined) window.clearInterval(unreadTimer);
+  window.clearTimeout(bellShakeTimer);
+  notifyPush.stop();
 });
 </script>
 
@@ -270,6 +295,7 @@ onBeforeUnmount(() => {
             <template #reference>
               <button
                 class="icon-btn"
+                :class="{ 'bell-shake': bellShake }"
                 type="button"
                 title="消息"
                 :aria-label="`消息，${unread} 条未读`"
@@ -444,6 +470,7 @@ onBeforeUnmount(() => {
       :visible="passwordVisible"
       @closed="passwordVisible = false"
     />
+    <NotifyToast />
   </ElContainer>
 </template>
 
@@ -748,6 +775,34 @@ onBeforeUnmount(() => {
   width: 1px;
   height: 22px;
   background: var(--app-line);
+}
+
+/* 推送到达的铃铛抖动:轻微摇摆一次,不做常驻动画 */
+.bell-shake {
+  animation: bell-shake 0.6s ease;
+}
+
+@keyframes bell-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+
+  20% {
+    transform: rotate(-14deg);
+  }
+
+  40% {
+    transform: rotate(12deg);
+  }
+
+  60% {
+    transform: rotate(-8deg);
+  }
+
+  80% {
+    transform: rotate(5deg);
+  }
 }
 
 .header-user {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
 import RowActions, { type RowAction } from '@/components/RowActions.vue';
@@ -30,9 +30,22 @@ async function reloadUnread(): Promise<void> {
   unread.value = await fetchUnreadCount();
 }
 
+/** 推送到达:停留在第一页且无筛选时静默刷新列表,否则只刷未读数(翻页/筛选态不动) */
+function onPushed(): void {
+  if (pageNum.value === 1 && !query.readStatus && !query.bizType) {
+    void refresh();
+  }
+  void reloadUnread();
+}
+
 onMounted(() => {
+  window.addEventListener('notify:pushed', onPushed);
   void refresh();
   void reloadUnread();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('notify:pushed', onPushed);
 });
 
 function reset(): void {
