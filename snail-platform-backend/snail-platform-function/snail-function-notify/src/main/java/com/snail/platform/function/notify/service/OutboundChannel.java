@@ -10,6 +10,18 @@ import java.util.List;
  */
 public interface OutboundChannel {
 
+    /** 通道名:站内信——不是出站通道,是"是否落收件行"的开关(NotifySendCommand.channels 口径) */
+    String CHANNEL_INNER = "inner";
+
+    /** 通道名:站内消息实时推送(落收件行的消息自动附加,保铃铛在线推) */
+    String CHANNEL_SSE = "sse";
+
+    /** 通道名:邮件出站 */
+    String CHANNEL_MAIL = "mail";
+
+    /** 通道名:短信出站 */
+    String CHANNEL_SMS = "sms";
+
     /** 通道标识,落 sys_notify_outbound.channel */
     String channel();
 

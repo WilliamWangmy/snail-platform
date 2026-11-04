@@ -27,9 +27,11 @@ import com.snail.platform.function.notify.mapper.SysNotifyRecipientMapper;
 import com.snail.platform.function.system.api.UserBriefPort;
 import com.snail.platform.function.system.api.UserBriefPort.UserBrief;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -223,7 +225,7 @@ public class NotifyService implements NotifyApi {
                 .toList(), result.getTotal());
     }
 
-    /** 发送主体:插消息、按快照批量插收件行、事务提交后交投递器 */
+    /** 发送主体:插消息(出站流水锚点)、收件行按通道开关落库、事务提交后携通道集快照交投递器 */
     private void doSend(NotifySendCommand command, String title, String content, List<Long> recipients) {
         SysNotifyMessage message = new SysNotifyMessage();
         message.setTitle(title);
@@ -243,19 +245,43 @@ public class NotifyService implements NotifyApi {
         List<OutboundChannel.OutboundTarget> targets = briefs.stream()
                 .map(brief -> new OutboundChannel.OutboundTarget(brief.userId(), brief.email(), brief.phone()))
                 .toList();
-        List<SysNotifyRecipient> rows = briefs.stream().map(brief -> {
-            SysNotifyRecipient row = new SysNotifyRecipient();
-            row.setMessageId(message.getMessageId());
-            row.setUserId(brief.userId());
-            row.setNickname(brief.nickname());
-            row.setReadStatus(UNREAD);
-            return row;
-        }).toList();
-        // 批量插入收件行;Db 复用当前事务的 SqlSession,租户注入与审计填充同样生效
-        Db.saveBatch(rows);
+        // inner 是"是否落收件行"的开关:channels 为 null 即现行全量落库,显式不含 inner 则只走出站
+        if (command.channels() == null || command.channels().contains(OutboundChannel.CHANNEL_INNER)) {
+            List<SysNotifyRecipient> rows = briefs.stream().map(brief -> {
+                SysNotifyRecipient row = new SysNotifyRecipient();
+                row.setMessageId(message.getMessageId());
+                row.setUserId(brief.userId());
+                row.setNickname(brief.nickname());
+                row.setReadStatus(UNREAD);
+                return row;
+            }).toList();
+            // 批量插入收件行;Db 复用当前事务的 SqlSession,租户注入与审计填充同样生效
+            Db.saveBatch(rows);
+        }
 
         dispatcher.dispatchAfterCommit(new OutboundDispatcher.DispatchJob(message.getMessageId(),
-                command.tenantId(), title, content, command.bizType(), targets));
+                command.tenantId(), title, content, command.bizType(), targets,
+                outboundChannelsOf(command.channels())));
+    }
+
+    /**
+     * 出站通道集快照:channels 为 null 保持现行全通道广播(返回 null 即"全部可用通道");
+     * 凡落收件行(channels 含 inner)自动附加 sse——sse 是"落库即在线推"的传输形态,不是用户可配的
+     * 通知方式,notifyType 里没有它的配置位,不附加会把消息铃铛退化成"要刷新才亮"。
+     * inner 本身不是出站通道,不进快照。
+     */
+    static Set<String> outboundChannelsOf(Set<String> channels) {
+        if (channels == null) {
+            return null;
+        }
+        Set<String> outbound = new LinkedHashSet<>();
+        if (channels.contains(OutboundChannel.CHANNEL_INNER)) {
+            outbound.add(OutboundChannel.CHANNEL_SSE);
+        }
+        channels.stream()
+                .filter(channel -> !OutboundChannel.CHANNEL_INNER.equals(channel))
+                .forEach(outbound::add);
+        return outbound;
     }
 
     /** bizType 过滤的前置消息 ID 集;未传返回 null 表示不参与过滤 */

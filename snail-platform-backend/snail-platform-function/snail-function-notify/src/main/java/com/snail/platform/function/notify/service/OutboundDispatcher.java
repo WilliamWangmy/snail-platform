@@ -7,6 +7,7 @@ import com.snail.platform.function.notify.service.OutboundChannel.OutboundMessag
 import com.snail.platform.function.notify.service.OutboundChannel.OutboundTarget;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -80,7 +81,9 @@ public class OutboundDispatcher implements DisposableBean {
             /** 业务域标签,SSE 通道按它分流 */
             String bizType,
             /** 收件目标 */
-            List<OutboundTarget> targets) {
+            List<OutboundTarget> targets,
+            /** 通道集快照:null=全部可用通道(现行行为);非空=只投声明的通道 */
+            Set<String> channels) {
     }
 
     /** 事务提交后再入队;无事务上下文(系统线程直调)时立即入队 */

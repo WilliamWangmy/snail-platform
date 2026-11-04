@@ -21,7 +21,7 @@ public class MailOutboundChannel implements OutboundChannel {
 
     @Override
     public String channel() {
-        return "mail";
+        return CHANNEL_MAIL;
     }
 
     @Override

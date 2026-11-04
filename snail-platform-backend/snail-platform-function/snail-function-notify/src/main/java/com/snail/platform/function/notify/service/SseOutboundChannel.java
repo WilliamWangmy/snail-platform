@@ -34,7 +34,7 @@ public class SseOutboundChannel implements OutboundChannel {
 
     @Override
     public String channel() {
-        return "sse";
+        return CHANNEL_SSE;
     }
 
     @Override
