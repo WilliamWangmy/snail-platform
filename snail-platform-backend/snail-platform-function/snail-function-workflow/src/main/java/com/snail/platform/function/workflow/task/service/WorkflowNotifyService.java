@@ -121,7 +121,7 @@ public class WorkflowNotifyService {
         Long senderId = currentUserId();
         String senderName = currentNickname();
         NotifySendCommand command = new NotifySendCommand(tenantId, title, content, BIZ_TYPE, null,
-                senderId, senderName == null ? "系统通知" : senderName, recipients);
+                senderId, senderName == null ? "系统通知" : senderName, recipients, null);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             dispatch(command);
             return;

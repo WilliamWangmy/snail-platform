@@ -1,6 +1,7 @@
 package com.snail.platform.function.notify.api;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 职责:业务模块发通知的唯一入口——住 notify 的 api 包,跨模块只准 import 本包(ArchUnit 机械执法)。
@@ -33,6 +34,11 @@ public interface NotifyApi {
             /** 发送人显示名快照 */
             String senderName,
             /** 收件人用户 ID 集 */
-            List<Long> recipients) {
+            List<Long> recipients,
+            /**
+             * 通道选择:null(缺省)= 现行行为,站内信落库 + 全部可用出站通道(公告与存量调用方零改动);
+             * 非空 = 精确通道,inner 落收件行,mail/sms 走出站投递。inner 不是出站通道,是"是否落收件行"的开关。
+             */
+            Set<String> channels) {
     }
 }
