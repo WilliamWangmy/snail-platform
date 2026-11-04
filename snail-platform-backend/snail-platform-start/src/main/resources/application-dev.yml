@@ -22,6 +22,13 @@ snail:
     jwt:
       # 开发占位密钥只住 dev profile;生产密钥必须由 SNAIL_JWT_SECRET 提供,共享配置无默认可漏
       secret: ${SNAIL_JWT_SECRET:snail-platform-dev-jwt-secret-change-me-0123456789}
+  external:
+    sms:
+      # 开发态短信走 mock 通道:发送动作同走网关留痕(sys_external_call_log),手机号打码;
+      # 码值默认不落日志,从 Valkey GET snail:auth:sms:{phone} 取;
+      # 本机自测要直接看码可开 mock-echo-code,生产 profile 两个开关都不存在,天然关闭
+      mock: ${SNAIL_SMS_MOCK:true}
+      mock-echo-code: ${SNAIL_SMS_MOCK_ECHO_CODE:true}
   storage:
     sftp:
       # 本机 SFTP 的开发默认连接;生产必须由环境变量提供,共享配置不放开任何默认口令
