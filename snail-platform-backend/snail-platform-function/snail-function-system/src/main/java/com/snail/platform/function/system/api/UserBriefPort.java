@@ -36,6 +36,8 @@ public interface UserBriefPort {
             String nickname,
             /** 邮箱,出站邮件通道寻址 */
             String email,
+            /** 手机号,出站短信通道寻址 */
+            String phone,
             /** 状态:0 正常 1 停用 */
             Integer status) {
     }

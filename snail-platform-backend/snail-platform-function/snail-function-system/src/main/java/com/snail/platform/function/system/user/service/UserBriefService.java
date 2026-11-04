@@ -85,6 +85,6 @@ public class UserBriefService implements UserBriefPort {
 
     private static UserBrief toBrief(SysUser user) {
         return new UserBrief(user.getUserId(), user.getUsername(), user.getNickname(),
-                user.getEmail(), user.getStatus());
+                user.getEmail(), user.getPhone(), user.getStatus());
     }
 }
