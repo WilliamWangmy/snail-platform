@@ -11,13 +11,20 @@ import com.snail.platform.framework.workflow.tenant.WorkflowTenantIds;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import org.flowable.bpmn.model.BaseElement;
+import org.flowable.bpmn.model.ExtensionAttribute;
+import org.flowable.bpmn.model.FlowElement;
+import org.flowable.bpmn.model.UserTask;
 import org.flowable.common.engine.impl.identity.Authentication;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
@@ -73,6 +80,9 @@ public class WorkflowEngineGateway {
 
     /** BPMN 安全闸门:部署前必过 */
     private final BpmnSecurityValidator bpmnSecurityValidator;
+
+    /** 节点通知配置缓存:definitionId 每次部署都新生成且不可变,进程内 ConcurrentHashMap 即够(方案 D9) */
+    private final Map<String, WorkflowNodeNotifyConfig> nodeNotifyConfigCache = new ConcurrentHashMap<>();
 
     public WorkflowEngineGateway(RepositoryService repositoryService, RuntimeService runtimeService,
                                  TaskService taskService, HistoryService historyService,
@@ -280,6 +290,54 @@ public class WorkflowEngineGateway {
                 throw BizException.badRequest("流程定义原文读取失败:" + e.getMessage());
             }
         });
+    }
+
+    /**
+     * 节点通知配置:notifyType/ccUsers/ccGroups 来自 BPMN 扩展属性,Flowable 对未知属性原样保留(方案 D9)。
+     * 定义不可变,按 definitionId+节点键缓存,命中即无引擎查询;节点不存在或非用户任务返回空配置——
+     * 不是错误,是"这个节点没有通知配置"。definitionId 全局唯一(内含 key/版本/租户),缓存不区分租户键。
+     */
+    public WorkflowNodeNotifyConfig nodeNotifyConfig(String definitionId, String taskDefinitionKey) {
+        if (definitionId == null || definitionId.isBlank() || taskDefinitionKey == null || taskDefinitionKey.isBlank()) {
+            return WorkflowNodeNotifyConfig.empty();
+        }
+        return nodeNotifyConfigCache.computeIfAbsent(definitionId + "::" + taskDefinitionKey,
+                key -> WorkflowEngineErrors.supply("查询节点通知配置", () -> {
+                    FlowElement element = repositoryService.getBpmnModel(definitionId)
+                            .getFlowElement(taskDefinitionKey);
+                    if (!(element instanceof UserTask userTask)) {
+                        return WorkflowNodeNotifyConfig.empty();
+                    }
+                    return new WorkflowNodeNotifyConfig(
+                            Set.copyOf(extensionParts(userTask, "notifyType")),
+                            List.copyOf(extensionParts(userTask, "ccUsers")),
+                            List.copyOf(extensionParts(userTask, "ccGroups")));
+                }));
+    }
+
+    /**
+     * 扩展属性取值:未知属性按 Flowable 的 ExtensionAttribute 保留在元素上,
+     * 忽略大小写按属性名匹配,逗号串拆分去空——设计器以逗号拼接落盘。
+     */
+    private static List<String> extensionParts(BaseElement element, String attributeName) {
+        List<String> parts = new ArrayList<>();
+        element.getAttributes().forEach((name, attributes) -> {
+            if (attributeName.equalsIgnoreCase(name)) {
+                for (ExtensionAttribute attribute : attributes) {
+                    String raw = attribute.getValue();
+                    if (raw == null) {
+                        continue;
+                    }
+                    for (String part : raw.split(",")) {
+                        String value = part.trim();
+                        if (!value.isEmpty()) {
+                            parts.add(value);
+                        }
+                    }
+                }
+            }
+        });
+        return parts;
     }
 
     /**
