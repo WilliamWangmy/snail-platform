@@ -49,6 +49,62 @@ class BpmnSecurityValidatorTest {
                 <endEvent id="end"/>""")));
     }
 
+    /** 设计器用户任务面板全集:审批人绑定 + 抢签 + 业务标注(通知/抄送/办理按钮)都可落库进引擎 */
+    @Test
+    void acceptsDesignerUserTaskAttributes() {
+        assertEquals("p", validator.validate(wrap("p", """
+                <startEvent id="start"/>
+                <sequenceFlow id="f1" sourceRef="start" targetRef="approve"/>
+                <userTask id="approve" name="审批"
+                          flowable:assignee="1"
+                          flowable:candidateGroups="1001"
+                          flowable:candidateUsers="1,2"
+                          flowable:actionButtons="approve,reject,transfer"
+                          flowable:notifyType="inbox,email"
+                          flowable:ccUsers="3,4"
+                          flowable:ccGroups="1002"/>
+                <sequenceFlow id="f2" sourceRef="approve" targetRef="end"/>
+                <endEvent id="end"/>""")));
+    }
+
+    /** 会签(多实例)是面板多人审批的产出物:多实例元素/属性/通过条件必须放行,表达式仍过标量白名单 */
+    @Test
+    void acceptsMultiInstanceCountersign() {
+        assertEquals("p", validator.validate(wrap("p", """
+                <startEvent id="start"/>
+                <sequenceFlow id="f1" sourceRef="start" targetRef="approve"/>
+                <userTask id="approve" name="会签" flowable:assignee="${assignee}">
+                  <multiInstanceLoopCharacteristics isSequential="true"
+                                                    flowable:collection="assigneeList"
+                                                    flowable:elementVariable="assignee">
+                    <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances >= 1}]]></completionCondition>
+                  </multiInstanceLoopCharacteristics>
+                </userTask>
+                <sequenceFlow id="f2" sourceRef="approve" targetRef="end"/>
+                <endEvent id="end"/>""")));
+    }
+
+    /** completionCondition 与 conditionExpression 同为 UEL 裸求值入口,同样必须 ${...} 包裹 */
+    @Test
+    void rejectsBareUelCompletionCondition() {
+        assertRejected("""
+                <userTask id="approve" name="会签" flowable:assignee="${assignee}">
+                  <multiInstanceLoopCharacteristics isSequential="true"
+                                                    flowable:collection="assigneeList"
+                                                    flowable:elementVariable="assignee">
+                    <completionCondition xsi:type="tFormalExpression">java.lang.Runtime.getRuntime()</completionCondition>
+                  </multiInstanceLoopCharacteristics>
+                </userTask>""", "条件表达式必须形如");
+        assertRejected("""
+                <userTask id="approve" name="会签" flowable:assignee="${assignee}">
+                  <multiInstanceLoopCharacteristics isSequential="true"
+                                                    flowable:collection="assigneeList"
+                                                    flowable:elementVariable="assignee">
+                    <completionCondition xsi:type="tFormalExpression">${execution.getVariable('x')}</completionCondition>
+                  </multiInstanceLoopCharacteristics>
+                </userTask>""", "表达式");
+    }
+
     /** 设计器一定会带图形信息,展示命名空间整体放行,否则画完就能布 */
     @Test
     void acceptsDiagramInterchange() {
@@ -87,7 +143,7 @@ class BpmnSecurityValidatorTest {
         assertRejected("<flowable:executionListener event=\"start\" delegateExpression=\"${bean}\"/>", "扩展元素");
     }
 
-    /** 绑 Bean 的扩展属性与元素同样危险:属性白名单只留审批人两枚 */
+    /** 绑 Bean 的扩展属性与元素同样危险:白名单只放审批人绑定与面板业务标注,能力类属性一律拒 */
     @Test
     void rejectsCapabilityAttributes() {
         assertRejected("<userTask id=\"u2\" flowable:delegateExpression=\"${bean}\"/>", "delegateExpression");

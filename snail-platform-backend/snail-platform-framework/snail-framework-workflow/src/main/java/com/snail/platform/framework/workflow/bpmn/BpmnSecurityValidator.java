@@ -63,11 +63,12 @@ public class BpmnSecurityValidator {
             "http://www.omg.org/spec/DD/20100524/DC",
             "http://www.omg.org/spec/DD/20100524/DI");
 
-    /** v1 可执行元素白名单:容器 + 人工审批所需节点 + 连线条件 + 设计器写出的流转引用 */
+    /** v1 可执行元素白名单:容器 + 人工审批所需节点 + 连线条件 + 会签(多实例) + 设计器写出的流转引用 */
     private static final Set<String> ALLOWED_ELEMENTS = Set.of(
             "definitions", "process",
             "startEvent", "endEvent", "userTask",
             "exclusiveGateway", "parallelGateway", "sequenceFlow",
+            "multiInstanceLoopCharacteristics", "completionCondition",
             "conditionExpression", "incoming", "outgoing");
 
     /**
@@ -78,10 +79,19 @@ public class BpmnSecurityValidator {
      */
     private static final Set<String> ALLOWED_ATTRIBUTES = Set.of(
             "id", "name", "sourceRef", "targetRef", "isExecutable",
-            "targetNamespace", "namespace");
+            "targetNamespace", "namespace",
+            "loopCharacteristics", "isSequential");
 
-    /** 允许的 Flowable 扩展属性:只用于绑审批人,不用于绑 Bean */
-    private static final Set<String> ALLOWED_FLOWABLE_ATTRIBUTES = Set.of("assignee", "candidateGroups");
+    /**
+     * 允许的 Flowable 扩展属性:审批人绑定(单人/候选/抢签/会签)与面板业务标注。
+     * 与前端 USER_TASK_FLOWABLE_ATTRS 一字不差(设计器是唯一合法生产方);
+     * bind Bean 類(delegateExpression/class/formKey)依然拒绝,表达式值仍过标量字符白名单。
+     * notifyType/ccUsers/ccGroups/actionButtons 目前由运行端待接入,先允许落库进引擎。
+     */
+    private static final Set<String> ALLOWED_FLOWABLE_ATTRIBUTES = Set.of(
+            "assignee", "candidateGroups", "candidateUsers",
+            "collection", "elementVariable",
+            "actionButtons", "notifyType", "ccUsers", "ccGroups");
 
     /** 流程标识形态:与平台 model_key 口径一致,小写字母开头 */
     private static final Pattern PROCESS_ID_PATTERN = Pattern.compile("[a-z][A-Za-z0-9_]{0,63}");
@@ -254,8 +264,8 @@ public class BpmnSecurityValidator {
 
     /**
      * 表达式裁剪:属性与元素文本里的 ${...} 都只准读标量变量。
-     * conditionExpression 是唯一的例外处理对象——它整段文本都是 UEL 求值入口,
-     * 见 requireScalarCondition 的注释。
+     * conditionExpression 与 completionCondition(会签通过条件)是唯二的例外处理对象——
+     * 两者整段文本都是 UEL 求值入口,见 requireScalarCondition 的注释。
      */
     private void checkExpressions(Element element) {
         NamedNodeMap attributes = element.getAttributes();
@@ -267,7 +277,8 @@ public class BpmnSecurityValidator {
             return;
         }
         if (BPMN_MODEL_NS.equals(element.getNamespaceURI())
-                && "conditionExpression".equals(element.getLocalName())) {
+                && ("conditionExpression".equals(element.getLocalName())
+                        || "completionCondition".equals(element.getLocalName()))) {
             requireScalarCondition(text.trim());
         } else if (text.contains("${")) {
             requireScalarExpression(text);
