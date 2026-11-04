@@ -27,6 +27,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function signIn(payload: LoginPayload): Promise<LoginResult> {
     const result = await loginRequest(payload);
+    applyLoginResult(result);
+    return result;
+  }
+
+  /** 登录成功的统一落点:密码/短信/选租户三链共用,落令牌与待改密信号。 */
+  function applyLoginResult(result: LoginResult): LoginResult {
     token.value = result.token;
     setToken(result.token);
     pendingPasswordChange.value = result.passwordChangeRequired;
@@ -69,6 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
     roleNames,
     has,
     signIn,
+    applyLoginResult,
     loadSession,
     loadMenus,
     signOut,

@@ -303,6 +303,185 @@
   margin-left: 6px;
 }
 
+/* ------------------------- 短信登录 ------------------------- */
+
+.login-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: -6px 0 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--app-muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.login-back:hover {
+  color: var(--app-primary);
+}
+
+.sms-code-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.sms-code-row :deep(.el-input) {
+  flex: 1;
+}
+
+.send-btn {
+  width: 118px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+/* ------------------------- 其他登录方式 ------------------------- */
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 12px;
+  color: var(--app-muted);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--app-line);
+}
+
+.login-methods {
+  display: flex;
+  gap: 8px;
+}
+
+.login-method {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.login-method:hover {
+  border-color: color-mix(in srgb, var(--app-primary) 45%, var(--app-line));
+  color: var(--app-ink);
+  background: var(--app-soft);
+}
+
+.login-method.active {
+  border-color: var(--app-primary);
+  color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-primary) 8%, transparent);
+}
+
+/* ------------------------- 租户账号选择对话框 ------------------------- */
+
+.pick-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pick-head span {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.account-item:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--app-primary) 45%, var(--app-line));
+  background: var(--app-soft);
+}
+
+.account-item:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.account-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(140deg, var(--app-primary), var(--app-accent));
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.account-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-main b {
+  color: var(--app-ink);
+  font-size: 13.5px;
+}
+
+.account-main i {
+  overflow: hidden;
+  color: var(--app-muted);
+  font-size: 11.5px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-picking {
+  color: var(--app-primary);
+  font-size: 11.5px;
+}
+
+.pick-hint {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
 .login-foot {
   margin-top: 30px;
   color: var(--app-muted);

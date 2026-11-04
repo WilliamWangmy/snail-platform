@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import type { FormInstance } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -8,6 +8,7 @@ import { useLogin } from './useLogin';
 
 const auth = useAuthStore();
 const formRef = useTemplateRef<FormInstance>('formRef');
+const smsFormRef = useTemplateRef<FormInstance>('smsFormRef');
 const {
   form,
   rules,
@@ -17,9 +18,23 @@ const {
   captchaState,
   statusLabel,
   forcePasswordChange,
+  mode,
+  switchMode,
+  smsForm,
+  smsRules,
+  countdown,
+  sending,
+  smsLoading,
+  smsPick,
+  pickingUserId,
   submit,
+  submitSms,
+  sendSmsCode,
+  pickAccount,
+  onPickDialogClosed,
+  externalLogin,
   refreshCaptcha,
-} = useLogin(formRef);
+} = useLogin(formRef, smsFormRef);
 
 const forceChangeVisible = ref(false);
 
@@ -39,6 +54,25 @@ function onForceChangeClosed(): void {
   forceChangeVisible.value = false;
   form.password = '';
   void refreshCaptcha();
+}
+
+/** 其他登录方式:手机登录切换双模;三个 IM 渠道占位,接入时换成各自的 OAuth 跳转。 */
+const otherMethods = computed(() => [
+  {
+    key: 'sms',
+    label: mode.value === 'sms' ? '手机登录中' : '手机登录',
+    icon: 'phone',
+    active: mode.value === 'sms',
+    action: () => void switchMode('sms'),
+  },
+  { key: 'dingtalk', label: '钉钉', icon: 'zap', active: false, action: () => externalLogin('钉钉') },
+  { key: 'feishu', label: '飞书', icon: 'send', active: false, action: () => externalLogin('飞书') },
+  { key: 'wecom', label: '企业微信', icon: 'chat', active: false, action: () => externalLogin('企业微信') },
+]);
+
+/** 候选账号头像字:昵称首字,退回登录名首字。 */
+function accountInitial(name: string): string {
+  return (name ?? '').trim().charAt(0) || '账';
 }
 </script>
 
@@ -105,7 +139,21 @@ function onForceChangeClosed(): void {
           登录 <b>Snail Admin</b>，按你的授权进入工作台。
         </p>
 
+        <button
+          v-if="mode === 'sms'"
+          type="button"
+          class="login-back"
+          @click="switchMode('password')"
+        >
+          <AppIcon
+            name="chevron-left"
+            :size="13"
+          />返回账号密码登录
+        </button>
+
+        <!-- 账号密码登录 -->
         <ElForm
+          v-if="mode === 'password'"
           ref="formRef"
           :model="form"
           :rules="rules"
@@ -222,11 +270,196 @@ function onForceChangeClosed(): void {
           </ElButton>
         </ElForm>
 
+        <!-- 手机验证码登录 -->
+        <ElForm
+          v-else
+          ref="smsFormRef"
+          :model="smsForm"
+          :rules="smsRules"
+          label-position="top"
+          @submit.prevent="submitSms"
+        >
+          <ElFormItem
+            label="手机号"
+            prop="phone"
+          >
+            <ElInput
+              v-model="smsForm.phone"
+              size="large"
+              maxlength="11"
+              autocomplete="tel"
+              placeholder="请输入 11 位手机号"
+              @keydown.enter.prevent="submitSms"
+            >
+              <template #prefix>
+                <AppIcon
+                  name="phone"
+                  :size="16"
+                />
+              </template>
+            </ElInput>
+          </ElFormItem>
+          <ElFormItem
+            label="图形验证码"
+            prop="captchaCode"
+          >
+            <div class="captcha-row">
+              <ElInput
+                v-model="smsForm.captchaCode"
+                size="large"
+                maxlength="4"
+                autocomplete="off"
+                placeholder="输入右侧 4 位验证码"
+                @keydown.enter.prevent="sendSmsCode"
+              >
+                <template #prefix>
+                  <AppIcon
+                    name="shield"
+                    :size="16"
+                  />
+                </template>
+              </ElInput>
+              <button
+                type="button"
+                class="captcha-box"
+                title="点击刷新验证码"
+                @click="refreshCaptcha"
+              >
+                <img
+                  v-if="captcha"
+                  :src="captcha.image"
+                  alt="验证码"
+                />
+                <span
+                  v-else
+                  class="captcha-loading"
+                >{{ captchaState === 'failed' ? '点击重试' : '加载中' }}</span>
+              </button>
+            </div>
+          </ElFormItem>
+          <ElFormItem
+            label="短信验证码"
+            prop="smsCode"
+          >
+            <div class="sms-code-row">
+              <ElInput
+                v-model="smsForm.smsCode"
+                size="large"
+                maxlength="6"
+                autocomplete="one-time-code"
+                placeholder="6 位短信验证码"
+                @keydown.enter.prevent="submitSms"
+              >
+                <template #prefix>
+                  <AppIcon
+                    name="bell"
+                    :size="16"
+                  />
+                </template>
+              </ElInput>
+              <ElButton
+                size="large"
+                class="send-btn"
+                native-type="button"
+                :loading="sending"
+                :disabled="countdown > 0 || !captcha"
+                @click="sendSmsCode"
+              >
+                {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+              </ElButton>
+            </div>
+          </ElFormItem>
+
+          <div class="login-options">
+            <span>验证码 5 分钟内有效</span>
+            <span>SSL 加密传输</span>
+          </div>
+
+          <ElButton
+            type="primary"
+            size="large"
+            native-type="button"
+            class="login-submit"
+            :loading="smsLoading"
+            @click="submitSms"
+          >
+            使用短信验证码登录 <AppIcon
+              name="arrow-right"
+              :size="15"
+            />
+          </ElButton>
+        </ElForm>
+
+        <div class="login-divider">
+          <span>其他登录方式</span>
+        </div>
+        <div class="login-methods">
+          <button
+            v-for="item in otherMethods"
+            :key="item.key"
+            type="button"
+            class="login-method"
+            :class="{ active: item.active }"
+            @click="item.action"
+          >
+            <AppIcon
+              :name="item.icon"
+              :size="15"
+            />
+            <span>{{ item.label }}</span>
+          </button>
+        </div>
+
         <div class="login-foot">
           © 2026 Snail Platform
         </div>
       </div>
     </section>
+
+    <!-- 多租户账号选择:短信登录多命中时出现,pickKey 2 分钟一次性 -->
+    <ElDialog
+      :model-value="smsPick !== null"
+      width="392px"
+      align-center
+      class="pick-dialog"
+      append-to-body
+      @update:model-value="(visible: boolean) => { if (!visible) onPickDialogClosed(); }"
+    >
+      <template #header>
+        <div class="pick-head">
+          <b>选择要登录的账号</b>
+          <span>该手机号在多个租户有账号</span>
+        </div>
+      </template>
+      <div class="account-list">
+        <button
+          v-for="account in smsPick?.accounts ?? []"
+          :key="account.userId"
+          type="button"
+          class="account-item"
+          :disabled="pickingUserId !== null"
+          @click="pickAccount(account)"
+        >
+          <span class="account-avatar">{{ accountInitial(account.nickname || account.username) }}</span>
+          <span class="account-main">
+            <b>{{ account.nickname || account.username }}</b>
+            <i>{{ account.tenantName }} · {{ account.username }}</i>
+          </span>
+          <span
+            v-if="pickingUserId === account.userId"
+            class="account-picking"
+          >登录中…</span>
+          <AppIcon
+            v-else
+            name="chevron-right"
+            :size="14"
+          />
+        </button>
+      </div>
+      <template #footer>
+        <span class="pick-hint">选择凭证 2 分钟内有效，超时或放弃后需重新获取短信验证码</span>
+      </template>
+    </ElDialog>
 
     <ForceChangePasswordDialog
       :visible="forceChangeVisible"
