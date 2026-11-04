@@ -8,7 +8,7 @@ import { defineStore } from 'pinia';
 import * as authApi from '@/api/auth';
 import { STORAGE_KEY_TOKEN } from '@/constants';
 import { getItem, removeItem, setItem } from '@/utils/storage';
-import type { LoginRequest, LoginUserVO } from '@/types/auth';
+import type { LoginRequest, LoginSuccessVO, LoginUserVO } from '@/types/auth';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>(getItem(STORAGE_KEY_TOKEN) ?? '');
@@ -44,6 +44,11 @@ export const useAuthStore = defineStore('auth', () => {
     setToken(success.token);
   }
 
+  /** 登录成功的统一落点：密码/短信/选租户三链共用（页面不直接调 auth api 的约定保持） */
+  function applyLoginSuccess(success: LoginSuccessVO): void {
+    setToken(success.token);
+  }
+
   /** 登出：后端失效 + 清本地态；页面跳转由调用方负责 */
   async function logout(): Promise<void> {
     try {
@@ -60,5 +65,5 @@ export const useAuthStore = defineStore('auth', () => {
     loginUser.value = null;
   }
 
-  return { token, loginUser, isLoggedIn, tenantName, displayName, has, setToken, fetchMe, login, logout, clearLocal };
+  return { token, loginUser, isLoggedIn, tenantName, displayName, has, setToken, fetchMe, login, applyLoginSuccess, logout, clearLocal };
 });

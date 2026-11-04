@@ -46,3 +46,39 @@ export interface RoleInfo {
   roleCode: string;
   roleName: string;
 }
+
+/* ------------------------- 短信验证码登录 ------------------------- */
+
+/** POST /system/auth/sms-captcha 入参：手机号 + 图形验证码（发送前人机闸） */
+export interface SmsCaptchaRequest {
+  phone: string;
+  captchaKey: string;
+  captchaCode: string;
+}
+
+/** POST /system/auth/login-sms 入参：手机号 + 短信码，不含租户（跨租户定位） */
+export interface SmsLoginRequest {
+  phone: string;
+  smsCode: string;
+}
+
+/** POST /system/auth/login-sms/pick 入参：pickKey 一次性凭证 + 选定账号 */
+export interface SmsPickRequest {
+  pickKey: string;
+  userId: number;
+}
+
+/** 多命中候选账号：最小暴露面，只有租户名/登录名/昵称 */
+export interface SmsAccountOption {
+  userId: number;
+  tenantId: number;
+  tenantName: string;
+  username: string;
+  nickname: string;
+}
+
+/** login-sms 多命中态：pickKey 2 分钟一次性凭证 + 可选账号集（按用户 ID 升序） */
+export interface LoginAccountsVO {
+  pickKey: string;
+  accounts: SmsAccountOption[];
+}
