@@ -36,5 +36,11 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-system</artifactId>
         </dependency>
+        <!-- 短信验证码登录:发码经 external 网关的 SmsPort(厂商细节与流水留痕在网关);
+             跨模块只准 import external.api 包,ArchUnit 执法 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-external</artifactId>
+        </dependency>
     </dependencies>
 </project>

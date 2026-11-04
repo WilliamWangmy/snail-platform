@@ -38,6 +38,9 @@ public class SysLoginLog {
     /** 操作系统 */
     private String os;
 
+    /** 登录方式编码:password/sms,后续 feishu/wecom/dingtalk */
+    private String loginType;
+
     /** 结果:1 成功 0 失败 */
     private Integer status;
 

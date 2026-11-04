@@ -10,6 +10,9 @@ import com.snail.platform.function.auth.dto.CaptchaVO;
 import com.snail.platform.function.auth.dto.LoginRequest;
 import com.snail.platform.function.auth.dto.LoginSuccessVO;
 import com.snail.platform.function.auth.dto.LoginUserVO;
+import com.snail.platform.function.auth.dto.SmsCaptchaRequest;
+import com.snail.platform.function.auth.dto.SmsLoginRequest;
+import com.snail.platform.function.auth.dto.SmsPickRequest;
 import com.snail.platform.function.auth.service.AuthService;
 import com.snail.platform.function.auth.service.CaptchaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,9 +27,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 职责:认证入口四端点——取验证码、登录、查看当前身份(/me 兼作过滤器链的自检点)、登出。
+ * 职责:认证入口七端点——取验证码、密码登录、发短信验证码、短信登录、多账号选择、
+ * 查看当前身份(/me 兼作过滤器链的自检点)、登出。
  * 登出由服务端自增令牌版本,当前用户全部设备立即失效;本期仍不设 refresh token 与 jti 黑名单。
- * 上游:登录页与全局登出入口;下游:CaptchaService、AuthService。
+ * 上游:登录页(密码/手机号两个 tab)与全局登出入口;下游:CaptchaService、AuthService。
  */
 @Tag(name = "认证")
 @RestController
@@ -61,6 +65,30 @@ public class AuthController {
     @PostMapping("/login")
     public R<LoginSuccessVO> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
         return R.ok(authService.login(request, http));
+    }
+
+    @PreAuthorize("permitAll()")
+    @Operation(summary = "发送短信验证码(图形验证码前置,四道限流闸)")
+    @PostMapping("/sms-captcha")
+    public R<Void> sendSmsCaptcha(@Valid @RequestBody SmsCaptchaRequest request, HttpServletRequest http) {
+        authService.sendSmsCaptcha(request, http);
+        return R.ok(null);
+    }
+
+    @PreAuthorize("permitAll()")
+    @Operation(summary = "短信验证码登录(多租户账号时返回 pickKey 候选列表,再调 /login-sms/pick)")
+    @PostMapping("/login-sms")
+    public R<Object> loginSms(@Valid @RequestBody SmsLoginRequest request, HttpServletRequest http) {
+        // 出参两态:LoginSuccessVO(单账号,直接签发)或 LoginAccountsVO(多账号,含 pickKey 候选列表)
+        return R.ok(authService.loginBySms(request, http));
+    }
+
+    @PreAuthorize("permitAll()")
+    @Operation(summary = "多租户账号选择换令牌(仅多账号命中时)")
+    @PostMapping("/login-sms/pick")
+    public R<LoginSuccessVO> pickSmsAccount(@Valid @RequestBody SmsPickRequest request,
+                                            HttpServletRequest http) {
+        return R.ok(authService.pickSmsAccount(request, http));
     }
 
     @PreAuthorize("isAuthenticated()")

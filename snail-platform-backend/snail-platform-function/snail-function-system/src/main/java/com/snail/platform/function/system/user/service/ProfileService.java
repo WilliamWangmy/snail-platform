@@ -76,10 +76,11 @@ public class ProfileService {
                 user.getCreateTime());
     }
 
-    /** 自助改资料:只动 nickname/email/phone;昵称变化让登录人快照失效 */
+    /** 自助改资料:只动 nickname/email/phone;昵称变化让登录人快照失效;手机号与建号/改档同规则查重 */
     @Transactional
     public void update(Long userId, UpdateProfileRequest request) {
         requireSelf(userId);
+        userService.requirePhoneUniqueInTenant(request.phone(), userId);
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
                 .set(SysUser::getNickname, request.nickname().trim())
                 .set(SysUser::getEmail, request.email())

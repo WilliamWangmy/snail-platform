@@ -130,6 +130,7 @@ public class UserService {
         if (usernameExists(username)) {
             throw BizException.badRequest("登录名已存在");
         }
+        requirePhoneUniqueInTenant(request.phone(), null);
         // 管理员自输初始口令(P2-3):服务端不再代生成,PasswordPolicy 是唯一裁决
         String rawPassword = request.password();
         PasswordPolicy.validate(rawPassword);
@@ -169,6 +170,7 @@ public class UserService {
     public void update(Long userId, UserUpdateRequest request) {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
+        requirePhoneUniqueInTenant(request.phone(), userId);
         requireUsableOrg(request.orgId());
         requireAssignableOrg(request.orgId());
         userMapper.update(new SysUser(), Wrappers.<SysUser>lambdaUpdate()
@@ -406,6 +408,24 @@ public class UserService {
         }
         if (Objects.equals(org.getStatus(), 1)) {
             throw BizException.badRequest("组织已停用,不能作为用户归属");
+        }
+    }
+
+    /**
+     * 租户内手机号查重:同一手机号在本租户只能绑一个账号(短信验证码登录的定位规则,设计 sms-login §2);
+     * 跨租户可重复——查询带租户拦截器,天然只看本租户;空白即未绑定,放行。
+     * 已删除的账号不占号:逻辑删的行不进计数,手机号随删除释放(与 username 终身占用的口径刻意不同)。
+     * 包内可见:ProfileService 的自助改资料与建号/改档同规则,不复制第二份。
+     */
+    void requirePhoneUniqueInTenant(String phone, Long excludeUserId) {
+        if (phone == null || phone.isBlank()) {
+            return;
+        }
+        Long conflict = userMapper.selectCount(Wrappers.<SysUser>lambdaQuery()
+                .eq(SysUser::getPhone, phone.trim())
+                .ne(excludeUserId != null, SysUser::getUserId, excludeUserId));
+        if (conflict > 0) {
+            throw BizException.badRequest("该手机号已绑定本租户其他账号");
         }
     }
 
