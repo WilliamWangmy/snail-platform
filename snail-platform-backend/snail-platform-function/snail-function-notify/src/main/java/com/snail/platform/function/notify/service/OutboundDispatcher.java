@@ -77,6 +77,8 @@ public class OutboundDispatcher implements DisposableBean {
             String title,
             /** 正文,纯文本 */
             String content,
+            /** 业务域标签,SSE 通道按它分流 */
+            String bizType,
             /** 收件目标 */
             List<OutboundTarget> targets) {
     }
@@ -128,7 +130,8 @@ public class OutboundDispatcher implements DisposableBean {
             record(job, FALLBACK_CHANNEL, "无可用出站通道", STATUS_SUCCESS, 0, null);
             return;
         }
-        OutboundMessage message = new OutboundMessage(job.messageId(), job.title(), job.content(), job.targets());
+        OutboundMessage message = new OutboundMessage(job.messageId(), job.title(), job.content(),
+                job.bizType(), job.targets());
         for (OutboundChannel channel : channels) {
             dispatchWithRetry(job, channel, message);
         }

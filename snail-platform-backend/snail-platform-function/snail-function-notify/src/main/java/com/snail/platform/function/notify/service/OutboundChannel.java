@@ -29,6 +29,8 @@ public interface OutboundChannel {
             String title,
             /** 正文,纯文本 */
             String content,
+            /** 业务域标签,SSE 推送端按它分流 */
+            String bizType,
             /** 收件目标 */
             List<OutboundTarget> targets) {
     }

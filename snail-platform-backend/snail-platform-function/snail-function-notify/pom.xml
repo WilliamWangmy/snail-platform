@@ -45,5 +45,10 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-external</artifactId>
         </dependency>
+        <!-- 实时推送的跨实例扇出经 Redis pub/sub,连接与键名纪律由 framework-redis 收口 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-redis</artifactId>
+        </dependency>
     </dependencies>
 </project>

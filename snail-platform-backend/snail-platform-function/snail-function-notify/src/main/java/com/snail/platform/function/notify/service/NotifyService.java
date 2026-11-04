@@ -254,7 +254,7 @@ public class NotifyService implements NotifyApi {
         Db.saveBatch(rows);
 
         dispatcher.dispatchAfterCommit(new OutboundDispatcher.DispatchJob(message.getMessageId(),
-                command.tenantId(), title, content, targets));
+                command.tenantId(), title, content, command.bizType(), targets));
     }
 
     /** bizType 过滤的前置消息 ID 集;未传返回 null 表示不参与过滤 */
