@@ -114,6 +114,11 @@
             </dependency>
             <dependency>
                 <groupId>com.snail.platform</groupId>
+                <artifactId>snail-function-external</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.snail.platform</groupId>
                 <artifactId>snail-framework-storage</artifactId>
                 <version>${project.version}</version>
             </dependency>

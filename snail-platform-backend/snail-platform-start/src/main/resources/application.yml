@@ -65,6 +65,8 @@ snail:
         - sys_menu
         - sys_role_menu
         - sys_notify_outbound
+        # 第三方调用流水:落账在异步线程,租户/操作人靠行内快照列
+        - sys_external_call_log
         # 流程模板与菜单同口径:平台维护一份全局目录,租户只读来建模型,本身不带租户列
         - sys_workflow_template
     pagination:

@@ -32,6 +32,11 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-notify</artifactId>
         </dependency>
+        <!-- 第三方接口网关:邮件/短信/IP 定位的唯一出口,消费方只准经 external.api -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-external</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-storage</artifactId>

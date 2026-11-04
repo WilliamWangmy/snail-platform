@@ -1,32 +1,22 @@
 package com.snail.platform.function.notify.service;
 
-import cn.hutool.core.lang.Validator;
-import cn.hutool.core.util.StrUtil;
-import jakarta.mail.internet.MimeMessage;
+import com.snail.platform.function.external.api.MailPort;
 import java.util.List;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 /**
- * 职责:邮件出站通道——单封 MimeMessage、收件人全部走 BCC(互不暴露地址),
- * 可用性取决于容器里是否有 JavaMailSender(未配置 spring.mail.host 时缺席)。
- * 上游:OutboundChannel SPI;下游:JavaMailSender 自动配置。
+ * 职责:邮件出站通道——出站投递语义(可用性/消息组装)住这里,SMTP 协议细节全部下沉到
+ * snail-function-external 的 SmtpMailClient,本类只做 OutboundChannel 到 MailPort 的转调。
+ * 上游:OutboundChannel SPI;下游:external.api 的 MailPort(跨模块只准经 api 包,ArchUnit 执法)。
  */
 @Component
 public class MailOutboundChannel implements OutboundChannel {
 
-    /** 发件人地址,取邮件账号自身,未配置时 available() 兜底不外发 */
-    @Value("${spring.mail.username:snail-platform@noreply.local}")
-    private String from;
+    /** 邮件发送端口,厂商细节在 external 网关 */
+    private final MailPort mailPort;
 
-    /** 邮件发送器,可能缺席 */
-    private final ObjectProvider<JavaMailSender> mailSenders;
-
-    public MailOutboundChannel(ObjectProvider<JavaMailSender> mailSenders) {
-        this.mailSenders = mailSenders;
+    public MailOutboundChannel(MailPort mailPort) {
+        this.mailPort = mailPort;
     }
 
     @Override
@@ -36,37 +26,17 @@ public class MailOutboundChannel implements OutboundChannel {
 
     @Override
     public boolean available() {
-        return mailSenders.getIfAvailable() != null;
+        return mailPort.available();
     }
 
     @Override
     public void send(OutboundMessage message) throws Exception {
-        JavaMailSender sender = mailSenders.getIfAvailable();
-        if (sender == null) {
-            throw new IllegalStateException("邮件通道未配置");
-        }
-        // 空白/非法/重复地址在此剔除:脏地址会让整封被 SMTP 拒收,一个人也只该收到一封
+        // 地址过滤(空白/非法/去重)与 BCC 细节在 SmtpMailClient;全无效时它抛 ExternalCallException,
+        // 由 dispatcher 记 failed 与错因,不静默当成功——口径与一期完全一致
         List<String> addresses = message.targets().stream()
                 .map(OutboundTarget::address)
-                .filter(StrUtil::isNotBlank)
-                .map(String::trim)
-                .filter(Validator::isEmail)
-                .distinct()
                 .toList();
-        if (addresses.isEmpty()) {
-            // 全部无效按失败上抛,由 dispatcher 记 failed 与错因,不静默当成功
-            throw new IllegalStateException("收件人没有可用邮箱地址");
-        }
-        MimeMessage mime = sender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(mime, false, "UTF-8");
-        helper.setFrom(from);
-        helper.setSubject(message.title());
-        // 第二个参数 false 即纯文本:正文由运营录入,不按 HTML 解析,免去标签注入客户端
-        helper.setText(message.content(), false);
-        // 收件人一律 BCC,同一封里互不可见地址
-        for (String address : addresses) {
-            helper.addBcc(address);
-        }
-        sender.send(mime);
+        mailPort.send(new MailPort.MailMessage(
+                message.title(), message.content(), addresses, "notify", "outbound", message.messageId()));
     }
 }

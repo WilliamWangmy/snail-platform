@@ -40,10 +40,10 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-system</artifactId>
         </dependency>
-        <!-- 邮件出站通道;未配置 spring.mail 时 JavaMailSender 不装配,通道缺席自动降级日志 -->
+        <!-- 邮件出站通道经 external 网关的 MailPort,SMTP 细节住在 snail-function-external -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-mail</artifactId>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-external</artifactId>
         </dependency>
     </dependencies>
 </project>

@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -42,8 +43,19 @@ class ArchitectureRulesTest {
     private static final String SYSTEM = "com.snail.platform.function.system.";
     private static final String AUTH = "com.snail.platform.function.auth";
     private static final String NOTIFY = "com.snail.platform.function.notify";
+    private static final String EXTERNAL = "com.snail.platform.function.external";
     private static final String STORAGE = "com.snail.platform.function.storage";
     private static final String WORKFLOW = "com.snail.platform.function.workflow.";
+
+    /**
+     * 第三方 SDK 包前缀:厂商/协议 SDK 只准住在 external 网关(设计 §8)——
+     * "所有第三方接口都经过这个模块"的机械形态;新厂商接入把前缀加进本清单。
+     * storage 的对象存储 SDK 暂列豁免之外的例外:framework-storage 的抽象自成一体,
+     * 收编进网关是登记在案的独立决策,拍板前不堵它的存量路径。
+     */
+    private static final List<String> THIRD_PARTY_SDK_PACKAGES = List.of(
+            "org.springframework.mail.", "jakarta.mail.",
+            "com.aliyun.", "com.tencentcloudapi.", "com.amap.");
 
     /**
      * 流程引擎包前缀:引擎词汇只准出现在 framework-workflow 内(方案 §2 边界)。
@@ -69,7 +81,7 @@ class ArchitectureRulesTest {
      * storage 暂不列入:它直读 sys_tenant 的 SysTenantMapper 取存储配额,与 auth 同款登记例外
      * (storage→tenant 的单一只读边),变密时收敛 system.api 包,再补进本清单。
      */
-    private static final Set<String> API_PACKAGE_ENFORCED = Set.of(NOTIFY, WORKFLOW);
+    private static final Set<String> API_PACKAGE_ENFORCED = Set.of(NOTIFY, EXTERNAL, AUTH, WORKFLOW);
 
     /** 功能模块包根:跨模块依赖的判定范围,落在此根内且不是目标模块 api 包的引用即为越界 */
     private static final String FUNCTION_ROOT = "com.snail.platform.function.";
@@ -177,6 +189,9 @@ class ArchitectureRulesTest {
             owner.getDirectDependenciesFromSelf().forEach(dependency ->
                     checkCrossSubdomain(owner, dependency, violations));
 
+            // 第三方 SDK 边界:厂商/协议 SDK 只准住在 external 网关(外部网关设计 §8)
+            violations.addAll(thirdPartySdkViolations(owner));
+
             // 引擎边界:Flowable 类型只准住在 framework-workflow(方案 §2、§9 裁决 D)
             if (!ownerPackage.startsWith(WORKFLOW_FRAMEWORK)) {
                 owner.getDirectDependenciesFromSelf().forEach(dependency -> {
@@ -207,7 +222,8 @@ class ArchitectureRulesTest {
                     String targetPackage = dependency.getTargetClass().getPackageName();
                     if (!targetPackage.startsWith(FUNCTION_ROOT)
                             || ownerModule.equals(moduleOf(targetPackage))
-                            || isModuleApiPackage(targetPackage)) {
+                            || isModuleApiPackage(targetPackage)
+                            || isWholeModuleEdge(ownerModule, moduleOf(targetPackage))) {
                         return;
                     }
                     violations.add(owner.getFullName() + " -> "
@@ -233,6 +249,35 @@ class ArchitectureRulesTest {
         if (!violations.isEmpty()) {
             throw new AssertionError("架构纪律被突破:\n" + String.join("\n", violations));
         }
+    }
+
+    /**
+     * 第三方 SDK 边界检查:external 模块之外的类依赖厂商/协议 SDK 即违规。
+     * 独立成方法以便样例测试直接对手工导入的类集复用(违规样例类住测试源码,
+     * 主规则按 DoNotIncludeTests 跑不会看见,这里用类文件导入器定点喂给它)。
+     */
+    static List<String> thirdPartySdkViolations(JavaClasses classes) {
+        List<String> violations = new java.util.ArrayList<>();
+        for (JavaClass owner : classes) {
+            violations.addAll(thirdPartySdkViolations(owner));
+        }
+        return violations;
+    }
+
+    /** 单类形态:owner 在 external 模块内豁免,否则任一依赖落到 SDK 包前缀即立案 */
+    private static List<String> thirdPartySdkViolations(JavaClass owner) {
+        List<String> violations = new java.util.ArrayList<>();
+        if (owner.getPackageName().startsWith(EXTERNAL)) {
+            return violations;
+        }
+        owner.getDirectDependenciesFromSelf().forEach(dependency -> {
+            String targetPackage = dependency.getTargetClass().getPackageName();
+            if (THIRD_PARTY_SDK_PACKAGES.stream().anyMatch(targetPackage::startsWith)) {
+                violations.add(owner.getFullName() + " -> " + dependency.getTargetClass().getFullName()
+                        + ":第三方 SDK 依赖越出 external 网关(外部网关设计 §8)");
+            }
+        });
+        return violations;
     }
 
     /**
@@ -382,6 +427,15 @@ class ArchitectureRulesTest {
     private static boolean isModuleApiPackage(String packageName) {
         String rest = packageName.substring(FUNCTION_ROOT.length());
         return rest.endsWith(".api") || rest.contains(".api.");
+    }
+
+    /**
+     * 整模块放行的存量边:auth→system 是 POM 显式声明的唯一跨模块边(用户/租户/登录日志三张表的
+     * PO/Mapper 归 system),子域级白名单对它整体放行(约定 §9.6);此豁免不再扩员,
+     * 新边(如 auth→external)一律只准落 api 包。
+     */
+    private static boolean isWholeModuleEdge(String ownerModule, String targetModule) {
+        return "auth".equals(ownerModule) && "system".equals(targetModule);
     }
 
     /** 是否为 MVC 映射方法:每个映射端点都必须有 @PreAuthorize,公开端点写 permitAll */

@@ -40,7 +40,7 @@
 - 平台公告：向指定租户的全部启用用户扇出，并提供跨租户的公告检索与扇出人数统计；
 - 收件人显示名、发送人署名在发送时刻快照落库，此后改名与停用都不回溯；
 - 出站投递：事务提交后把消息交给投递线程，逐通道投递、失败重试一次，终态写 `sys_notify_outbound`；
-- 邮件通道实现（单封 MimeMessage、收件人全部 BCC）与通道 SPI 的接入约定。
+- 邮件出站通道（薄壳转调 external 网关的 `MailPort`，SMTP 细节在 `snail-function-external`）与通道 SPI 的接入约定。
 
 **不负责**：
 
@@ -68,7 +68,7 @@ NotifyService ──────────────────────
    ├─▶ SysNotifyMessageMapper ─────▶ sys_notify_message   （消息主体）
    ├─▶ SysNotifyRecipientMapper ───▶ sys_notify_recipient （一人一行）
    └─▶ OutboundDispatcher ──afterCommit──▶ 队列 ─▶ 投递线程
-                                                  ├─▶ MailOutboundChannel ─▶ JavaMailSender
+                                                  ├─▶ MailOutboundChannel ─▶ external.api 的 MailPort（SMTP 细节在 snail-function-external）
                                                   └─▶ SysNotifyOutboundMapper ─▶ sys_notify_outbound
 
 平台管理员 ──POST /platform/notify/announcement──▶ NotifyPlatformController ─▶ NotifyService.announce
@@ -300,19 +300,15 @@ dispatcher 在 `handle` 里过滤。副作用是通道中途失效（邮件服�
 
 ### `OutboundChannel` / `MailOutboundChannel`
 
-SPI 与它的第一个实现。`OutboundMessage` 携带 `messageId/title/content/targets`，
+SPI 与它的邮件实现。`OutboundMessage` 携带 `messageId/title/content/targets`，
 `OutboundTarget` 是 `userId + address`，`address` 按通道语义解释（邮件即邮箱，可为空）。
 
-`MailOutboundChannel.send` 的做法：
-
-1. `getIfAvailable()` 取 `JavaMailSender`，缺席即 `邮件通道未配置`；
-2. 目标地址过滤链：非空白 → `trim` → `Validator::isEmail` → `distinct`。脏地址会让整封被 SMTP 拒收，
-   重复地址会让一个人收到两封，所以在这里一次性清掉；
-3. 全部无效即抛 `收件人没有可用邮箱地址`，由 dispatcher 记 `status = 2` 与错因，不静默当成功；
-4. 单封 `MimeMessage` + `MimeMessageHelper(mime, false, "UTF-8")`，正文按纯文本发送（第二个参数 false
-   即不解析 HTML，公告正文来自运营录入）；
-5. 收件人一律 `addBcc`，同一封里互不可见地址；`from` 取 `spring.mail.username`，默认
-   `snail-platform@noreply.local`。
+`MailOutboundChannel` 是薄壳：`available()` 直接问 `MailPort.available()`；`send` 把收件目标展开成
+地址列表，组装 `MailPort.MailMessage`（`caller = notify`、`bizType = outbound`、`bizId = 消息 ID`）
+转调 external 网关。SMTP 协议细节——地址过滤（空白/非法/去重）、全无效抛错、单封 MimeMessage、
+收件人全部 BCC、纯文本发送——全部住在 `snail-function-external` 的 `SmtpMailClient`，口径与一期一致，
+详见其模块 README。邮件调用的留痕随之下沉：`sys_external_call_log` 记网关侧流水，
+`sys_notify_outbound` 仍记投递终态，两张账本各司其职。
 
 ### `NotifyController` / `NotifyPlatformController`
 
@@ -543,8 +539,9 @@ SELECT channel, target, status, retry_count, error
 
 ### 启用邮件通道
 
-仓库默认**不带** `spring.mail` 配置，此时 `JavaMailSender` 不装配，`MailOutboundChannel.available()` 为 false，
-所有投递走 `log` 兜底行。要真实发信，在 `snail-platform-start` 的配置文件里补：
+仓库默认**不带** `spring.mail` 配置，此时 `JavaMailSender` 不装配，external 网关的 `SmtpMailClient.available()`
+为 false、`MailOutboundChannel.available()` 随之为 false，所有投递走 `log` 兜底行。要真实发信，在
+`snail-platform-start` 的配置文件里补：
 
 ```yaml
 spring:
