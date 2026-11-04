@@ -279,7 +279,9 @@ function onConditionValueChange(): void {
 const notifyTypes = computed({
   get: () => {
     void props.revision;
-    return readFlowableAttr(props.element, 'notifyType').split(',').filter(Boolean);
+    const selected = readFlowableAttr(props.element, 'notifyType').split(',').filter(Boolean);
+    // 未配置时按站内信展示默认勾选:不写回 XML,后端对空值同口径回落站内(方案 D3)
+    return selected.length ? selected : ['inner'];
   },
   set: (v: string[]) => writeFlowableAttrs(props.services.modeling, props.element, { notifyType: v.join(',') }),
 });
@@ -653,7 +655,7 @@ const candidateUsers = computed(() => {
           </el-checkbox-button>
         </el-checkbox-group>
         <p class="field-hint section-hint">
-          可多选；都不选即不通知。标注「待接入」的方式暂不会实际发送通知。
+          可多选；都不选时按站内消息发送。标注「待接入」的方式暂不会实际发送通知。
         </p>
       </div>
 

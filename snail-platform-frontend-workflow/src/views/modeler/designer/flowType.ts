@@ -24,7 +24,7 @@ export const ACTION_BUTTONS: ActionButtonDef[] = [
 
 export const DEFAULT_ACTION_BUTTONS = 'approve,reject,transfer';
 
-/** 通知方式码位（notifyType 属性，逗号分隔多选；不选即不通知） */
+/** 通知方式码位（notifyType 属性，逗号分隔多选；都不选时按站内消息发送） */
 export const NOTIFY_TYPES: Array<{ code: string; label: string; pending: boolean }> = [
   { code: 'sms', label: '短信', pending: true },
   { code: 'mail', label: '邮件', pending: true },
