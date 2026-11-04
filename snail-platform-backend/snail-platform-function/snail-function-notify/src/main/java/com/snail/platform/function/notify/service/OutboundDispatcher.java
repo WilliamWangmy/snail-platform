@@ -126,9 +126,14 @@ public class OutboundDispatcher implements DisposableBean {
         }
     }
 
-    /** 通道可用性在投递时判定;全不可用也落一行 log 兜底,保证消息有投递记录 */
+    /**
+     * 通道可用性在投递时判定;job 带通道集快照即按其过滤(null 保持全通道广播),
+     * 声明的通道全不可用也落一行 log 兜底,保证每条消息都有投递痕迹。
+     */
     private void handle(DispatchJob job) {
-        List<OutboundChannel> channels = channelProvider.stream().filter(OutboundChannel::available).toList();
+        List<OutboundChannel> channels = channelProvider.stream().filter(OutboundChannel::available)
+                .filter(channel -> job.channels() == null || job.channels().contains(channel.channel()))
+                .toList();
         if (channels.isEmpty()) {
             record(job, FALLBACK_CHANNEL, "无可用出站通道", STATUS_SUCCESS, 0, null);
             return;
