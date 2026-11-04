@@ -33,6 +33,7 @@
   --app-info-rgb: 75, 127, 169;
   --app-primary-tint: #7bcaba;
   --app-sidebar-glow: #0b423a;
+  --app-font-mono: 'JetBrains Mono', 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
 }
 
 html,
@@ -61,6 +62,60 @@ body {
 
 .el-button > .app-icon:last-child {
   margin-right: 0;
+}
+
+/* 顶栏控件:与流程端 .icon-btn 同尺寸的方形按钮,ThemePicker 与顶栏共用,故放全局。 */
+.icon-btn {
+  display: inline-grid;
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--app-line);
+  border-radius: 9px;
+  background: var(--app-soft);
+  color: var(--app-muted);
+  cursor: pointer;
+  transition:
+    color 0.18s,
+    border-color 0.18s,
+    background 0.18s;
+}
+
+.icon-btn:hover {
+  border-color: color-mix(in srgb, var(--app-primary) 38%, var(--app-line));
+  background: var(--app-soft-2);
+  color: var(--app-ink);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+
+.icon-btn .app-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* 顶栏未读角标:超 99 由调用方收敛成 99+。 */
+.icon-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--app-danger);
+  color: var(--app-on-primary);
+  font-family: var(--app-font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
 }
 
 /* 品牌标识:登录页与侧栏共用同一套标记,文字色随容器覆盖。 */
@@ -442,6 +497,130 @@ body {
 /* 主题面板弹层同样 teleport 到 body,宽度上限放全局。 */
 .theme-popper {
   max-width: calc(100vw - 24px);
+}
+
+/* 顶栏系统切换/账号菜单弹层同样 teleport 到 body,排版只能放全局。 */
+.system-switch-popper .system-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 186px;
+}
+
+.system-switch-popper .system-item b {
+  font-weight: 600;
+}
+
+.system-switch-popper .system-item small {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.user-menu-popper .user-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 108px;
+}
+
+.system-switch-popper .app-icon,
+.user-menu-popper .app-icon {
+  color: var(--app-muted);
+}
+
+/* 顶栏消息面板:结构与流程端 .msg-* 逐条同规格,色值走 admin 令牌。 */
+.msg-popper {
+  max-width: calc(100vw - 24px);
+}
+
+.msg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--app-line);
+  color: var(--app-ink);
+  font-size: 12.5px;
+}
+
+.msg-head-count {
+  margin-left: auto;
+  color: color-mix(in srgb, var(--app-muted) 82%, transparent);
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+}
+
+.msg-list {
+  max-height: 252px;
+  margin: 4px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.msg-item + .msg-item {
+  border-top: 1px solid var(--app-line);
+}
+
+.msg-item {
+  display: grid;
+  gap: 3px;
+  padding: 7px 2px;
+}
+
+.msg-item-title {
+  overflow: hidden;
+  color: var(--app-ink);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-item-meta {
+  color: color-mix(in srgb, var(--app-muted) 82%, transparent);
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+}
+
+.msg-empty {
+  margin: 14px 0;
+  color: color-mix(in srgb, var(--app-muted) 82%, transparent);
+  font-size: 12px;
+  text-align: center;
+}
+
+.msg-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid var(--app-line);
+}
+
+.msg-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--app-primary);
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition:
+    background 0.16s,
+    color 0.16s;
+}
+
+.msg-link:hover {
+  background: var(--app-soft-2);
+}
+
+.msg-link .app-icon {
+  width: 13px;
+  height: 13px;
 }
 
 /* 折叠侧栏的二级菜单弹层被 teleport 到 body,只能在全局样式里染深色底。 */

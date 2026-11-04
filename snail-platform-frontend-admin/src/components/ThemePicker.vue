@@ -13,17 +13,17 @@ const theme = useThemeStore();
     popper-class="theme-popper"
   >
     <template #reference>
-      <ElButton
-        text
-        circle
-        class="topbar-icon"
+      <button
+        class="icon-btn"
+        type="button"
+        title="外观主题"
         aria-label="外观主题"
       >
         <AppIcon
           name="palette"
-          :size="18"
+          :size="16"
         />
-      </ElButton>
+      </button>
     </template>
 
     <div class="theme-panel-head">
