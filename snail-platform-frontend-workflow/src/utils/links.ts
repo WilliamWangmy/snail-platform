@@ -11,13 +11,14 @@ export const SYSTEM_LINKS = {
 
 export type SystemKey = keyof typeof SYSTEM_LINKS;
 
-/** 目标端地址拼一次性 ssotoken。 */
-export function crossAppUrl(key: SystemKey, token: string): string {
+/** 目标端地址拼一次性 ssotoken;传 path 则深链到目标端站内路由（如管理端通知中心）。 */
+export function crossAppUrl(key: SystemKey, token: string, path?: string): string {
   const base = SYSTEM_LINKS[key];
-  const joiner = base.includes('?') ? '&' : '?';
-  return `${base}${joiner}ssotoken=${encodeURIComponent(token)}`;
+  const target = path ? `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}` : base;
+  const joiner = target.includes('?') ? '&' : '?';
+  return `${target}${joiner}ssotoken=${encodeURIComponent(token)}`;
 }
 
-export function openCrossApp(key: SystemKey, token: string): void {
-  window.open(crossAppUrl(key, token), '_blank', 'noopener');
+export function openCrossApp(key: SystemKey, token: string, path?: string): void {
+  window.open(crossAppUrl(key, token, path), '_blank', 'noopener');
 }

@@ -619,6 +619,11 @@ html.light {
   max-width: calc(100vw - 24px);
 }
 
+/* 顶栏消息面板同样挂 body 下 */
+.msg-popper {
+  max-width: calc(100vw - 24px);
+}
+
 /* 顶栏系统切换下拉（popper 挂在 body 下，需全局样式） */
 .system-switch-popper .system-item {
   display: inline-flex;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 
@@ -16,6 +16,49 @@ const auth = useAuthStore();
 
 const profileVisible = ref(false);
 const passwordVisible = ref(false);
+
+/* ------------------------- 消息角标:30s 轮询未读数 ------------------------- */
+
+const unread = ref(0);
+const latestUnread = ref<NotifyInboxItem[]>([]);
+/** 收件箱列表端点要 system:notify:list,审批人角色未必带它;无权限时面板只报未读数,不给死链。 */
+const canReadInbox = computed(() => auth.has('system:notify:list'));
+let unreadTimer: number | undefined;
+
+async function pollUnread(): Promise<void> {
+  try {
+    unread.value = await fetchUnreadCount();
+  } catch {
+    // 轮询失败静默:角标是辅助信息,不因网络抖动打断主流程
+  }
+}
+
+async function loadLatestUnread(): Promise<void> {
+  if (!canReadInbox.value) return;
+  try {
+    latestUnread.value = (await pageLatestUnread()).rows;
+  } catch {
+    latestUnread.value = [];
+  }
+}
+
+/** 后端送 'yyyy-MM-dd HH:mm:ss',面板窄,只留 'MM-dd HH:mm'。 */
+function shortTime(value: string | null): string {
+  return value ? value.slice(5, 16) : '';
+}
+
+function openInbox(): void {
+  openCrossApp('admin', auth.token, '/system/notify');
+}
+
+onMounted(() => {
+  void pollUnread();
+  unreadTimer = window.setInterval(() => void pollUnread(), 30_000);
+});
+
+onBeforeUnmount(() => {
+  if (unreadTimer !== undefined) window.clearInterval(unreadTimer);
+});
 
 function onUserCommand(command: string | number | object): void {
   if (command === 'profile') profileVisible.value = true;
@@ -147,6 +190,68 @@ async function handleLogout(): Promise<void> {
         </span>
         <span class="top-date">{{ today }}</span>
         <span class="env-pill">{{ env }}</span>
+        <ElPopover
+          trigger="click"
+          placement="bottom-end"
+          :width="316"
+          popper-class="msg-popper"
+          @before-enter="loadLatestUnread"
+        >
+          <template #reference>
+            <button
+              class="icon-btn"
+              type="button"
+              title="消息"
+              :aria-label="`消息，${unread} 条未读`"
+            >
+              <AppIcon name="bell" />
+              <span
+                v-if="unread > 0"
+                class="icon-badge"
+              >{{ unread > 99 ? '99+' : unread }}</span>
+            </button>
+          </template>
+
+          <div class="msg-head">
+            <b>消息</b>
+            <span class="msg-head-count">{{ unread > 0 ? `${unread} 条未读` : '没有未读' }}</span>
+          </div>
+          <ul
+            v-if="latestUnread.length"
+            class="msg-list"
+          >
+            <li
+              v-for="item in latestUnread"
+              :key="item.recipientId"
+              class="msg-item"
+            >
+              <span class="msg-item-title">{{ item.title }}</span>
+              <span class="msg-item-meta">{{ item.senderName || '系统' }} · {{ shortTime(item.sendTime) }}</span>
+            </li>
+          </ul>
+          <p
+            v-else
+            class="msg-empty"
+          >
+            {{ canReadInbox ? '暂无未读消息' : `有 ${unread} 条未读，正文需在管理端通知中心查看` }}
+          </p>
+          <div
+            v-if="canReadInbox"
+            class="msg-foot"
+          >
+            <button
+              class="text-btn"
+              type="button"
+              @click="openInbox"
+            >
+              查看全部
+              <AppIcon
+                name="external-link"
+                :size="13"
+              />
+            </button>
+          </div>
+        </ElPopover>
         <ThemePicker />
         <el-dropdown
           trigger="click"

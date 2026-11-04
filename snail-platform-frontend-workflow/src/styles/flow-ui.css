@@ -1268,6 +1268,7 @@ svg {
 
 .icon-btn {
   display: inline-grid;
+  position: relative;
   width: 34px;
   height: 34px;
   flex: none;
@@ -1288,6 +1289,89 @@ svg {
 .icon-btn .ic {
   width: 16px;
   height: 16px;
+}
+
+/* 顶栏未读角标:超 99 由调用方收敛成 99+。 */
+.icon-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* 顶栏消息面板（popper 挂在 body 下） */
+.msg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-1);
+  font-size: 12.5px;
+}
+
+.msg-head-count {
+  margin-left: auto;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.msg-list {
+  max-height: 252px;
+  margin: 4px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.msg-item + .msg-item {
+  border-top: 1px solid var(--line);
+}
+
+.msg-item {
+  display: grid;
+  gap: 3px;
+  padding: 7px 2px;
+}
+
+.msg-item-title {
+  overflow: hidden;
+  color: var(--text-1);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-item-meta {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.msg-empty {
+  margin: 14px 0;
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: center;
+}
+
+.msg-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid var(--line);
 }
 
 .text-btn {

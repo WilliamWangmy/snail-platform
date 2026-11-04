@@ -27,6 +27,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** 权限判定唯一入口：登录人快照里的权限码集合（后端不下发即视为无权限）。 */
+  function has(code: string): boolean {
+    return loginUser.value?.permissions?.includes(code) === true;
+  }
+
   /** 静默拉取当前登录人（守卫在 token 存在但用户为空时调用） */
   async function fetchMe(): Promise<LoginUserVO> {
     const me = await authApi.getMe();
@@ -55,5 +60,5 @@ export const useAuthStore = defineStore('auth', () => {
     loginUser.value = null;
   }
 
-  return { token, loginUser, isLoggedIn, tenantName, displayName, setToken, fetchMe, login, logout, clearLocal };
+  return { token, loginUser, isLoggedIn, tenantName, displayName, has, setToken, fetchMe, login, logout, clearLocal };
 });
