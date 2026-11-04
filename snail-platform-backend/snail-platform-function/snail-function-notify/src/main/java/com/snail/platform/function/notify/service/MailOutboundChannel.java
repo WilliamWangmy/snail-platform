@@ -34,7 +34,7 @@ public class MailOutboundChannel implements OutboundChannel {
         // 地址过滤(空白/非法/去重)与 BCC 细节在 SmtpMailClient;全无效时它抛 ExternalCallException,
         // 由 dispatcher 记 failed 与错因,不静默当成功——口径与一期完全一致
         List<String> addresses = message.targets().stream()
-                .map(OutboundTarget::address)
+                .map(OutboundTarget::email)
                 .toList();
         mailPort.send(new MailPort.MailMessage(
                 message.title(), message.content(), addresses, "notify", "outbound", message.messageId()));

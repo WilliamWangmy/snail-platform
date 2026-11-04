@@ -21,7 +21,7 @@ public interface OutboundChannel {
     /** 投递一次;失败抛异常,由投递器重试一次后落失败记录 */
     void send(OutboundMessage message) throws Exception;
 
-    /** 一次投递的消息体:targets 的 address 按通道语义寻址(邮件为邮箱) */
+    /** 一次投递的消息体:targets 按通道语义寻址(邮件取 email,短信取 phone) */
     record OutboundMessage(
             /** 消息 ID */
             Long messageId,
@@ -35,11 +35,13 @@ public interface OutboundChannel {
             List<OutboundTarget> targets) {
     }
 
-    /** 收件目标:userId 溯源,address 为通道寻址地址(可为空,实现侧过滤) */
+    /** 收件目标:userId 溯源;email/phone 为对应通道的寻址地址,可空由实现侧过滤 */
     record OutboundTarget(
             /** 用户 ID */
             Long userId,
-            /** 寻址地址:邮箱/手机号 */
-            String address) {
+            /** 邮箱,邮件通道寻址 */
+            String email,
+            /** 手机号,短信通道寻址 */
+            String phone) {
     }
 }

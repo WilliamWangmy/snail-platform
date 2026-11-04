@@ -241,7 +241,8 @@ public class NotifyService implements NotifyApi {
             throw BizException.badRequest("收件人均不存在或已跨租户");
         }
         List<OutboundChannel.OutboundTarget> targets = briefs.stream()
-                .map(brief -> new OutboundChannel.OutboundTarget(brief.userId(), brief.email())).toList();
+                .map(brief -> new OutboundChannel.OutboundTarget(brief.userId(), brief.email(), brief.phone()))
+                .toList();
         List<SysNotifyRecipient> rows = briefs.stream().map(brief -> {
             SysNotifyRecipient row = new SysNotifyRecipient();
             row.setMessageId(message.getMessageId());
