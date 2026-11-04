@@ -2,6 +2,7 @@ package com.snail.platform.function.workflow.task.service;
 
 import com.snail.platform.framework.core.context.LoginUser;
 import com.snail.platform.framework.core.context.LoginUserContextHolder;
+import com.snail.platform.framework.workflow.engine.WorkflowEngineGateway;
 import com.snail.platform.framework.workflow.engine.WorkflowTask;
 import com.snail.platform.function.notify.api.NotifyApi;
 import com.snail.platform.function.notify.api.NotifyApi.NotifySendCommand;
@@ -17,7 +18,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * 职责:流程侧的通知出口——办理动作产生的提醒一律经 NotifyApi 发,自己不留第二套消息表(方案 §7)。
- * 上游:WorkflowTaskService 的签收/办理/转办;下游:notify 模块的收件箱与出站通道。
+ * 上游:WorkflowTaskService 的签收/办理/转办;下游:notify 模块的收件箱与出站通道、
+ * 引擎网关(读节点通知配置,按定义缓存)。
  * 口径:发送排在事务提交之后。办理动作与通知不是同一件事:审批已经成立,通知渠道挂了也不该把单子退回未办,
  * 所以这里只登记 afterCommit 回调,失败落日志不回滚、不重试(重试与死信属 P5 观测线)。
  * 收件人在登记时就算好:afterCommit 里线程上下文正在清理,那时再去查角色成员会撞上"无租户上下文"。
@@ -28,8 +30,17 @@ public class WorkflowNotifyService {
     /** 通知业务域标签,与收件箱筛选对齐 */
     private static final String BIZ_TYPE = "workflow";
 
+    /** 站内信通道名:notifyType 未配置时的回落通道(方案 D3),与 notify 侧通道词汇对齐 */
+    private static final String CHANNEL_INNER = "inner";
+
+    /** 通道白名单:设计器 notifyType 只会写这三个,其余值丢弃防脏数据进投递器 */
+    private static final Set<String> NOTIFY_CHANNELS = Set.of(CHANNEL_INNER, "mail", "sms");
+
     /** 日志:通知失败只留痕,不打断已提交的审批 */
     private static final Logger LOG = LoggerFactory.getLogger(WorkflowNotifyService.class);
+
+    /** 流程引擎网关:读节点通知配置(notifyType/ccUsers/ccGroups,按定义缓存) */
+    private final WorkflowEngineGateway gateway;
 
     /** 通知发送唯一入口 */
     private final NotifyApi notifyApi;
@@ -37,15 +48,18 @@ public class WorkflowNotifyService {
     /** 用户档案端口:候选角色要展开成具体收件人 */
     private final UserBriefPort userBriefPort;
 
-    public WorkflowNotifyService(NotifyApi notifyApi, UserBriefPort userBriefPort) {
+    public WorkflowNotifyService(WorkflowEngineGateway gateway, NotifyApi notifyApi,
+                                 UserBriefPort userBriefPort) {
+        this.gateway = gateway;
         this.notifyApi = notifyApi;
         this.userBriefPort = userBriefPort;
     }
 
     /**
-     * 给一张任务找收件人并提醒:已签收的提醒办理人,未签收的提醒候选角色的全部启用成员。
+     * 给一张任务找收件人并提醒:已签收的提醒办理人,未签收的提醒候选用户与候选角色的全部启用成员。
      * 无人可提醒(角色空挂)即静默返回——这不是错误,是没人在等这张单子。
      * 文案里带业务单号:收件人要能从通知跳回单据,只知道"有个流程"不够。
+     * 通道按节点 notifyType 走(方案 D2):未配置回落站内信,存量模型不回归。
      */
     public void remindTodo(WorkflowTask task, String instanceName, String businessKey) {
         Set<Long> recipients = recipientsOf(task);
@@ -55,15 +69,15 @@ public class WorkflowNotifyService {
         String title = "待办提醒:" + blankTo(instanceName, "流程任务");
         String content = "节点「" + blankTo(task.name(), task.taskDefinitionKey()) + "」等待您办理。"
                 + coordinate(businessKey);
-        sendAfterCommit(title, content, List.copyOf(recipients));
+        sendAfterCommit(title, content, List.copyOf(recipients), channelsOf(task));
     }
 
-    /** 转办后提醒接手人;办理完成后提醒发起人(结果告知) */
+    /** 转办后提醒接手人;办理完成后提醒发起人(结果告知)。平台固定通知不走节点通道,维持现行行为(D6) */
     public void notifyUsers(String title, String content, List<Long> recipients) {
         if (recipients == null || recipients.isEmpty()) {
             return;
         }
-        sendAfterCommit(title, content, recipients);
+        sendAfterCommit(title, content, recipients, null);
     }
 
     /** 单号片段:裸流程(没有业务单)就不带这句,通知里不写"单号:null" */
@@ -90,12 +104,15 @@ public class WorkflowNotifyService {
         return raw == null || raw.isBlank() ? fallback : raw;
     }
 
-    /** 收件人展开:办理人优先,否则候选角色成员并集 */
+    /** 收件人展开:办理人优先,否则抢签候选用户与候选角色成员并集(方案 D4) */
     private Set<Long> recipientsOf(WorkflowTask task) {
         Set<Long> recipients = new LinkedHashSet<>();
         if (task.assignee() != null) {
             addIfNumeric(recipients, task.assignee());
             return recipients;
+        }
+        for (String candidateUser : task.candidateUsers()) {
+            addIfNumeric(recipients, candidateUser);
         }
         for (String roleId : task.candidateGroups()) {
             try {
@@ -115,13 +132,30 @@ public class WorkflowNotifyService {
         }
     }
 
-    /** 登记提交后发送;当前不在事务里(如测试直调)就立即发 */
-    private void sendAfterCommit(String title, String content, List<Long> recipients) {
+    /**
+     * 节点到达提醒的通道选择:读 BPMN 节点的 notifyType(网关按定义缓存,命中无引擎查询),
+     * 白名单过滤后即为通道集;未配置(存量模型)回落站内信,否则发布后待办站内提醒会凭空消失(方案 D3)。
+     */
+    private Set<String> channelsOf(WorkflowTask task) {
+        Set<String> notifyTypes = gateway.nodeNotifyConfig(task.definitionId(), task.taskDefinitionKey())
+                .notifyTypes();
+        Set<String> channels = new LinkedHashSet<>();
+        for (String notifyType : notifyTypes) {
+            String channel = notifyType.trim().toLowerCase();
+            if (NOTIFY_CHANNELS.contains(channel)) {
+                channels.add(channel);
+            }
+        }
+        return channels.isEmpty() ? Set.of(CHANNEL_INNER) : channels;
+    }
+
+    /** 登记提交后发送;当前不在事务里(如测试直调)就立即发;channels 语义见 NotifySendCommand */
+    private void sendAfterCommit(String title, String content, List<Long> recipients, Set<String> channels) {
         Long tenantId = currentTenantId();
         Long senderId = currentUserId();
         String senderName = currentNickname();
         NotifySendCommand command = new NotifySendCommand(tenantId, title, content, BIZ_TYPE, null,
-                senderId, senderName == null ? "系统通知" : senderName, recipients, null);
+                senderId, senderName == null ? "系统通知" : senderName, recipients, channels);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             dispatch(command);
             return;
