@@ -991,6 +991,22 @@ svg {
   display: flex;
   align-items: center;
   gap: 9px;
+  cursor: pointer;
+  outline-offset: 4px;
+}
+
+.header-user:hover .avatar {
+  border-color: var(--teal-line);
+}
+
+.user-caret {
+  flex: none;
+  color: var(--text-3);
+  transition: transform 0.18s var(--ease);
+}
+
+.header-user:hover .user-caret {
+  color: var(--text-2);
 }
 
 .avatar {

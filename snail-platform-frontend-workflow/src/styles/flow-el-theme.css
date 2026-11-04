@@ -642,6 +642,20 @@ html.light {
   font-size: 11px;
 }
 
+/* 顶栏账号菜单（popper 挂在 body 下，需全局样式） */
+.user-menu-popper .user-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 108px;
+}
+
+.user-menu-popper .user-item .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--text-3);
+}
+
 /* ------------------------------------------------------------------ table */
 
 .el-table.flow-table {

@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AppIcon: typeof import('./components/AppIcon.vue')['default']
+    ChangePasswordDialog: typeof import('./components/ChangePasswordDialog.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCheckboxButton: typeof import('element-plus/es')['ElCheckboxButton']
@@ -43,6 +44,8 @@ declare module 'vue' {
     ElTimeline: typeof import('element-plus/es')['ElTimeline']
     ElTimelineItem: typeof import('element-plus/es')['ElTimelineItem']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
+    PasswordHintInput: typeof import('./components/PasswordHintInput.vue')['default']
+    ProfileEditDialog: typeof import('./components/ProfileEditDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ThemePicker: typeof import('./components/ThemePicker.vue')['default']

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 
 import AppIcon from '@/components/AppIcon.vue';
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
+import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
 import ThemePicker from '@/components/ThemePicker.vue';
 import { useAuthStore } from '@/stores/auth';
 import { openCrossApp, type SystemKey } from '@/utils/links';
@@ -11,6 +13,15 @@ import { openCrossApp, type SystemKey } from '@/utils/links';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+
+const profileVisible = ref(false);
+const passwordVisible = ref(false);
+
+function onUserCommand(command: string | number | object): void {
+  if (command === 'profile') profileVisible.value = true;
+  else if (command === 'password') passwordVisible.value = true;
+  else if (command === 'logout') void handleLogout();
+}
 
 function onSwitchSystem(command: string | number | object): void {
   openCrossApp(command as SystemKey, auth.token);
@@ -173,23 +184,54 @@ async function handleLogout(): Promise<void> {
           class="header-divider"
           aria-hidden="true"
         ></span>
-        <div class="header-user">
-          <span class="avatar">{{ avatarText }}</span>
-          <span class="header-user-copy">
-            <span class="header-user-name">{{ auth.displayName }}</span>
-            <span class="header-user-role">{{ auth.tenantName || '流程管理员' }}</span>
-          </span>
-          <button
-            class="icon-btn"
-            type="button"
-            title="退出登录"
-            aria-label="退出登录"
-            @click="handleLogout"
+        <el-dropdown
+          trigger="click"
+          popper-class="user-menu-popper"
+          @command="onUserCommand"
+        >
+          <span
+            class="header-user"
+            role="button"
+            tabindex="0"
+            :aria-label="`账号菜单，当前：${auth.displayName}`"
           >
-            <AppIcon name="log-out" />
-          </button>
-        </div>
+            <span class="avatar">{{ avatarText }}</span>
+            <span class="header-user-copy">
+              <span class="header-user-name">{{ auth.displayName }}</span>
+              <span class="header-user-role">{{ auth.tenantName || '流程管理员' }}</span>
+            </span>
+            <AppIcon
+              class="user-caret"
+              name="chevron-down"
+              :size="12"
+            />
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="profile">
+                <span class="user-item"><AppIcon name="user" />个人信息</span>
+              </el-dropdown-item>
+              <el-dropdown-item command="password">
+                <span class="user-item"><AppIcon name="lock" />修改密码</span>
+              </el-dropdown-item>
+              <el-dropdown-item
+                divided
+                command="logout"
+              >
+                <span class="user-item"><AppIcon name="log-out" />退出登录</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
+      <ProfileEditDialog
+        :visible="profileVisible"
+        @closed="profileVisible = false"
+      />
+      <ChangePasswordDialog
+        :visible="passwordVisible"
+        @closed="passwordVisible = false"
+      />
     </div>
   </header>
 </template>
