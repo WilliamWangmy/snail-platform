@@ -618,19 +618,19 @@ public class WorkflowEngineGateway {
                 () -> runtimeService.getActiveActivityIds(processInstanceId));
     }
 
-    /** 在途任务视图:候选组从身份链接读取,endTime 为空 */
+    /** 在途任务视图:候选组与抢签候选用户都从身份链接读取,endTime 为空 */
     private WorkflowTask toTask(Task row) {
         return new WorkflowTask(row.getId(), row.getTaskDefinitionKey(), row.getName(),
                 row.getProcessDefinitionId(), row.getProcessInstanceId(),
-                row.getAssignee(), candidateGroupsOf(row.getId()),
+                row.getAssignee(), candidateGroupsOf(row.getId()), candidateUsersOf(row.getId()),
                 WorkflowTimes.ofEngine(row.getCreateTime()), WorkflowTimes.ofEngine(row.getDueDate()), null);
     }
 
-    /** 历史任务没有实时身份链接可读,候选组留空:已办展示的是"我办过的",候选信息以留痕为准 */
+    /** 历史任务没有实时身份链接可读,候选信息留空:已办展示的是"我办过的",候选信息以留痕为准 */
     private WorkflowTask toHistoricTask(HistoricTaskInstance row) {
         return new WorkflowTask(row.getId(), row.getTaskDefinitionKey(), row.getName(),
                 row.getProcessDefinitionId(), row.getProcessInstanceId(),
-                row.getAssignee(), List.of(),
+                row.getAssignee(), List.of(), List.of(),
                 WorkflowTimes.ofEngine(row.getCreateTime()), WorkflowTimes.ofEngine(row.getDueDate()),
                 WorkflowTimes.ofEngine(row.getEndTime()));
     }
@@ -641,6 +641,16 @@ public class WorkflowEngineGateway {
                 .stream()
                 .filter(link -> IDENTITY_LINK_CANDIDATE.equals(link.getType()) && link.getGroupId() != null)
                 .map(link -> link.getGroupId())
+                .distinct()
+                .toList());
+    }
+
+    /** 抢签任务的候选用户:与候选组同挂身份链接,按 candidate 类型取 userId 集合(通知收件人展开用) */
+    private List<String> candidateUsersOf(String taskId) {
+        return WorkflowEngineErrors.supply("查询任务候选用户", () -> taskService.getIdentityLinksForTask(taskId)
+                .stream()
+                .filter(link -> IDENTITY_LINK_CANDIDATE.equals(link.getType()) && link.getUserId() != null)
+                .map(link -> link.getUserId())
                 .distinct()
                 .toList());
     }
