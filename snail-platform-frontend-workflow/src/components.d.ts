@@ -44,6 +44,7 @@ declare module 'vue' {
     ElTimeline: typeof import('element-plus/es')['ElTimeline']
     ElTimelineItem: typeof import('element-plus/es')['ElTimelineItem']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
+    NotifyToast: typeof import('./components/NotifyToast.vue')['default']
     PasswordHintInput: typeof import('./components/PasswordHintInput.vue')['default']
     ProfileEditDialog: typeof import('./components/ProfileEditDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

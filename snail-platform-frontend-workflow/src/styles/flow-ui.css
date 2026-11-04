@@ -1291,6 +1291,34 @@ svg {
   height: 16px;
 }
 
+/* 推送到达的铃铛抖动:轻微摇摆一次,不做常驻动画(与管理端 DefaultLayout 同款) */
+.icon-btn.bell-shake {
+  animation: bell-shake 0.6s ease;
+}
+
+@keyframes bell-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+
+  20% {
+    transform: rotate(-14deg);
+  }
+
+  40% {
+    transform: rotate(12deg);
+  }
+
+  60% {
+    transform: rotate(-8deg);
+  }
+
+  80% {
+    transform: rotate(5deg);
+  }
+}
+
 /* 顶栏未读角标:超 99 由调用方收敛成 99+。 */
 .icon-badge {
   position: absolute;

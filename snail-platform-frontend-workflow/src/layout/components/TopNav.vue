@@ -5,8 +5,11 @@ import { ElMessageBox } from 'element-plus';
 
 import AppIcon from '@/components/AppIcon.vue';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
+import NotifyToast from '@/components/NotifyToast.vue';
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
 import ThemePicker from '@/components/ThemePicker.vue';
+import { fetchUnreadCount, pageLatestUnread, type NotifyInboxItem } from '@/api/notify';
+import { useNotifyPush } from '@/composables/useNotifyPush';
 import { useAuthStore } from '@/stores/auth';
 import { openCrossApp, type SystemKey } from '@/utils/links';
 
@@ -17,7 +20,7 @@ const auth = useAuthStore();
 const profileVisible = ref(false);
 const passwordVisible = ref(false);
 
-/* ------------------------- 消息角标:30s 轮询未读数 ------------------------- */
+/* ------------------------- 消息角标:30s 轮询未读数(兜底),SSE 推送(加速) ------------------------- */
 
 const unread = ref(0);
 const latestUnread = ref<NotifyInboxItem[]>([]);
@@ -25,12 +28,29 @@ const latestUnread = ref<NotifyInboxItem[]>([]);
 const canReadInbox = computed(() => auth.has('system:notify:list'));
 let unreadTimer: number | undefined;
 
+/** 推送到达时铃铛抖一下:纯视觉提示,与铃铛权限无关,推送开着就有 */
+const bellShake = ref(false);
+let bellShakeTimer: number | undefined;
+
 async function pollUnread(): Promise<void> {
   try {
     unread.value = await fetchUnreadCount();
   } catch {
     // 轮询失败静默:角标是辅助信息,不因网络抖动打断主流程
   }
+}
+
+/** 每帧到达:立即重取未读数(推送 payload 不带计数,以数据库口径为准) */
+const notifyPush = useNotifyPush({ onFrame: () => void pollUnread() });
+
+function onPushed(): void {
+  bellShake.value = false;
+  window.clearTimeout(bellShakeTimer);
+  // 双 rAF 强制重启动画:连发多条推送时每次都要抖
+  requestAnimationFrame(() => {
+    bellShake.value = true;
+    bellShakeTimer = window.setTimeout(() => (bellShake.value = false), 700);
+  });
 }
 
 async function loadLatestUnread(): Promise<void> {
@@ -52,12 +72,17 @@ function openInbox(): void {
 }
 
 onMounted(() => {
+  window.addEventListener('notify:pushed', onPushed);
   void pollUnread();
   unreadTimer = window.setInterval(() => void pollUnread(), 30_000);
+  notifyPush.start();
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('notify:pushed', onPushed);
   if (unreadTimer !== undefined) window.clearInterval(unreadTimer);
+  window.clearTimeout(bellShakeTimer);
+  notifyPush.stop();
 });
 
 function onUserCommand(command: string | number | object): void {
@@ -115,6 +140,7 @@ const avatarText = computed(() => {
 });
 
 async function handleLogout(): Promise<void> {
+  notifyPush.stop();
   await ElMessageBox.confirm('确定退出登录？', '提示', { type: 'warning' });
   await auth.logout();
   await router.push('/login');
@@ -200,6 +226,7 @@ async function handleLogout(): Promise<void> {
           <template #reference>
             <button
               class="icon-btn"
+              :class="{ 'bell-shake': bellShake }"
               type="button"
               title="消息"
               :aria-label="`消息，${unread} 条未读`"
@@ -337,6 +364,7 @@ async function handleLogout(): Promise<void> {
         :visible="passwordVisible"
         @closed="passwordVisible = false"
       />
+      <NotifyToast />
     </div>
   </header>
 </template>

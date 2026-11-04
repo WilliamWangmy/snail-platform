@@ -5,6 +5,11 @@
  * label 为展示名；已存到 BPMN 的初始值按 id 反查名称回显，查不到保留原值。
  * 选中即钉住：Element Plus 远程下拉在选中后会重触发 remote-method 置空列表，
  * 已选项若不钉住会从列表丢失，输入框回退显示裸 value（id）。
+ *
+ * 回显关键（EP remote 限制）：el-option 的 label 原地升级时，EP 仅在非 remote 下才重算已选文案
+ * （useOption 的 watch(currentLabel) 对 remote 直接跳过）。因此初始不能放裸 id 占位项——
+ * 否则同名 key 原地换成真名后输入框永远显示 id；必须留空 options，让解析结果以「新 key」
+ * 挂载触发 select 内部 setSelected 重算。解析失败/未匹配时输入框自然回退显示裸 value。
  */
 import { ref } from 'vue';
 
@@ -52,27 +57,26 @@ function createSticky(options: Ref<RemoteOption[]>) {
         pinned.set(value, found ?? { label: value, value });
       }
     },
-    /** 回显解析完成后升级钉住项为真实名称 */
-    upgrade: (resolved: RemoteOption[]) => {
-      for (const option of resolved) {
-        if (pinned.has(option.value)) pinned.set(option.value, option);
-      }
+    /** 回显解析完成后以真实名称落钉（覆盖此前可能的裸值占位钉住） */
+    resolve: (resolved: RemoteOption[]) => {
+      for (const option of resolved) pinned.set(option.value, option);
     },
   };
 }
 
 export function useUserRemoteSearch(initial: string[] = []): RemoteSearch {
-  const options = ref<RemoteOption[]>(initial.map((v) => ({ label: v, value: v })));
+  // 初始不放裸 id 占位项：remote 下占位项与解析结果同 key，label 原地升级不会刷新已选文案（见文件头注释）
+  const options = ref<RemoteOption[]>([]);
   const sticky = createSticky(options);
   let searched = false;
   if (initial.length) {
     // 用户接口没有按 id 批量查：回显阶段拉一页全量按 id 匹配，查不到保留原值
     pageUsers({ pageNum: 1, pageSize: 200 })
       .then((page) => {
-        if (searched) return;
         const resolved = toUserOptions(page.rows).filter((o) => initial.includes(o.value));
-        sticky.upgrade(resolved);
-        options.value = sticky.merge(resolved);
+        sticky.resolve(resolved);
+        // 已有搜索结果时不覆盖列表，仅把钉住项并入
+        options.value = sticky.merge(searched ? options.value : resolved);
       })
       .catch(() => undefined);
   }
@@ -96,16 +100,16 @@ export function useUserRemoteSearch(initial: string[] = []): RemoteSearch {
 }
 
 export function useRoleRemoteSearch(initial: string[] = []): RemoteSearch {
-  const options = ref<RemoteOption[]>(initial.map((v) => ({ label: v, value: v })));
+  // 初始不放裸 id 占位项，理由同 useUserRemoteSearch
+  const options = ref<RemoteOption[]>([]);
   const sticky = createSticky(options);
   let searched = false;
   if (initial.length) {
     pageRoles({ pageNum: 1, pageSize: 200 })
       .then((page) => {
-        if (searched) return;
         const resolved = toRoleOptions(page.rows).filter((o) => initial.includes(o.value));
-        sticky.upgrade(resolved);
-        options.value = sticky.merge(resolved);
+        sticky.resolve(resolved);
+        options.value = sticky.merge(searched ? options.value : resolved);
       })
       .catch(() => undefined);
   }
