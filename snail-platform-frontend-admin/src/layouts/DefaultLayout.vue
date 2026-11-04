@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
@@ -50,7 +49,15 @@ async function signOut(): Promise<void> {
   void router.push('/login');
 }
 
-/** 用户下拉四项:个人信息/修改密码开弹窗,数据大屏暂未实现,退出登录直接走人 */
+/** 独立端地址:三端共用一套会话,跳转一律带一次性 ssotoken(大屏收下后可再交接);均新开页签。 */
+const SCREEN_URL = import.meta.env.VITE_SCREEN_URL ?? 'http://localhost:8001/';
+const FLOW_URL = import.meta.env.VITE_FLOW_URL ?? 'http://localhost:8002/';
+
+function openStandalone(url: string): void {
+  window.open(`${url}${url.includes('?') ? '&' : '?'}ssotoken=${encodeURIComponent(auth.token)}`, '_blank', 'noopener');
+}
+
+/** 用户下拉五项:个人信息/修改密码开弹窗,数据大屏与流程平台新开页签,退出登录直接走人 */
 const profileVisible = ref(false);
 const passwordVisible = ref(false);
 
@@ -58,7 +65,8 @@ function handleUserCommand(command: string | number | object): void {
   if (command === 'logout') void signOut();
   else if (command === 'profile') profileVisible.value = true;
   else if (command === 'password') passwordVisible.value = true;
-  else if (command === 'dashboard') ElMessage.info('数据大屏开发中，敬请期待');
+  else if (command === 'dashboard') openStandalone(SCREEN_URL);
+  else if (command === 'flow') openStandalone(FLOW_URL);
 }
 
 /* ------------------------- 通知未读数:30s 轮询 ------------------------- */
@@ -250,6 +258,9 @@ onBeforeUnmount(() => {
                 </ElDropdownItem>
                 <ElDropdownItem command="dashboard">
                   数据大屏
+                </ElDropdownItem>
+                <ElDropdownItem command="flow">
+                  流程平台
                 </ElDropdownItem>
                 <ElDropdownItem
                   divided

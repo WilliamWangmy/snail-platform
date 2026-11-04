@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import DefaultLayout from '@/layouts/DefaultLayout.vue';
 import { useAuthStore } from '@/stores/auth';
+import { setToken } from '@/utils/token';
 import { installMenuRoutes, resetMenuRoutes, WORKSPACE } from './menuRoutes';
 
 const routes: RouteRecordRaw[] = [
@@ -60,6 +61,16 @@ function needsPasswordChange(auth: ReturnType<typeof useAuthStore>): boolean {
  *  菜单接口属业务接口,会被后端兜底闸 403,先拉后判会 401→登出→再登录→再拉菜单 死循环。 */
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
+
+  // 大屏/流程平台免登录跳转:一次性 ssotoken 落地后去参重走守卫,后续与 F5 恢复会话同路径
+  if (typeof to.query.ssotoken === 'string' && to.query.ssotoken) {
+    auth.token = to.query.ssotoken;
+    setToken(to.query.ssotoken);
+    const rest = { ...to.query };
+    delete rest.ssotoken;
+    return { path: to.path, query: rest, replace: true };
+  }
+
   if (to.meta.public) {
     if (to.name !== 'login' || !auth.token) return true;
     // 带令牌访问登录页:先恢复会话,待改密则留在登录页弹改密窗,其余回工作台
