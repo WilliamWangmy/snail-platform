@@ -53,12 +53,15 @@ class NotifyFlowTest {
     private static final Pattern RECIPIENT_ID = Pattern.compile("\"recipientId\":(\\d+)");
     private static final Pattern UNREAD = Pattern.compile("\"readStatus\":0");
 
+    /** 种子 admin 的口令:本地开发库可能已改密,用 SNAIL_TEST_ADMIN_PASSWORD 注入实际口令,缺省回落种子口径 */
+    private static final String ADMIN_PASSWORD =
+            System.getenv().getOrDefault("SNAIL_TEST_ADMIN_PASSWORD", "admin123");
     private static final String PASSWORD = "User@1234";
 
     @Test
     void notifyFlowEndToEnd() throws Exception {
         String suffix = String.valueOf(System.nanoTime() % 100_000_000L);
-        String adminToken = login("admin", "admin123");
+        String adminToken = login("admin", ADMIN_PASSWORD);
 
         // 造一个持通知菜单码的普通用户,验证收件箱隔离与扇出
         long roleId = createRoleWithNotify(suffix, adminToken);
