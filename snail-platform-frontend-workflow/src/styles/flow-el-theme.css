@@ -619,6 +619,29 @@ html.light {
   max-width: calc(100vw - 24px);
 }
 
+/* 顶栏系统切换下拉（popper 挂在 body 下，需全局样式） */
+.system-switch-popper .system-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 186px;
+}
+
+.system-switch-popper .system-item .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--text-3);
+}
+
+.system-switch-popper .system-item-name {
+  font-weight: 600;
+}
+
+.system-switch-popper .system-item-desc {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
 /* ------------------------------------------------------------------ table */
 
 .el-table.flow-table {

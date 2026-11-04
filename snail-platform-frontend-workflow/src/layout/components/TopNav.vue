@@ -6,10 +6,15 @@ import { ElMessageBox } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
 import ThemePicker from '@/components/ThemePicker.vue';
 import { useAuthStore } from '@/stores/auth';
+import { openCrossApp, type SystemKey } from '@/utils/links';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+
+function onSwitchSystem(command: string | number | object): void {
+  openCrossApp(command as SystemKey, auth.token);
+}
 
 const ICONS: Record<string, string> = {
   dashboard: 'layout-dashboard',
@@ -132,6 +137,38 @@ async function handleLogout(): Promise<void> {
         <span class="top-date">{{ today }}</span>
         <span class="env-pill">{{ env }}</span>
         <ThemePicker />
+        <el-dropdown
+          trigger="click"
+          popper-class="system-switch-popper"
+          @command="onSwitchSystem"
+        >
+          <button
+            class="icon-btn"
+            type="button"
+            title="切换系统"
+            aria-label="切换系统"
+          >
+            <AppIcon name="more" />
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="admin">
+                <span class="system-item">
+                  <AppIcon name="shield" />
+                  <span class="system-item-name">管理端</span>
+                  <span class="system-item-desc">多租户运营控制台</span>
+                </span>
+              </el-dropdown-item>
+              <el-dropdown-item command="screen">
+                <span class="system-item">
+                  <AppIcon name="activity" />
+                  <span class="system-item-name">数据大屏</span>
+                  <span class="system-item-desc">三维态势可视化</span>
+                </span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <span
           class="header-divider"
           aria-hidden="true"
