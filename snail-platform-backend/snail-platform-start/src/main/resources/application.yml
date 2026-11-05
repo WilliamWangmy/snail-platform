@@ -69,8 +69,25 @@ snail:
         - sys_external_call_log
         # 流程模板与菜单同口径:平台维护一份全局目录,租户只读来建模型,本身不带租户列
         - sys_workflow_template
-    pagination:
-      max-limit: 500
+        # 第三方身份绑定:登录按(source,open_id)跨租户定位,tenant_id 只是绑定时刻的展示快照
+        - sys_user_identity
+  pagination:
+    max-limit: 500
+  auth:
+    oauth:
+      # 第三方扫码登录(钉钉/飞书/企业微信)总开关:回滚第一级,false 时入口列表返回空、端点按"登录方式未开放"拒绝
+      enabled: ${SNAIL_AUTH_OAUTH_ENABLED:true}
+      phone-bind:
+        # 未绑定身份按厂商实名手机号自动关联唯一可用平台账号并落绑定;false 则一律走报错引导
+        enabled: ${SNAIL_AUTH_OAUTH_PHONE_BIND:true}
+      sources:
+        # 各来源授权回调地址白名单(逗号分隔,精确匹配);凭证(snail.external.oauth.*)缺失的来源天然不可用
+        dingtalk:
+          redirect-uris: ${SNAIL_OAUTH_DINGTALK_REDIRECT_URIS:}
+        feishu:
+          redirect-uris: ${SNAIL_OAUTH_FEISHU_REDIRECT_URIS:}
+        wecom:
+          redirect-uris: ${SNAIL_OAUTH_WECOM_REDIRECT_URIS:}
   notify:
     push:
       # 站内消息实时推送(SSE)总开关:关闭即退化为 30s 轮询,订阅端点按"未开启"拒绝
@@ -79,6 +96,19 @@ snail:
       templates:
         # 流程待办通用短信模板编码:阿里云报备后回填(O1);缺省空 = 短信通道不可用,投递器跳过
         todo: ${SNAIL_NOTIFY_SMS_TODO_TEMPLATE:}
+  external:
+    oauth:
+      # 厂商应用凭据一律环境变量注入;缺凭据的来源 available()=false 即不可用,不阻断启动,共享配置不留真实默认值
+      dingtalk:
+        app-id: ${SNAIL_DINGTALK_APP_ID:}
+        app-secret: ${SNAIL_DINGTALK_APP_SECRET:}
+      feishu:
+        app-id: ${SNAIL_FEISHU_APP_ID:}
+        app-secret: ${SNAIL_FEISHU_APP_SECRET:}
+      wecom:
+        corp-id: ${SNAIL_WECOM_CORP_ID:}
+        agent-id: ${SNAIL_WECOM_AGENT_ID:}
+        corp-secret: ${SNAIL_WECOM_CORP_SECRET:}
   storage:
     # type 缺省(空)= 不装配写入端口,文件功能端点按"文件存储未配置"降级;
     # 开关打开后所选后端必填,配置缺失即启动失败;开发默认连接只住 application-dev.yml
