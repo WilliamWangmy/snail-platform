@@ -41,7 +41,12 @@ public class SnailSecurityConfig {
     /** 认证入口白名单;登录相关窄开口,别扩 */
     private static final String[] AUTH_WHITELIST = {
             "/system/auth/captcha",
-            "/system/auth/login"
+            "/system/auth/login",
+            // 短信三端点与第三方扫码端点同为认证入口:方法级 permitAll 不被 HTTP 授权层感知,必须在此放行
+            "/system/auth/sms-captcha",
+            "/system/auth/login-sms",
+            "/system/auth/login-sms/pick",
+            "/system/auth/oauth/**"
     };
 
     /** 接口文档白名单:仅在 springdoc 实际启用时拼入,生产忘关文档端点也不会裸奔 */
