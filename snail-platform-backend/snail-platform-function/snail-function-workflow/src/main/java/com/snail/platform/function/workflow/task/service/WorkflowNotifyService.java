@@ -3,6 +3,7 @@ package com.snail.platform.function.workflow.task.service;
 import com.snail.platform.framework.core.context.LoginUser;
 import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.workflow.engine.WorkflowEngineGateway;
+import com.snail.platform.framework.workflow.engine.WorkflowNodeNotifyConfig;
 import com.snail.platform.framework.workflow.engine.WorkflowTask;
 import com.snail.platform.function.notify.api.NotifyApi;
 import com.snail.platform.function.notify.api.NotifyApi.NotifySendCommand;
@@ -84,6 +85,33 @@ public class WorkflowNotifyService {
                 "nodeName", blankTo(task.name(), task.taskDefinitionKey()),
                 "businessKey", businessKey == null ? "" : businessKey);
         sendAfterCommit(title, content, List.copyOf(recipients), channelsOf(task), params);
+    }
+
+    /**
+     * 节点到达时向抄送人发副本:ccUsers 与 ccGroups 展开为用户并集,固定站内信(方案 D5)——
+     * 抄送的本质是知会留档,不是催办,跟随 notifyType 会把副本推成短信/邮件,成本与噪音不可控。
+     * 无抄送配置即静默返回;不存在/跨租户的抄送人按档案口径静默缺席。
+     */
+    public void notifyCc(WorkflowTask task, String instanceName, String businessKey) {
+        WorkflowNodeNotifyConfig config = gateway.nodeNotifyConfig(task.definitionId(), task.taskDefinitionKey());
+        Set<Long> recipients = new LinkedHashSet<>();
+        for (String ccUser : config.ccUsers()) {
+            addIfNumeric(recipients, ccUser);
+        }
+        for (String ccGroup : config.ccGroups()) {
+            try {
+                recipients.addAll(userBriefPort.enabledUserIdsOfRole(Long.valueOf(ccGroup.trim())));
+            } catch (NumberFormatException e) {
+                LOG.warn("流程抄送组不是角色 ID,跳过抄送:{}", ccGroup);
+            }
+        }
+        if (recipients.isEmpty()) {
+            return;
+        }
+        sendAfterCommit("您被抄送:节点「" + blankTo(task.name(), task.taskDefinitionKey()) + "」",
+                "流程「" + blankTo(instanceName, "流程") + "」正在该节点办理,现抄送您留档知悉。"
+                        + coordinate(businessKey),
+                List.copyOf(recipients), Set.of(CHANNEL_INNER), null);
     }
 
     /** 转办后提醒接手人;办理完成后提醒发起人(结果告知)。平台固定通知不走节点通道,维持现行行为(D6) */

@@ -170,7 +170,10 @@ public class WorkflowTaskService {
                     approved ? WorkflowStatus.APPROVED : WorkflowStatus.REJECTED);
             return;
         }
-        nextTasks.forEach(next -> notifyService.remindTodo(next, instance.name(), instance.businessKey()));
+        nextTasks.forEach(next -> {
+            notifyService.remindTodo(next, instance.name(), instance.businessKey());
+            notifyService.notifyCc(next, instance.name(), instance.businessKey());
+        });
     }
 
     /** 流程办结:告知发起人结果。发起人自己办的最后一 step 不给自己发通知 */

@@ -93,7 +93,10 @@ public class WorkflowInstanceService implements WorkflowApi {
         recordService.record(Trace.ofInstance(WorkflowTaskRecordService.ACTION_START, instance.id(),
                 businessType, businessKey, null));
         gateway.findTasksOfInstance(instance.id())
-                .forEach(next -> notifyService.remindTodo(next, instance.name(), businessKey));
+                .forEach(next -> {
+                    notifyService.remindTodo(next, instance.name(), businessKey);
+                    notifyService.notifyCc(next, instance.name(), businessKey);
+                });
         return new StartResult(instance.id(), instance.definitionId());
     }
 
