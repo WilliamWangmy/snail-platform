@@ -26,9 +26,12 @@ import com.snail.platform.function.system.user.dto.UserCreateRequest;
 import com.snail.platform.function.system.user.dto.UserCreatedVO;
 import com.snail.platform.function.system.user.dto.UserQuery;
 import com.snail.platform.function.system.user.dto.UserUpdateRequest;
+import com.snail.platform.function.system.user.dto.UserIdentityVO;
 import com.snail.platform.function.system.user.dto.UserVO;
 import com.snail.platform.function.system.user.entity.SysUser;
+import com.snail.platform.function.system.user.entity.SysUserIdentity;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
+import com.snail.platform.function.system.user.mapper.SysUserIdentityMapper;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
@@ -73,9 +76,13 @@ public class UserService {
     /** 缓存点清出口:只在写真的发生之后、事务提交之后清 */
     private final CacheEvictor cacheEvictor;
 
+    /** 第三方身份绑定读:用户详情只读展示;写入方在 auth 登录链(豁免表,tenant_id 不参与过滤) */
+    private final SysUserIdentityMapper userIdentityMapper;
+
     public UserService(SysUserMapper userMapper, SysOrgMapper orgMapper, SysRoleMapper roleMapper,
                        SysUserRoleMapper userRoleMapper, SysTenantMapper tenantMapper,
-                       DataScopeService dataScopeService, CacheEvictor cacheEvictor) {
+                       DataScopeService dataScopeService, CacheEvictor cacheEvictor,
+                       SysUserIdentityMapper userIdentityMapper) {
         this.userMapper = userMapper;
         this.orgMapper = orgMapper;
         this.roleMapper = roleMapper;
@@ -83,6 +90,7 @@ public class UserService {
         this.tenantMapper = tenantMapper;
         this.dataScopeService = dataScopeService;
         this.cacheEvictor = cacheEvictor;
+        this.userIdentityMapper = userIdentityMapper;
     }
 
     /**
@@ -108,6 +116,19 @@ public class UserService {
         SysUser user = requireUser(userId);
         requireUserInScope(userId);
         return UserVO.of(user, roleIdsOf(userId));
+    }
+
+    /**
+     * 用户第三方绑定只读列表:存在闸在前、可见闸在后(与 detail 同序)——绑定表在豁免清单,
+     * 必须先过这两道闸再查,防跨租户探测。按 create_time 升序(绑定先后),单人绑定行数个位数不分页。
+     */
+    public List<UserIdentityVO> identitiesOf(Long userId) {
+        requireUser(userId);
+        requireUserInScope(userId);
+        return userIdentityMapper.selectList(Wrappers.<SysUserIdentity>lambdaQuery()
+                        .eq(SysUserIdentity::getUserId, userId)
+                        .orderByAsc(SysUserIdentity::getCreateTime))
+                .stream().map(UserIdentityVO::of).toList();
     }
 
     /** 登录名占用查询:与建号查重同口径——withoutTenant 全表、deleted 行也算占用(唯一键终身占用);失焦即查的前端校验用 */

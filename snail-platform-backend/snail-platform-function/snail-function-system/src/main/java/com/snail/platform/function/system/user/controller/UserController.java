@@ -10,6 +10,7 @@ import com.snail.platform.function.system.user.dto.AssignRolesRequest;
 import com.snail.platform.function.system.user.dto.UserCreateRequest;
 import com.snail.platform.function.system.user.dto.UserCreatedVO;
 import com.snail.platform.function.system.user.dto.ResetPasswordRequest;
+import com.snail.platform.function.system.user.dto.UserIdentityVO;
 import com.snail.platform.function.system.user.dto.UserQuery;
 import com.snail.platform.function.system.user.dto.UserUpdateRequest;
 import com.snail.platform.function.system.user.dto.UserVO;
@@ -22,6 +23,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -64,6 +66,13 @@ public class UserController {
     @GetMapping("/{userId}")
     public R<UserVO> detail(@PathVariable Long userId) {
         return R.ok(userService.detail(userId));
+    }
+
+    @PreAuthorize("hasAuthority('system:user:list')")
+    @Operation(summary = "用户第三方绑定列表(只读,解绑换绑二期)")
+    @GetMapping("/{userId}/identities")
+    public R<List<UserIdentityVO>> identities(@PathVariable Long userId) {
+        return R.ok(userService.identitiesOf(userId));
     }
 
     @PreAuthorize("hasAuthority('system:user:create')")
