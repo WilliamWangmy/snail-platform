@@ -655,7 +655,7 @@ const candidateUsers = computed(() => {
           </el-checkbox-button>
         </el-checkbox-group>
         <p class="field-hint section-hint">
-          可多选；都不选时按站内消息发送。标注「待接入」的方式暂不会实际发送通知。
+          可多选；都不选时按站内消息发送。
         </p>
       </div>
 

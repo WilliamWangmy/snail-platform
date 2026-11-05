@@ -26,9 +26,9 @@ export const DEFAULT_ACTION_BUTTONS = 'approve,reject,transfer';
 
 /** 通知方式码位（notifyType 属性，逗号分隔多选；都不选时按站内消息发送） */
 export const NOTIFY_TYPES: Array<{ code: string; label: string; pending: boolean }> = [
-  { code: 'sms', label: '短信', pending: true },
-  { code: 'mail', label: '邮件', pending: true },
-  { code: 'inner', label: '站内消息', pending: true },
+  { code: 'sms', label: '短信', pending: false },
+  { code: 'mail', label: '邮件', pending: false },
+  { code: 'inner', label: '站内消息', pending: false },
 ];
 
 /** 审批模式（维度一：任务生成方式） */
