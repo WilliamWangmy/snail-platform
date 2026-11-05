@@ -95,7 +95,7 @@ class OutboundDispatcherChannelFilterTest {
 
     private static OutboundDispatcher.DispatchJob job(Set<String> channels) {
         return new OutboundDispatcher.DispatchJob(1L, 1L, "标题", "正文", "workflow",
-                List.of(new OutboundTarget(9L, "a@b.c", null)), channels);
+                List.of(new OutboundTarget(9L, "a@b.c", null)), channels, null);
     }
 
     private static ObjectProvider<OutboundChannel> providerOf(List<OutboundChannel> channels) {

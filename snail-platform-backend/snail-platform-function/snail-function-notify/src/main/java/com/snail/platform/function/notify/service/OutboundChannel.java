@@ -1,6 +1,7 @@
 package com.snail.platform.function.notify.service;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 职责:出站通道 SPI——站内信落库即达,站外投递(邮件/短信)由实现各自承担;
@@ -44,7 +45,13 @@ public interface OutboundChannel {
             /** 业务域标签,SSE 推送端按它分流 */
             String bizType,
             /** 收件目标 */
-            List<OutboundTarget> targets) {
+            List<OutboundTarget> targets,
+            /** 模板变量键值,模板制通道(短信)消费;null 归一化为空集 */
+            Map<String, String> params) {
+
+        public OutboundMessage {
+            params = params == null ? Map.of() : Map.copyOf(params);
+        }
     }
 
     /** 收件目标:userId 溯源;email/phone 为对应通道的寻址地址,可空由实现侧过滤 */

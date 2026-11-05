@@ -9,6 +9,7 @@ import com.snail.platform.function.notify.api.NotifyApi.NotifySendCommand;
 import com.snail.platform.function.system.api.UserBriefPort;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +78,12 @@ public class WorkflowNotifyService {
         String title = "待办提醒:" + blankTo(instanceName, "流程任务");
         String content = "节点「" + blankTo(task.name(), task.taskDefinitionKey()) + "」等待您办理。"
                 + coordinate(businessKey);
-        sendAfterCommit(title, content, List.copyOf(recipients), channelsOf(task));
+        // 模板变量与报备的待办短信模板对应(流程名/节点名/单号);其余通道不读它
+        Map<String, String> params = Map.of(
+                "processName", blankTo(instanceName, "流程任务"),
+                "nodeName", blankTo(task.name(), task.taskDefinitionKey()),
+                "businessKey", businessKey == null ? "" : businessKey);
+        sendAfterCommit(title, content, List.copyOf(recipients), channelsOf(task), params);
     }
 
     /** 转办后提醒接手人;办理完成后提醒发起人(结果告知)。平台固定通知不走节点通道,维持现行行为(D6) */
@@ -85,7 +91,7 @@ public class WorkflowNotifyService {
         if (recipients == null || recipients.isEmpty()) {
             return;
         }
-        sendAfterCommit(title, content, recipients, null);
+        sendAfterCommit(title, content, recipients, null, null);
     }
 
     /** 单号片段:裸流程(没有业务单)就不带这句,通知里不写"单号:null" */
@@ -157,13 +163,14 @@ public class WorkflowNotifyService {
         return channels.isEmpty() ? Set.of(CHANNEL_INNER) : channels;
     }
 
-    /** 登记提交后发送;当前不在事务里(如测试直调)就立即发;channels 语义见 NotifySendCommand */
-    private void sendAfterCommit(String title, String content, List<Long> recipients, Set<String> channels) {
+    /** 登记提交后发送;当前不在事务里(如测试直调)就立即发;channels/params 语义见 NotifySendCommand */
+    private void sendAfterCommit(String title, String content, List<Long> recipients, Set<String> channels,
+                                 Map<String, String> params) {
         Long tenantId = currentTenantId();
         Long senderId = currentUserId();
         String senderName = currentNickname();
         NotifySendCommand command = new NotifySendCommand(tenantId, title, content, BIZ_TYPE, null,
-                senderId, senderName == null ? "系统通知" : senderName, recipients, channels);
+                senderId, senderName == null ? "系统通知" : senderName, recipients, channels, params);
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             dispatch(command);
             return;

@@ -128,7 +128,7 @@ public class NotifyService implements NotifyApi {
         send(new NotifySendCommand(request.tenantId(), request.title(), request.content(), BIZ_ANNOUNCEMENT,
                 null, operator == null ? null : operator.userId(),
                 operator == null ? SYSTEM_SENDER : operator.nickname(),
-                targets.stream().map(UserBrief::userId).toList(), null));
+                targets.stream().map(UserBrief::userId).toList(), null, null));
     }
 
     /** 收件箱分页:私人数据,谓词恒带本人;bizType 在消息主体上,先解析消息 ID 再过滤收件行 */
@@ -261,7 +261,7 @@ public class NotifyService implements NotifyApi {
 
         dispatcher.dispatchAfterCommit(new OutboundDispatcher.DispatchJob(message.getMessageId(),
                 command.tenantId(), title, content, command.bizType(), targets,
-                outboundChannelsOf(command.channels())));
+                outboundChannelsOf(command.channels()), command.params()));
     }
 
     /**

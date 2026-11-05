@@ -1,6 +1,7 @@
 package com.snail.platform.function.notify.api;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -39,6 +40,11 @@ public interface NotifyApi {
              * 通道选择:null(缺省)= 现行行为,站内信落库 + 全部可用出站通道(公告与存量调用方零改动);
              * 非空 = 精确通道,inner 落收件行,mail/sms 走出站投递。inner 不是出站通道,是"是否落收件行"的开关。
              */
-            Set<String> channels) {
+            Set<String> channels,
+            /**
+             * 模板变量键值:模板制出站通道(短信)按报备模板消费,键名与模板变量一一对应;
+             * 自由文案通道不读它。可空。
+             */
+            Map<String, String> params) {
     }
 }
