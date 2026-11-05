@@ -213,6 +213,61 @@ class WorkflowNodeNotifyFlowTest {
                 "非用户任务节点没有通知配置,统一空配置口径");
     }
 
+    /** 抄送固定站内信(D5):提醒按 notifyType 走邮件,副本只落收件行不出站;ccGroups 展开生效 */
+    @Test
+    void ccStaysInnerWhileReminderFollowsNotifyType() throws Exception {
+        String key = deployFlowWithCc("notifyCc", "mail", "9,2", String.valueOf(REAL_ROLE_ID));
+        LoginUserContextHolder.set(initiator());
+        instanceService.start(new WorkflowStartCommand(key, "node-notify-flow", "bk-" + key,
+                "抄送验收单", Map.of()));
+
+        // 提醒消息:纯邮件,不落收件行
+        long reminderId = workflowMessageIdOf("bk-" + key);
+        awaitOutbound(reminderId, row -> "mail".equals(row.getChannel()) && row.getStatus() == 1);
+        assertEquals(0L, recipientRowsOf(reminderId), "邮件提醒不落收件行");
+
+        // 抄送消息:ccUsers(不存在的人)静默缺席,ccGroups 展开出超管
+        long ccId = ccMessageIdOf("bk-" + key);
+        assertEquals(1L, recipientRowsOf(ccId), "抄送组应展开成收件行,不存在的抄送人静默缺席");
+        List<SysNotifyOutbound> ccOutbound = awaitOutbound(ccId, row -> "sse".equals(row.getChannel()));
+        assertTrue(ccOutbound.stream().noneMatch(row -> "mail".equals(row.getChannel())
+                        || "sms".equals(row.getChannel())),
+                "抄送一律站内信,不得出站: " + ccOutbound.stream().map(SysNotifyOutbound::getChannel).toList());
+        synchronized (sentMails) {
+            assertEquals(1, sentMails.size(), "只有节点提醒发邮件,抄送不发邮件");
+        }
+    }
+
+    /** 抢签候选用户进提醒收件人展开(D4):candidateUsers 无候选组也能收到待办提醒 */
+    @Test
+    void competitiveCandidateUsersGetReminder() throws Exception {
+        String tag = String.valueOf(System.nanoTime() % 100_000_000L);
+        String key = "notifyCompete" + tag;
+        LoginUserContextHolder.set(initiator());
+        String bpmn = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                             xmlns:flowable="http://flowable.org/bpmn"
+                             targetNamespace="http://snail.platform/node-notify">
+                  <process id="%s" name="%s 验收流程" isExecutable="true">
+                    <startEvent id="start"/>
+                    <sequenceFlow id="f1" sourceRef="start" targetRef="approve"/>
+                    <userTask id="approve" name="抢签节点" flowable:candidateUsers="%s"/>
+                    <sequenceFlow id="f2" sourceRef="approve" targetRef="end"/>
+                    <endEvent id="end"/>
+                  </process>
+                </definitions>
+                """.formatted(key, key, String.valueOf(REAL_USER_ID));
+        Long modelId = modelService.create(new WorkflowModelCreateRequest(key, "抢签验收流程", null, null, null, bpmn));
+        modelService.publish(modelId);
+
+        instanceService.start(new WorkflowStartCommand(key, "node-notify-flow", "bk-" + key,
+                "抢签验收单", Map.of()));
+        long messageId = workflowMessageIdOf("bk-" + key);
+        assertEquals(1L, recipientRowsOf(messageId), "抢签候选用户应收到待办提醒(此前口径漏收)");
+        awaitOutbound(messageId, row -> "sse".equals(row.getChannel()) && row.getStatus() == 1);
+    }
+
     /* ------------------------------ 辅助 ------------------------------ */
 
     private static LoginUser initiator() {
@@ -222,10 +277,17 @@ class WorkflowNodeNotifyFlowTest {
 
     /** 建模型→发布:notifyType 为 null 即存量口径(节点无通知属性) */
     private String deployFlow(String prefix, String notifyType) {
+        return deployFlowWithCc(prefix, notifyType, null, null);
+    }
+
+    /** 带抄送配置的部署:ccUsers/ccGroups 为 null 即不写对应属性 */
+    private String deployFlowWithCc(String prefix, String notifyType, String ccUsers, String ccGroups) {
         String tag = String.valueOf(System.nanoTime() % 100_000_000L);
         String key = prefix + tag;
         LoginUserContextHolder.set(initiator());
         String notifyAttr = notifyType == null ? "" : "flowable:notifyType=\"" + notifyType + "\"";
+        String ccUserAttr = ccUsers == null ? "" : "flowable:ccUsers=\"" + ccUsers + "\"";
+        String ccGroupAttr = ccGroups == null ? "" : "flowable:ccGroups=\"" + ccGroups + "\"";
         String bpmn = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -234,23 +296,24 @@ class WorkflowNodeNotifyFlowTest {
                   <process id="%s" name="%s 验收流程" isExecutable="true">
                     <startEvent id="start"/>
                     <sequenceFlow id="f1" sourceRef="start" targetRef="approve"/>
-                    <userTask id="approve" name="验收节点" flowable:candidateGroups="%s" %s/>
+                    <userTask id="approve" name="验收节点" flowable:candidateGroups="%s" %s %s %s/>
                     <sequenceFlow id="f2" sourceRef="approve" targetRef="end"/>
                     <endEvent id="end"/>
                   </process>
                 </definitions>
-                """.formatted(key, key, String.valueOf(REAL_ROLE_ID), notifyAttr);
+                """.formatted(key, key, String.valueOf(REAL_ROLE_ID), notifyAttr, ccUserAttr, ccGroupAttr);
         Long modelId = modelService.create(new WorkflowModelCreateRequest(key, prefix + "验收流程", null, null, null, bpmn));
         modelService.publish(modelId);
         return key;
     }
 
-    /** 本用例业务单号对应的通知消息 ID:文案带单号是产品口径,按它筛才不会把别人的消息算进来 */
+    /** 本用例业务单号对应的提醒消息 ID:文案带单号是产品口径,标题前缀区分提醒与抄送两类消息 */
     private long workflowMessageIdOf(String businessKey) {
         List<SysNotifyMessage> matched = messageMapper.selectList(Wrappers.<SysNotifyMessage>lambdaQuery()
                 .eq(SysNotifyMessage::getBizType, "workflow")
+                .likeRight(SysNotifyMessage::getTitle, "待办提醒")
                 .like(SysNotifyMessage::getContent, businessKey));
-        assertEquals(1, matched.size(), "本单应恰好产生一条通知消息: " + matched.size());
+        assertEquals(1, matched.size(), "本单应恰好产生一条提醒消息: " + matched.size());
         return matched.get(0).getMessageId();
     }
 
@@ -262,6 +325,16 @@ class WorkflowNodeNotifyFlowTest {
     private List<SysNotifyOutbound> outboundRowsOf(long messageId) {
         return outboundMapper.selectList(Wrappers.<SysNotifyOutbound>lambdaQuery()
                 .eq(SysNotifyOutbound::getMessageId, messageId));
+    }
+
+    /** 抄送副本消息 ID:标题以"您被抄送"开头,按内容里的业务单号圈定本用例 */
+    private long ccMessageIdOf(String businessKey) {
+        List<SysNotifyMessage> matched = messageMapper.selectList(Wrappers.<SysNotifyMessage>lambdaQuery()
+                .eq(SysNotifyMessage::getBizType, "workflow")
+                .likeRight(SysNotifyMessage::getTitle, "您被抄送")
+                .like(SysNotifyMessage::getContent, businessKey));
+        assertEquals(1, matched.size(), "本单应恰好产生一条抄送消息: " + matched.size());
+        return matched.get(0).getMessageId();
     }
 
     /** 短信经 external 网关的流水行:caller=notify、biz_id=消息 ID,由 SmsOutboundChannel 写入 */
@@ -283,14 +356,15 @@ class WorkflowNodeNotifyFlowTest {
         throw new AssertionError("短信流水未达到 " + expected + " 行,现有 " + smsCallLogRowsOf(messageId) + " 行");
     }
 
-    /** 轮询等待出站流水出现命中行;超时把已有行摆进断言消息,失败可读 */
-    private void awaitOutbound(long messageId, Predicate<SysNotifyOutbound> match) throws InterruptedException {
+    /** 轮询等待出站流水出现命中行,返回此刻全部行;超时把已有行摆进断言消息,失败可读 */
+    private List<SysNotifyOutbound> awaitOutbound(long messageId, Predicate<SysNotifyOutbound> match)
+            throws InterruptedException {
         long deadline = System.currentTimeMillis() + AWAIT_MS;
         List<SysNotifyOutbound> rows = List.of();
         while (System.currentTimeMillis() < deadline) {
             rows = outboundRowsOf(messageId);
             if (rows.stream().anyMatch(match)) {
-                return;
+                return rows;
             }
             Thread.sleep(200);
         }
