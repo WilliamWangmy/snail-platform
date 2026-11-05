@@ -650,10 +650,11 @@ public class AuthService {
                 .toList();
     }
 
-    /** 命中既有绑定:刷最近登录时间与昵称快照;单行写自提交即原子,免登代理不进事务 */
+    /** 命中既有绑定:刷最近登录时间与昵称快照;传实体让 updateFill 补 update_time(源码纪律 §noAuditFillBypass) */
     private void touchBinding(String source, String openId, String nickname, SysUser user) {
-        userIdentityMapper.update(null, Wrappers.<SysUserIdentity>lambdaUpdate()
-                .set(SysUserIdentity::getLastLoginTime, LocalDateTime.now())
+        SysUserIdentity patch = new SysUserIdentity();
+        patch.setLastLoginTime(LocalDateTime.now());
+        userIdentityMapper.update(patch, Wrappers.<SysUserIdentity>lambdaUpdate()
                 .set(nickname != null, SysUserIdentity::getNickname, nickname)
                 .eq(SysUserIdentity::getSource, source)
                 .eq(SysUserIdentity::getOpenId, openId)
