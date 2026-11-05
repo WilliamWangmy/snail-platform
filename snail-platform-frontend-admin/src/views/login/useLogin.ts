@@ -3,12 +3,16 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import {
   fetchCaptcha,
+  fetchOAuthAuthorize,
+  fetchOAuthOptions,
   isSmsAccountsResult,
   loginBySms,
+  OAUTH_REDIRECT_KEY,
   pickSmsAccount,
   sendSmsCaptcha,
   type Captcha,
   type LoginResult,
+  type OAuthSource,
   type SmsAccountOption,
   type SmsAccountsResult,
 } from '@/api/auth';
@@ -249,11 +253,40 @@ export function useLogin(
     smsForm.smsCode = '';
   }
 
-  /* ------------------------- 其他登录方式(占位) ------------------------- */
+  /* ------------------------- 第三方扫码登录 ------------------------- */
 
-  /** 钉钉/飞书/企业微信登录尚未开通:后端 login_type 已留编码位,接入时换跳转即可。 */
-  function externalLogin(name: string): void {
-    ElMessage.info(`${name}登录暂未开通,请使用账号密码或手机验证码登录`);
+  /** 开放的第三方来源;加载失败按空处理,只隐藏入口行,不阻塞密码/短信登录。 */
+  const oauthSources = ref<OAuthSource[]>([]);
+  /** 正在整页跳转:防重复点击把同一个 state 发两次。 */
+  const oauthRedirecting = ref(false);
+
+  /** 第三方入口与密码/短信登录无耦合,挂载时异步拉取,失败不影响主登录方式。 */
+  onMounted(async () => {
+    try {
+      oauthSources.value = await fetchOAuthOptions();
+    } catch {
+      oauthSources.value = [];
+    }
+  });
+
+  /**
+   * 发起第三方扫码登录:先记下站内跳转目标(回调页成功后回跳),再拿授权页地址整页跳转;
+   * 回跳由 /oauth-callback/:source 接管,与登录页无共享状态。
+   */
+  async function startOAuth(source: OAuthSource): Promise<void> {
+    if (oauthRedirecting.value) return;
+    oauthRedirecting.value = true;
+    try {
+      sessionStorage.setItem(OAUTH_REDIRECT_KEY, redirectTarget());
+      const authorize = await fetchOAuthAuthorize(
+        source,
+        `${window.location.origin}/oauth-callback/${source}`,
+      );
+      window.location.href = authorize.authorizeUrl;
+    } catch {
+      // 未开放/回调未登记等文案由拦截器统一弹出;跳转失败要允许重试
+      oauthRedirecting.value = false;
+    }
   }
 
   onMounted(() => void refreshCaptcha());
@@ -281,7 +314,8 @@ export function useLogin(
     sendSmsCode,
     pickAccount,
     onPickDialogClosed,
-    externalLogin,
+    oauthSources,
+    startOAuth,
     refreshCaptcha,
   };
 }

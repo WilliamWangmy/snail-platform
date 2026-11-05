@@ -119,3 +119,49 @@ export function fetchLoginUser(): Promise<LoginUser> {
 export function logout(): Promise<void> {
   return post<void>('/system/auth/logout');
 }
+
+/* ------------------------- 第三方扫码登录 ------------------------- */
+
+/** 第三方扫码来源编码,与后端 login_type 同口径。 */
+export type OAuthSource = 'dingtalk' | 'feishu' | 'wecom';
+
+/** 第三方登录跳转前的站内目标暂存键:发起时写入,回调页消费后清除。 */
+export const OAUTH_REDIRECT_KEY = 'snail_admin_oauth_redirect_v1';
+
+/** 发起授权出参:厂商授权页地址 + 一次性 state(回调时随 code 原样带回)。 */
+export interface OAuthAuthorize {
+  authorizeUrl: string;
+  state: string;
+}
+
+export interface OAuthLoginPayload {
+  source: OAuthSource;
+  code: string;
+  /** 重定向流必带;免登态缺省(二期)。 */
+  state?: string;
+  /** 前端回调地址回显,state 存在时须与服务端登记一致。 */
+  redirectUri?: string;
+}
+
+/** 开放的第三方来源;空数组即登录页隐藏第三方入口行。 */
+export function fetchOAuthOptions(): Promise<OAuthSource[]> {
+  return get<string[]>('/system/auth/oauth/options') as Promise<OAuthSource[]>;
+}
+
+/** 拿厂商授权页地址:redirectUri 须与来源白名单精确匹配,否则报"回调地址未登记"。 */
+export function fetchOAuthAuthorize(source: OAuthSource, redirectUri: string): Promise<OAuthAuthorize> {
+  return get<OAuthAuthorize>('/system/auth/oauth/authorize', { source, redirectUri });
+}
+
+/**
+ * 第三方授权码登录,出参两态(与 login-sms 同构):
+ * 单账号直接返回 LoginResult;多账号返回 SmsAccountsResult(pickKey 非空),需再调 pick。
+ */
+export function loginByOauth(payload: OAuthLoginPayload): Promise<LoginResult | SmsAccountsResult> {
+  return post<LoginResult | SmsAccountsResult>('/system/auth/oauth/login', payload);
+}
+
+/** 选定租户账号换正式令牌:pickKey 一次一用,失败须重走扫码。 */
+export function pickOauthAccount(payload: SmsPickPayload): Promise<LoginResult> {
+  return post<LoginResult>('/system/auth/oauth/pick', payload);
+}

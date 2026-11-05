@@ -12,6 +12,13 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: '登录' },
   },
   {
+    // 第三方扫码回调页:厂商回跳带 code/state 落在这里,与登录页无共享状态
+    path: '/oauth-callback/:source',
+    name: 'oauth-callback',
+    component: () => import('@/views/login/OAuthCallback.vue'),
+    meta: { public: true, title: '第三方登录' },
+  },
+  {
     path: '/403',
     name: 'forbidden',
     component: () => import('@/views/error/ForbiddenView.vue'),

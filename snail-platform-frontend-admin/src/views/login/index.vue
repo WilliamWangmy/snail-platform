@@ -32,7 +32,8 @@ const {
   sendSmsCode,
   pickAccount,
   onPickDialogClosed,
-  externalLogin,
+  oauthSources,
+  startOAuth,
   refreshCaptcha,
 } = useLogin(formRef, smsFormRef);
 
@@ -56,7 +57,11 @@ function onForceChangeClosed(): void {
   void refreshCaptcha();
 }
 
-/** 其他登录方式:手机登录切换双模;三个 IM 渠道占位,接入时换成各自的 OAuth 跳转。 */
+/** 第三方入口的展示名与图标:来源由后端开放列表驱动,顺序即后端返回顺序。 */
+const OAUTH_LABELS: Record<string, string> = { dingtalk: '钉钉', feishu: '飞书', wecom: '企业微信' };
+const OAUTH_ICONS: Record<string, string> = { dingtalk: 'zap', feishu: 'send', wecom: 'chat' };
+
+/** 其他登录方式:手机登录切换双模;第三方入口仅渲染后端返回的开放来源(空则整行只剩手机登录)。 */
 const otherMethods = computed(() => [
   {
     key: 'sms',
@@ -65,9 +70,13 @@ const otherMethods = computed(() => [
     active: mode.value === 'sms',
     action: () => void switchMode('sms'),
   },
-  { key: 'dingtalk', label: '钉钉', icon: 'zap', active: false, action: () => externalLogin('钉钉') },
-  { key: 'feishu', label: '飞书', icon: 'send', active: false, action: () => externalLogin('飞书') },
-  { key: 'wecom', label: '企业微信', icon: 'chat', active: false, action: () => externalLogin('企业微信') },
+  ...oauthSources.value.map((source) => ({
+    key: source,
+    label: OAUTH_LABELS[source] ?? source,
+    icon: OAUTH_ICONS[source] ?? 'zap',
+    active: false,
+    action: () => void startOAuth(source),
+  })),
 ]);
 
 /** 候选账号头像字:昵称首字,退回登录名首字。 */
