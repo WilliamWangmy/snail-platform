@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import CesiumMap from '@/components/CesiumMap.vue';
-import SystemSwitcher from '@/components/SystemSwitcher.vue';
+// 路由出口:/login 登录页,/ 数据大屏;登录门槛由 router 守卫统一把关。
 </script>
 
 <template>
-  <CesiumMap />
-  <SystemSwitcher />
+  <router-view />
 </template>

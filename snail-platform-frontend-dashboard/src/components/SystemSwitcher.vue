@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { signOutEverywhere } from '@/stores/auth';
 
-/** 大屏无登录态:收下跳转带来的一次性 ssotoken 仅用于再交接给管理端/流程平台。 */
+const router = useRouter();
+
+/** ssotoken 仅为站间一次性交接凭证,不是大屏登录态;登录门槛由 router 守卫 + JWT 把关。 */
 const STORAGE_KEY = 'snail-sso-token';
 
 const ADMIN_URL = import.meta.env.VITE_ADMIN_URL ?? 'http://localhost:8000/';
@@ -33,6 +37,13 @@ function go(url: string): void {
   const suffix = token.value ? `ssotoken=${encodeURIComponent(token.value)}` : '';
   window.open(`${url}${joiner}${suffix}`, '_blank', 'noopener');
 }
+
+/** 退出登录:先吊销服务端令牌再清本地,凭 redirect 记住来路,登录后回到当前视图。 */
+async function onLogout(): Promise<void> {
+  await signOutEverywhere();
+  const target = window.location.pathname + window.location.search;
+  await router.push({ name: 'login', query: { redirect: target } });
+}
 </script>
 
 <template>
@@ -51,6 +62,14 @@ function go(url: string): void {
       @click="go(item.url)"
     >
       {{ item.name }}
+    </button>
+    <button
+      type="button"
+      class="switcher-btn logout"
+      title="退出登录"
+      @click="onLogout"
+    >
+      退出
     </button>
   </div>
 </template>
@@ -102,5 +121,16 @@ function go(url: string): void {
 .switcher-btn:focus-visible {
   outline: 2px solid #38bdf8;
   outline-offset: 1px;
+}
+
+.switcher-btn.logout {
+  margin-left: 4px;
+  color: #f87171;
+}
+
+.switcher-btn.logout:hover {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(127, 29, 29, 0.45);
+  color: #fecaca;
 }
 </style>

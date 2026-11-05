@@ -1,0 +1,39 @@
+import { createRouter, createWebHistory } from 'vue-router';
+import { getToken } from '@/stores/auth';
+
+/**
+ * 大屏路由:/login 登录页,/ 数据大屏本体(三维地图)。
+ * 未匹配路径一律回大屏首页,保证登录后总有落点。
+ */
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/',
+      name: 'dashboard',
+      component: () => import('@/views/DashboardView.vue'),
+    },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
+  ],
+});
+
+/** 全局守卫:除公开页外一律要求登录态,未认证统一重定向登录页并记下来路。 */
+router.beforeEach((to) => {
+  const authed = Boolean(getToken());
+  if (!to.meta.public && !authed) {
+    return { name: 'login', query: { redirect: to.fullPath } };
+  }
+  // 已登录再进登录页没有意义,直接回大屏
+  if (to.name === 'login' && authed) {
+    return { name: 'dashboard' };
+  }
+  return true;
+});
+
+export default router;

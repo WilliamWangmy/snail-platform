@@ -33,6 +33,14 @@ export default defineConfig({
   server: {
     port: 8001,
     strictPort: true,
+    proxy: {
+      // 认证接口与平台后端同源口径(/system/auth/*),经代理转发避免跨域;
+      // 目标为后端 start 模块端口,与管理端 vite 代理一致。
+      '/system': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: 'es2022',
