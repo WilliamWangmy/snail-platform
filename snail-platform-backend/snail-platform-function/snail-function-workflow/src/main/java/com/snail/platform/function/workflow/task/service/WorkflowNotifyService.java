@@ -13,8 +13,11 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 职责:流程侧的通知出口——办理动作产生的提醒一律经 NotifyApi 发,自己不留第二套消息表(方案 §7)。
@@ -48,11 +51,16 @@ public class WorkflowNotifyService {
     /** 用户档案端口:候选角色要展开成具体收件人 */
     private final UserBriefPort userBriefPort;
 
+    /** 发送用新事务模板:afterCommit 回调里外层事务已提交但资源未清,REQUIRED 会挂靠上去,发送侧自己的 afterCommit(出站入队)永不触发 */
+    private final TransactionTemplate sendTransaction;
+
     public WorkflowNotifyService(WorkflowEngineGateway gateway, NotifyApi notifyApi,
-                                 UserBriefPort userBriefPort) {
+                                 UserBriefPort userBriefPort, PlatformTransactionManager transactionManager) {
         this.gateway = gateway;
         this.notifyApi = notifyApi;
         this.userBriefPort = userBriefPort;
+        this.sendTransaction = new TransactionTemplate(transactionManager);
+        this.sendTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
@@ -170,7 +178,9 @@ public class WorkflowNotifyService {
 
     private void dispatch(NotifySendCommand command) {
         try {
-            notifyApi.send(command);
+            // 发送必须开自己的新事务:afterCommit 回调里线程上还挂着已提交的外层事务,
+            // REQUIRED 会原样挂靠(不产生新提交),发送侧登记的 afterCommit(出站投递入队)就永不触发
+            sendTransaction.executeWithoutResult(status -> notifyApi.send(command));
         } catch (RuntimeException e) {
             LOG.warn("流程通知发送失败,已提交的动作不受影响:{}", e.getMessage());
         }
