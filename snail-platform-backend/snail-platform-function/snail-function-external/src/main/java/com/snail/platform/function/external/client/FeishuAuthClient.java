@@ -1,0 +1,107 @@
+package com.snail.platform.function.external.client;
+
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
+import com.snail.platform.function.external.api.ExternalCallException;
+import com.snail.platform.function.external.api.SocialAuthPort;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
+/**
+ * 职责:飞书适配(企业自建应用):PC 扫码整页跳转;二期工作台内为 h5sdk 取 authCode 后
+ * 复用同一交换链路。出站链路:authen/v2/oauth/token(JSON POST,交换必须回传与授权一致的
+ * redirect_uri)→ authen/v1/user_info(Bearer),open_id 为平台唯一身份。
+ * 注意:mobile 带 +86 国家码,入库前剥成裸号(snail 联调实录);手机号需单独申请权限。
+ * 上游:external.api 的 SocialAuthPort;下游:AbstractSocialAuthClient 出站收口。
+ */
+@Component
+@ConditionalOnProperty(name = "snail.external.oauth.mock", havingValue = "false", matchIfMissing = true)
+public class FeishuAuthClient extends AbstractSocialAuthClient {
+
+    /** 授权页(PC 扫码/网页授权) */
+    private static final String AUTHORIZE = "https://open.feishu.cn/open-apis/authen/v1/authorize";
+
+    /** 授权码换用户访问令牌(v2 端点,直接用 client_id/secret,无需先取应用令牌) */
+    private static final String TOKEN = "https://open.feishu.cn/open-apis/authen/v2/oauth/token";
+
+    /** 读取登录用户信息 */
+    private static final String USERINFO = "https://open.feishu.cn/open-apis/authen/v1/user_info";
+
+    private final String appId;
+
+    private final String appSecret;
+
+    public FeishuAuthClient(ExternalCallLedger ledger,
+                            @Value("${snail.external.oauth.feishu.app-id:}") String appId,
+                            @Value("${snail.external.oauth.feishu.app-secret:}") String appSecret) {
+        super(ledger);
+        this.appId = appId;
+        this.appSecret = appSecret;
+    }
+
+    @Override
+    protected String vendor() {
+        return "feishu";
+    }
+
+    @Override
+    public String source() {
+        return "feishu";
+    }
+
+    @Override
+    public boolean available() {
+        return notBlank(appId) && notBlank(appSecret);
+    }
+
+    @Override
+    public String authorizeUrl(String redirectUri, String state) {
+        return AUTHORIZE
+                + "?app_id=" + urlEncode(appId)
+                + "&redirect_uri=" + urlEncode(redirectUri)
+                + "&response_type=code"
+                + "&state=" + urlEncode(state);
+    }
+
+    @Override
+    public SocialIdentity exchange(String code, String redirectUri) {
+        if (!notBlank(redirectUri)) {
+            throw new ExternalCallException(vendor(), "oauth-token", "飞书交换必须回传与授权一致的 redirect_uri");
+        }
+        // 1. 授权码换用户访问令牌:clientSecret 只在请求体,快照不落密钥
+        String tokenBody = JSONUtil.toJsonStr(Map.of(
+                "grant_type", "authorization_code",
+                "client_id", appId,
+                "client_secret", appSecret,
+                "code", code,
+                "redirect_uri", redirectUri));
+        JSONObject tokenResp = parse(postJson(TOKEN, tokenBody, "oauth-token"), "oauth-token");
+        String accessToken = requireField(tokenResp, "access_token", "oauth-token", "飞书返回的访问令牌为空");
+
+        // 2. 读取登录用户信息
+        JSONObject user = parse(getJson(USERINFO, null, Map.of("Authorization", "Bearer " + accessToken),
+                "oauth-userinfo"), "oauth-userinfo");
+        String bizCode = user.getStr("code");
+        if (bizCode != null && !"0".equals(bizCode)) {
+            throw new ExternalCallException(vendor(), "oauth-userinfo",
+                    "飞书调用失败:code=" + bizCode + ", msg=" + user.getStr("msg"));
+        }
+        JSONObject data = user.getJSONObject("data");
+        if (data == null) {
+            data = new JSONObject();
+        }
+        String openId = requireField(data, "open_id", "oauth-userinfo", "飞书返回的用户标识为空");
+        return new SocialIdentity(openId, data.getStr("union_id"), data.getStr("name"),
+                data.getStr("avatar_url"), stripCountryCode(data.getStr("mobile")));
+    }
+
+    /** 平台手机号带国家码,绑定匹配按裸号口径,与 sys_user.phone 对齐 */
+    private static String stripCountryCode(String mobile) {
+        if (mobile != null && mobile.startsWith("+86")) {
+            return mobile.substring(3);
+        }
+        return mobile;
+    }
+}
