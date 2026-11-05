@@ -104,3 +104,22 @@ export function assignUserRoles(userId: number, roleIds: number[]): Promise<void
 export function forceLogoutUser(userId: number): Promise<void> {
   return post<void>(`/system/user/${userId}/force-logout`);
 }
+
+/* ------------------------- 第三方绑定(只读) ------------------------- */
+
+/** 用户第三方绑定:一行=厂商身份x平台账号;openId 原样展示,便于与厂商后台核对易主/错绑 */
+export interface UserIdentity {
+  id: number;
+  source: 'dingtalk' | 'feishu' | 'wecom';
+  openId: string;
+  unionId: string | null;
+  nickname: string | null;
+  /** 最近一次经此身份登录时间(ISO 字符串);从未登录过为 null */
+  lastLoginTime: string | null;
+  createTime: string;
+}
+
+/** 第三方绑定只读列表,按绑定先后升序;解绑换绑二期 */
+export function fetchUserIdentities(userId: number): Promise<UserIdentity[]> {
+  return get<UserIdentity[]>(`/system/user/${userId}/identities`);
+}

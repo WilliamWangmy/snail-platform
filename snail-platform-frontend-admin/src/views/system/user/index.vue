@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import dayjs from 'dayjs';
 import AppIcon from '@/components/AppIcon.vue';
 import { fetchOrgTree, type OrgNode } from '@/api/org';
 import { pageRoles, type RoleVO } from '@/api/role';
@@ -10,11 +11,13 @@ import {
   checkUsername,
   createUser,
   deleteUser,
+  fetchUserIdentities,
   forceLogoutUser,
   getUser,
   pageUsers,
   resetUserPassword,
   updateUser,
+  type UserIdentity,
   type UserQuery,
   type UserVO,
 } from '@/api/user';
@@ -307,11 +310,40 @@ function actionsOf(row: UserVO): RowAction[] {
     { key: 'edit', label: '修改', show: auth.has('system:user:update'), handler: () => openEdit(row) },
     { key: 'reset', label: '重置密码', show: auth.has('system:user:reset-password'), handler: () => openResetPassword(row) },
     { key: 'roles', label: '分配角色', show: auth.has('system:user:assign-role'), handler: () => { void openAssignRoles(row); } },
+    { key: 'identities', label: '第三方绑定', show: auth.has('system:user:list'), handler: () => { void openIdentities(row); } },
     { key: 'toggle', label: row.status === 0 ? '停用' : '启用', show: auth.has('system:user:update'), handler: () => { void toggleStatus(row); } },
     { key: 'delete', label: '删除', tone: 'danger', show: auth.has('system:user:delete'), handler: () => { void remove(row); } },
     // 踢自己后端(控制器与服务层两处)都拒,这里先不占位,免得点出一次报错
     { key: 'kick', label: '强制下线', tone: 'danger', show: auth.has('system:user:kick') && row.userId !== auth.user?.userId, handler: () => { void kickUser(row); } },
   ];
+}
+
+/* -------------------------------- 第三方绑定(只读) -------------------------------- */
+
+const identityVisible = ref(false);
+const identityTarget = ref<UserVO | null>(null);
+const identityLoading = ref(false);
+/** 空数组 = 未绑定任何第三方身份 */
+const identities = ref<UserIdentity[]>([]);
+
+/** 来源编码展示名,与后端 login_type 同口径 */
+const OAUTH_SOURCE_LABELS: Record<string, string> = { dingtalk: '钉钉', feishu: '飞书', wecom: '企业微信' };
+
+/** 绑定列表随开随取:错绑排查要看最近登录时间,openId 原样展示便于与厂商后台核对 */
+async function openIdentities(row: UserVO): Promise<void> {
+  identityTarget.value = row;
+  identityVisible.value = true;
+  identityLoading.value = true;
+  identities.value = [];
+  try {
+    identities.value = await fetchUserIdentities(row.userId);
+  } finally {
+    identityLoading.value = false;
+  }
+}
+
+function formatTime(value: string | null): string {
+  return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '—';
 }
 
 /** 强制下线:令牌版本自增,该用户全部设备下一次请求即 401。 */
@@ -696,6 +728,49 @@ async function kickUser(row: UserVO): Promise<void> {
         </ElButton>
       </template>
     </ElDialog>
+
+    <ElDialog
+      v-model="identityVisible"
+      :title="`第三方绑定 · ${identityTarget?.nickname ?? ''}`"
+      width="520px"
+    >
+      <ElAlert
+        v-if="!identityLoading && identities.length === 0"
+        :closable="false"
+        show-icon
+        title="该用户未绑定任何第三方身份;绑定在首次扫码登录成功后自动建立。"
+      />
+      <div
+        v-else
+        v-loading="identityLoading"
+        class="identity-list"
+      >
+        <div
+          v-for="identity in identities"
+          :key="identity.id"
+          class="identity-item"
+        >
+          <div class="identity-head">
+            <b>{{ OAUTH_SOURCE_LABELS[identity.source] ?? identity.source }}</b>
+            <span>{{ identity.nickname ?? '—' }}</span>
+          </div>
+          <div class="identity-line">
+            {{ identity.openId }}
+          </div>
+          <div class="identity-line">
+            绑定于 {{ formatTime(identity.createTime) }}
+            <template v-if="identity.lastLoginTime">
+              · 最近登录 {{ formatTime(identity.lastLoginTime) }}
+            </template>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <ElButton @click="identityVisible = false">
+          关闭
+        </ElButton>
+      </template>
+    </ElDialog>
   </div>
 </template>
 
@@ -714,5 +789,35 @@ async function kickUser(row: UserVO): Promise<void> {
   font-family: monospace;
   font-weight: 600;
   letter-spacing: 0.04em;
+}
+
+.identity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60px;
+}
+
+.identity-item {
+  padding: 10px 14px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+}
+
+.identity-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.identity-head span {
+  color: var(--el-text-color-secondary);
+}
+
+.identity-line {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  word-break: break-all;
 }
 </style>
