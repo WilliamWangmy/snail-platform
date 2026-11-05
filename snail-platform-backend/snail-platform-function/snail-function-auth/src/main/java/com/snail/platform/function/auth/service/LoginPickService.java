@@ -10,7 +10,8 @@ import org.springframework.stereotype.Service;
  * 职责:多租户账号选择的一次性凭证(pickKey)的登记与核销——验证码在登录首调即核销,
  * pickKey 是"验证码已验证"的唯一证明:UUID 高熵 + 2 分钟 TTL + GETDEL 一次一用。
  * 候选只存 userId 列表(逗号拼接,Long 无转义歧义,不值得引 JSON),签发时按 ID 现查,
- * 不回传手机号等档案快照。独立成小类:密码登录将来若也要多账号选择,凭证机制原样复用。
+ * 不回传手机号等档案快照。独立成小类:密码登录将来若也要多账号选择,凭证机制原样复用;
+ * 第三方扫码链的同构变体见 OAuthPickService(值多记 source+openId 供 pick 落绑定),键前缀独立。
  * 上游:AuthService 的多命中分支与 pick 端点;下游:StringRedisTemplate。
  */
 @Service
