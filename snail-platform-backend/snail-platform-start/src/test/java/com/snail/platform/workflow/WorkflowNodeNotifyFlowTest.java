@@ -12,6 +12,8 @@ import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.workflow.engine.WorkflowEngineGateway;
 import com.snail.platform.framework.workflow.engine.WorkflowNodeNotifyConfig;
 import com.snail.platform.function.external.api.MailPort;
+import com.snail.platform.function.external.entity.SysExternalCallLog;
+import com.snail.platform.function.external.mapper.SysExternalCallLogMapper;
 import com.snail.platform.function.notify.entity.SysNotifyMessage;
 import com.snail.platform.function.notify.entity.SysNotifyOutbound;
 import com.snail.platform.function.notify.entity.SysNotifyRecipient;
@@ -36,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * 职责:节点通知验收——notifyType=mail 的节点只投邮件不落收件行、未配置节点回落站内信(存量不回归,方案 D3)、
@@ -81,6 +85,9 @@ class WorkflowNodeNotifyFlowTest {
     private SysNotifyOutboundMapper outboundMapper;
 
     @Autowired
+    private SysExternalCallLogMapper externalCallLogMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     /** 邮件端口替身:开发库无 SMTP,置可用后由通知链路真实调用,投递内容就地记录 */
@@ -89,12 +96,18 @@ class WorkflowNodeNotifyFlowTest {
 
     private final List<MailPort.MailMessage> sentMails = new ArrayList<>();
 
+    /** 短信模板编码:开发库无阿里云报备,测试注入占位编码打通 mock 厂商链路 */
+    @DynamicPropertySource
+    static void smsTemplate(DynamicPropertyRegistry registry) {
+        registry.add("snail.notify.sms.templates.todo", () -> "SMS_TEST_TODO");
+    }
+
     @BeforeEach
     void setUp() {
         TenantContextHolder.set(TENANT_A);
-        // 收件人地址要真实存在,邮件通道才有寻址目标;残留与既有流程测试同口径
-        jdbcTemplate.update("UPDATE sys_user SET email = ? WHERE user_id = ?",
-                "admin-node-notify@example.com", REAL_USER_ID);
+        // 收件人地址要真实存在,邮件/短信通道才有寻址目标;残留与既有流程测试同口径
+        jdbcTemplate.update("UPDATE sys_user SET email = ?, phone = ? WHERE user_id = ?",
+                "admin-node-notify@example.com", "13800001234", REAL_USER_ID);
         when(mailPort.available()).thenReturn(true);
         org.mockito.Mockito.doAnswer(invocation -> {
             synchronized (sentMails) {
@@ -113,7 +126,7 @@ class WorkflowNodeNotifyFlowTest {
     /** notifyType=mail 的节点:邮件出站命中替身,收件行与 sse 行都不存在——精确通道,不广播 */
     @Test
     void mailNodeNotifiesByMailWithoutInboxRow() throws Exception {
-        String key = deployFlow("notifyMail", true);
+        String key = deployFlow("notifyMail", "mail");
         LoginUserContextHolder.set(initiator());
         instanceService.start(new WorkflowStartCommand(key, "node-notify-flow", "bk-" + key,
                 "邮件节点验收单", Map.of()));
@@ -128,12 +141,13 @@ class WorkflowNodeNotifyFlowTest {
         assertEquals(0L, recipientRowsOf(messageId), "未勾选站内信的节点不落收件行,收件箱不出现待办提醒");
         assertTrue(outboundRowsOf(messageId).stream().allMatch(row -> "mail".equals(row.getChannel())),
                 "不得广播到其它通道: " + outboundRowsOf(messageId).stream().map(SysNotifyOutbound::getChannel).toList());
+        assertEquals(0L, smsCallLogRowsOf(messageId), "未勾短信不得触发短信投递");
     }
 
     /** 未配置 notifyType 的节点回落站内信:收件行在、sse 推送在,邮件与短信不出(存量模型不回归,D3) */
     @Test
     void missingNotifyTypeFallsBackToInner() throws Exception {
-        String key = deployFlow("notifyFallback", false);
+        String key = deployFlow("notifyFallback", null);
         LoginUserContextHolder.set(initiator());
         instanceService.start(new WorkflowStartCommand(key, "node-notify-flow", "bk-" + key,
                 "回落验收单", Map.of()));
@@ -143,9 +157,27 @@ class WorkflowNodeNotifyFlowTest {
         awaitOutbound(messageId, row -> "sse".equals(row.getChannel()) && row.getStatus() == 1);
         assertTrue(outboundRowsOf(messageId).stream().noneMatch(row -> "mail".equals(row.getChannel())),
                 "未勾邮件就不应出站邮件");
+        assertEquals(0L, smsCallLogRowsOf(messageId), "未勾短信就不应出站短信");
         synchronized (sentMails) {
             assertTrue(sentMails.isEmpty(), "回落站内信不得触发邮件投递: " + sentMails);
         }
+    }
+
+    /** notifyType=sms 的节点:走真实 mock 短信厂商落 external 流水,收件行不落(方案 D8/M2 验收) */
+    @Test
+    void smsNodeSendsTemplatedSmsWithoutInboxRow() throws Exception {
+        String key = deployFlow("notifySms", "sms");
+        LoginUserContextHolder.set(initiator());
+        instanceService.start(new WorkflowStartCommand(key, "node-notify-flow", "bk-" + key,
+                "短信节点验收单", Map.of()));
+
+        long messageId = workflowMessageIdOf("bk-" + key);
+        awaitOutbound(messageId, row -> "sms".equals(row.getChannel()) && row.getStatus() == 1);
+        assertEquals(0L, recipientRowsOf(messageId), "纯短信提醒不落收件行");
+        synchronized (sentMails) {
+            assertTrue(sentMails.isEmpty(), "短信节点不得触发邮件投递: " + sentMails);
+        }
+        awaitSmsCallLog(messageId, 1);
     }
 
     /** D9 保留性实测:含全部自定义属性的 XML 部署后经网关读回比对,未知属性必须原样保留 */
@@ -188,12 +220,12 @@ class WorkflowNodeNotifyFlowTest {
                 1L, "总部", 1L, List.of(new LoginUser.RoleInfo(REAL_ROLE_ID, "admin", "超级管理员")), false);
     }
 
-    /** 建模型→发布:withNotify=false 即存量口径(节点无任何通知属性) */
-    private String deployFlow(String prefix, boolean withNotify) {
+    /** 建模型→发布:notifyType 为 null 即存量口径(节点无通知属性) */
+    private String deployFlow(String prefix, String notifyType) {
         String tag = String.valueOf(System.nanoTime() % 100_000_000L);
         String key = prefix + tag;
         LoginUserContextHolder.set(initiator());
-        String notifyAttr = withNotify ? "flowable:notifyType=\"mail\"" : "";
+        String notifyAttr = notifyType == null ? "" : "flowable:notifyType=\"" + notifyType + "\"";
         String bpmn = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -230,6 +262,25 @@ class WorkflowNodeNotifyFlowTest {
     private List<SysNotifyOutbound> outboundRowsOf(long messageId) {
         return outboundMapper.selectList(Wrappers.<SysNotifyOutbound>lambdaQuery()
                 .eq(SysNotifyOutbound::getMessageId, messageId));
+    }
+
+    /** 短信经 external 网关的流水行:caller=notify、biz_id=消息 ID,由 SmsOutboundChannel 写入 */
+    private long smsCallLogRowsOf(long messageId) {
+        return externalCallLogMapper.selectCount(Wrappers.<SysExternalCallLog>lambdaQuery()
+                .eq(SysExternalCallLog::getCaller, "notify")
+                .eq(SysExternalCallLog::getBizId, messageId));
+    }
+
+    /** 流水落账走异步队列,断言前轮询等待;超时把现有行数摆进错误信息 */
+    private void awaitSmsCallLog(long messageId, long expected) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + AWAIT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            if (smsCallLogRowsOf(messageId) >= expected) {
+                return;
+            }
+            Thread.sleep(200);
+        }
+        throw new AssertionError("短信流水未达到 " + expected + " 行,现有 " + smsCallLogRowsOf(messageId) + " 行");
     }
 
     /** 轮询等待出站流水出现命中行;超时把已有行摆进断言消息,失败可读 */
