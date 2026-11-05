@@ -5,12 +5,15 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 
 import {
   getCaptcha,
+  getOAuthAuthorize,
+  getOAuthOptions,
   isLoginAccounts,
   loginBySms,
+  OAUTH_REDIRECT_KEY,
   pickSmsAccount,
   sendSmsCaptcha,
 } from '@/api/auth';
-import type { LoginSuccessVO, SmsAccountOption } from '@/types/auth';
+import type { LoginSuccessVO, OAuthSource, SmsAccountOption } from '@/types/auth';
 import AppIcon from '@/components/AppIcon.vue';
 import { useAuthStore } from '@/stores/auth';
 
@@ -204,12 +207,41 @@ function onPickDialogClosed(): void {
   smsForm.smsCode = '';
 }
 
-/* ------------------------- 其他登录方式（占位） ------------------------- */
+/* ------------------------- 第三方扫码登录 ------------------------- */
 
-/** 钉钉/飞书/企业微信登录尚未开通：后端 login_type 已留编码位，接入时换跳转即可 */
-function externalLogin(name: string): void {
-  ElMessage.info(`${name}登录暂未开通，请使用账号密码或手机验证码登录`);
+/** 开放的第三方来源；加载失败按空处理，只隐藏入口行，不阻塞密码/短信登录 */
+const oauthSources = ref<OAuthSource[]>([]);
+/** 正在整页跳转：防重复点击把同一个 state 发两次 */
+const oauthRedirecting = ref(false);
+
+async function loadOAuthOptions(): Promise<void> {
+  try {
+    oauthSources.value = await getOAuthOptions();
+  } catch {
+    oauthSources.value = [];
+  }
 }
+
+/**
+ * 发起第三方扫码登录：先记下站内跳转目标（回调页成功后回跳），再拿授权页地址整页跳转；
+ * 回跳由 /oauth-callback/:source 接管，与登录页无共享状态
+ */
+async function startOAuth(source: OAuthSource): Promise<void> {
+  if (oauthRedirecting.value) return;
+  oauthRedirecting.value = true;
+  try {
+    sessionStorage.setItem(OAUTH_REDIRECT_KEY, redirectTarget());
+    const authorize = await getOAuthAuthorize(source, `${window.location.origin}/oauth-callback/${source}`);
+    window.location.href = authorize.authorizeUrl;
+  } catch {
+    // 未开放/回调未登记等文案由请求拦截器统一弹出；跳转失败要允许重试
+    oauthRedirecting.value = false;
+  }
+}
+
+/** 第三方入口的展示名与图标：来源由后端开放列表驱动，顺序即后端返回顺序 */
+const OAUTH_LABELS: Record<string, string> = { dingtalk: '钉钉', feishu: '飞书', wecom: '企业微信' };
+const OAUTH_ICONS: Record<string, string> = { dingtalk: 'zap', feishu: 'send', wecom: 'chat' };
 
 const otherMethods = computed(() => [
   {
@@ -219,9 +251,13 @@ const otherMethods = computed(() => [
     active: mode.value === 'sms',
     action: () => void switchMode('sms'),
   },
-  { key: 'dingtalk', label: '钉钉', icon: 'zap', active: false, action: () => externalLogin('钉钉') },
-  { key: 'feishu', label: '飞书', icon: 'send', active: false, action: () => externalLogin('飞书') },
-  { key: 'wecom', label: '企业微信', icon: 'chat', active: false, action: () => externalLogin('企业微信') },
+  ...oauthSources.value.map((source) => ({
+    key: source,
+    label: OAUTH_LABELS[source] ?? source,
+    icon: OAUTH_ICONS[source] ?? 'zap',
+    active: false,
+    action: () => void startOAuth(source),
+  })),
 ]);
 
 /** 候选账号头像字：昵称首字，退回登录名首字 */
@@ -231,6 +267,7 @@ function accountInitial(name: string): string {
 
 onMounted(() => {
   void refreshCaptcha();
+  void loadOAuthOptions();
 });
 </script>
 

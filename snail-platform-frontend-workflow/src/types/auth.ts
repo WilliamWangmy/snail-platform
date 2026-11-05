@@ -82,3 +82,22 @@ export interface LoginAccountsVO {
   pickKey: string;
   accounts: SmsAccountOption[];
 }
+
+/* ------------------------- 第三方扫码登录 ------------------------- */
+
+/** 第三方扫码来源编码，与后端 login_type 同口径 */
+export type OAuthSource = 'dingtalk' | 'feishu' | 'wecom';
+
+/** GET /system/auth/oauth/authorize 出参：厂商授权页地址 + 一次性 state */
+export interface OAuthAuthorizeVO {
+  authorizeUrl: string;
+  state: string;
+}
+
+/** POST /system/auth/oauth/login 入参：state 重定向流必带，免登态缺省 */
+export interface OAuthLoginRequest {
+  source: OAuthSource;
+  code: string;
+  state?: string;
+  redirectUri?: string;
+}

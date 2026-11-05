@@ -8,6 +8,9 @@ import type {
   LoginRequest,
   LoginSuccessVO,
   LoginUserVO,
+  OAuthAuthorizeVO,
+  OAuthLoginRequest,
+  OAuthSource,
   SmsCaptchaRequest,
   SmsLoginRequest,
   SmsPickRequest,
@@ -55,4 +58,33 @@ export function isLoginAccounts(
   result: LoginSuccessVO | LoginAccountsVO,
 ): result is LoginAccountsVO {
   return typeof (result as LoginAccountsVO).pickKey === 'string';
+}
+
+/* ------------------------- 第三方扫码登录 ------------------------- */
+
+/** 第三方登录跳转前的站内目标暂存键：发起时写入，回调页消费后清除 */
+export const OAUTH_REDIRECT_KEY = 'snail_workflow_oauth_redirect_v1';
+
+/** 开放的第三方来源；空数组即登录页隐藏第三方入口行 */
+export function getOAuthOptions(): Promise<OAuthSource[]> {
+  return http<OAuthSource[]>({ url: '/system/auth/oauth/options', method: 'GET' });
+}
+
+/** 拿厂商授权页地址：redirectUri 须与来源白名单精确匹配，否则报"回调地址未登记" */
+export function getOAuthAuthorize(source: OAuthSource, redirectUri: string): Promise<OAuthAuthorizeVO> {
+  return http<OAuthAuthorizeVO>({
+    url: '/system/auth/oauth/authorize',
+    method: 'GET',
+    params: { source, redirectUri },
+  });
+}
+
+/** 第三方授权码登录：单账号返回 LoginSuccessVO；多账号返回 LoginAccountsVO（pickKey 非空） */
+export function loginByOauth(data: OAuthLoginRequest): Promise<LoginSuccessVO | LoginAccountsVO> {
+  return http<LoginSuccessVO | LoginAccountsVO>({ url: '/system/auth/oauth/login', method: 'POST', data });
+}
+
+/** 选定租户账号换令牌：pickKey 一次一用，失败需重走扫码 */
+export function pickOauthAccount(data: SmsPickRequest): Promise<LoginSuccessVO> {
+  return http<LoginSuccessVO>({ url: '/system/auth/oauth/pick', method: 'POST', data });
 }
