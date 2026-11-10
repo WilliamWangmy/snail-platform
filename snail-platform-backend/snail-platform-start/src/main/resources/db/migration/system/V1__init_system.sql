@@ -1,10 +1,14 @@
 -- =========================================================
--- Snail Platform 系统基础表(多租户版)
--- 拆分口径:建表 V1 系统 / V2 文件 / V3 流程,数据初始化 V4 系统 / V5 文件 / V6 流程
---          建表与种子不混写,文件与流程各自成文件——加一域只动它自己那两个文件,不碰别人的历史脚本
+-- Snail Platform 系统域全量脚本(多租户版):建表 + 内置种子,一个文件装齐
+-- 干什么:系统/通知基础表 + 第三方身份绑定表;默认租户 + admin 账号 + 全局菜单目录 + 平台面授权
+-- 能否重跑:不能;Flyway 版本迁移仅执行一次,重放需整库重建
+-- 前置条件:admin 口令以 BCrypt 密文(非明文)经 SNAIL_SEED_ADMIN_PASSWORD 注入 ${seedAdminPassword} 占位符;
+--          dev 缺省为 admin123 密文(首登强制改密兜底),prod 缺该变量属性解析失败、启动被拦;
+--          密文用与业务侧一致的 Hutool BCrypt.hashpw(明文) 离线生成
 -- 租户模式:共享库共享表 + tenant_id 判别列,MP TenantLineInnerInterceptor 默认全员注入
 -- ignore 清单:sys_tenant / sys_user_role / sys_menu / sys_role_menu / 两张日志表
 --              / sys_notify_outbound(通知出站队列表,异步线程写入,租户归属靠行内快照)
+--              / sys_user_identity(第三方身份绑定,登录按(source,open_id)跨租户定位)
 --              (日志与队列表带 tenant_id,由查询侧或切面显式写)
 -- 登录口径:不选租户,账号+密码+验证码;username 全表唯一,按用户名自动定位租户
 -- 业务表:审计四件套 + 逻辑删除;日志表只增,不配逻辑删除,时间毫秒
@@ -14,6 +18,7 @@
 -- 权限码三段式 <面>:<模块>:<动作>;面随 scope 走:1 平台用 platform:,2 租户用 system:
 -- 字典租户各自维护:无平台内置、无并集、无默认种子
 -- 目录与外链 perm_code 为 NULL;MySQL 唯一索引允许多个 NULL
+-- 种子只装系统面:文件面/流程面/第三方面种子在 V2/V3/V4 各自文件末尾
 -- =========================================================
 
 CREATE TABLE sys_tenant (
@@ -43,6 +48,7 @@ CREATE TABLE sys_user (
     nickname    VARCHAR(30)  NOT NULL COMMENT '显示名',
     password    VARCHAR(100) NOT NULL COMMENT 'BCrypt 密文',
     token_version BIGINT     NOT NULL DEFAULT 0 COMMENT '令牌版本,改密/重置/停用/强制下线自增,进 JWT ver 声明实现吊销',
+    password_modify_time DATETIME DEFAULT NULL COMMENT '密码最近修改时间:NULL 待强制改密,非空为最近一次改密时间',
     email       VARCHAR(50)  DEFAULT NULL COMMENT '邮箱',
     phone       VARCHAR(20)  DEFAULT NULL COMMENT '手机号',
     org_id      BIGINT       DEFAULT NULL COMMENT '所属组织,关联 sys_org.org_id;一用户一主组织',
@@ -183,6 +189,7 @@ CREATE TABLE sys_login_log (
     ip         VARCHAR(50)  DEFAULT NULL COMMENT '客户端IP',
     browser    VARCHAR(100) DEFAULT NULL COMMENT '浏览器',
     os         VARCHAR(100) DEFAULT NULL COMMENT '操作系统',
+    login_type VARCHAR(20)  NOT NULL DEFAULT 'password' COMMENT '登录方式编码:password/sms,后续 feishu/wecom/dingtalk',
     status     TINYINT      NOT NULL COMMENT '结果:1 成功 0 失败',
     msg        VARCHAR(255) DEFAULT NULL COMMENT '失败原因',
     login_time DATETIME(3)  NOT NULL COMMENT '登录时间',
@@ -272,4 +279,109 @@ CREATE TABLE sys_notify_outbound (
     PRIMARY KEY (outbound_id),
     KEY idx_no_message (message_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '通知出站投递记录,异步线程写入;租户拦截器 ignore 表';
+
+-- ---------- 第三方身份绑定:一行=厂商身份x平台账号,登录查询键(source,open_id) ----------
+-- 同一 (source,open_id) 允许多行(多租户撞号,登录走 pickKey 二段式);唯一键挡并发首绑的重复行
+-- 不设软删列:无解绑功能,错绑物理删行
+
+CREATE TABLE sys_user_identity (
+    id              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    user_id         BIGINT       NOT NULL COMMENT '平台用户ID,sys_user.user_id',
+    tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '绑定时刻的用户租户快照,仅展示口径,不做过滤列',
+    source          VARCHAR(20)  NOT NULL COMMENT '来源编码:dingtalk/feishu/wecom',
+    open_id         VARCHAR(128) NOT NULL COMMENT '厂商内稳定标识:钉钉unionId/飞书openId/企微userid',
+    union_id        VARCHAR(128) NULL COMMENT '厂商跨应用标识:钉钉与open_id同值,飞书预留',
+    nickname        VARCHAR(64)  NULL COMMENT '最近一次厂商昵称快照',
+    last_login_time DATETIME(3)  NULL COMMENT '最近一次经此身份登录时间',
+    create_time     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    update_time     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_identity (source, open_id, user_id),
+    KEY idx_user_identity_user (user_id)
+) ENGINE = InnoDB COMMENT ='第三方身份绑定:一行=厂商身份x平台账号,登录查询键(source,open_id)';
+
+-- =========================================================
+-- 内置种子:默认租户 + admin 账号 + 全局菜单目录 + 平台面授权
+-- 新租户开通不靠迁移脚本:由平台管理功能在运行时按本模板复制,且不写 sys_menu、不复制目录
+-- 目录内节点全部 is_system=1;现有页面均为站内菜单,target 走默认 1
+-- 授权按 A 语义:租户面(scope=2)隐式全量,不落库;只显式授平台面(scope=1)节点
+-- =========================================================
+
+-- ---------- 默认租户与初始组织 ----------
+INSERT INTO sys_tenant (tenant_id, tenant_code, name, status, create_time)
+VALUES (1, 'default', '默认租户', 0, NOW());
+
+INSERT INTO sys_org (org_id, tenant_id, parent_id, name, ancestors, sort, create_time)
+VALUES (1, 1, 0, 'Snail', '0', 0, NOW());
+
+-- ---------- 内置角色与超级管理员 ----------
+INSERT INTO sys_role (role_id, tenant_id, role_name, role_code, data_scope, is_system, sort, create_time) VALUES
+(1, 1, '超级管理员', 'admin',  1, 1, 1, NOW()),
+(2, 1, '普通角色',   'common', 4, 1, 2, NOW());
+
+INSERT INTO sys_user (user_id, tenant_id, username, nickname, password, org_id, status, create_time)
+VALUES (1, 1, 'admin', '超级管理员', '${seedAdminPassword}', 1, 0, NOW());
+
+INSERT INTO sys_user_role (user_id, role_id) VALUES (1, 1);
+
+-- ---------- 全局菜单目录 ----------
+INSERT INTO sys_menu
+(menu_id, parent_id, menu_name, menu_type, scope, path, component, perm_code, icon, sort, is_system, create_time)
+VALUES
+-- 租户面(scope=2)
+(1,    0,   '系统管理',     1, 2, '/system',          NULL,                     NULL,                         'Setting',        1, 1, NOW()),
+(100,  1,   '用户管理',     2, 2, '/system/user',     'system/user/index',      'system:user:list',           'User',           1, 1, NOW()),
+(1001, 100, '新增用户',     3, 2, NULL,               NULL,                     'system:user:create',         NULL,             1, 1, NOW()),
+(1002, 100, '修改用户',     3, 2, NULL,               NULL,                     'system:user:update',         NULL,             2, 1, NOW()),
+(1003, 100, '删除用户',     3, 2, NULL,               NULL,                     'system:user:delete',         NULL,             3, 1, NOW()),
+(1004, 100, '重置密码',     3, 2, NULL,               NULL,                     'system:user:reset-password', NULL,             4, 1, NOW()),
+(1005, 100, '分配角色',     3, 2, NULL,               NULL,                     'system:user:assign-role',    NULL,             5, 1, NOW()),
+(1006, 100, '强制下线',     3, 2, NULL,               NULL,                     'system:user:kick',           NULL,             6, 1, NOW()),
+(110,  1,   '角色管理',     2, 2, '/system/role',     'system/role/index',      'system:role:list',           'UserFilled',     2, 1, NOW()),
+(1101, 110, '新增角色',     3, 2, NULL,               NULL,                     'system:role:create',         NULL,             1, 1, NOW()),
+(1102, 110, '修改角色',     3, 2, NULL,               NULL,                     'system:role:update',         NULL,             2, 1, NOW()),
+(1103, 110, '删除角色',     3, 2, NULL,               NULL,                     'system:role:delete',         NULL,             3, 1, NOW()),
+(1104, 110, '分配菜单',     3, 2, NULL,               NULL,                     'system:role:assign-menu',    NULL,             4, 1, NOW()),
+(1105, 110, '平台授权',     3, 1, NULL,               NULL,                     'platform:role:assign-menu',  NULL,             5, 1, NOW()),
+(120,  1,   '组织管理',     2, 2, '/system/org',      'system/org/index',       'system:org:list',            'OfficeBuilding', 3, 1, NOW()),
+(1201, 120, '新增组织',     3, 2, NULL,               NULL,                     'system:org:create',          NULL,             1, 1, NOW()),
+(1202, 120, '修改组织',     3, 2, NULL,               NULL,                     'system:org:update',          NULL,             2, 1, NOW()),
+(1203, 120, '删除组织',     3, 2, NULL,               NULL,                     'system:org:delete',          NULL,             3, 1, NOW()),
+(130,  1,   '字典管理',     2, 2, '/system/dict',     'system/dict/index',      'system:dict:list',           'Collection',     4, 1, NOW()),
+(1301, 130, '新增字典',     3, 2, NULL,               NULL,                     'system:dict:create',         NULL,             1, 1, NOW()),
+(1302, 130, '修改字典',     3, 2, NULL,               NULL,                     'system:dict:update',         NULL,             2, 1, NOW()),
+(1303, 130, '删除字典',     3, 2, NULL,               NULL,                     'system:dict:delete',         NULL,             3, 1, NOW()),
+(140,  1,   '登录日志',     2, 2, '/system/loginlog', 'system/loginlog/index',  'system:loginlog:list',       'Key',            5, 1, NOW()),
+(1401, 140, '导出登录日志', 3, 2, NULL,               NULL,                     'system:loginlog:export',     NULL,             1, 1, NOW()),
+(1402, 140, '跨租户查看',   3, 1, NULL,               NULL,                     'platform:loginlog:all',      NULL,             2, 1, NOW()),
+(150,  1,   '操作日志',     2, 2, '/system/operlog',  'system/operlog/index',   'system:operlog:list',        'Document',       6, 1, NOW()),
+(1501, 150, '导出操作日志', 3, 2, NULL,               NULL,                     'system:operlog:export',      NULL,             1, 1, NOW()),
+(1502, 150, '跨租户查看',   3, 1, NULL,               NULL,                     'platform:operlog:all',       NULL,             2, 1, NOW()),
+(160,  1,   '通知中心',     2, 2, '/system/notify',   'system/notify/index',    'system:notify:list',         'Bell',           7, 1, NOW()),
+(170,  1,   '在线用户',     2, 2, '/system/online',   'system/online/index',    'system:online:list',         'User',           8, 1, NOW()),
+(1701, 170, '强制下线',     3, 2, NULL,               NULL,                     'system:online:kick',         NULL,             1, 1, NOW()),
+-- 平台面(scope=1)
+(2,    0,   '平台管理',     1, 1, '/platform',        NULL,                     NULL,                         'Platform',       2, 1, NOW()),
+(200,  2,   '租户管理',     2, 1, '/platform/tenant', 'platform/tenant/index',  'platform:tenant:list',       'School',         1, 1, NOW()),
+(2001, 200, '新增租户',     3, 1, NULL,               NULL,                     'platform:tenant:create',     NULL,             1, 1, NOW()),
+(2002, 200, '修改租户',     3, 1, NULL,               NULL,                     'platform:tenant:update',     NULL,             2, 1, NOW()),
+(210,  2,   '菜单管理',     2, 1, '/platform/menu',   'platform/menu/index',    'platform:menu:list',         'Menu',           2, 1, NOW()),
+(2101, 210, '新增菜单',     3, 1, NULL,               NULL,                     'platform:menu:create',       NULL,             1, 1, NOW()),
+(2102, 210, '修改菜单',     3, 1, NULL,               NULL,                     'platform:menu:update',       NULL,             2, 1, NOW()),
+(2103, 210, '删除菜单',     3, 1, NULL,               NULL,                     'platform:menu:delete',       NULL,             3, 1, NOW()),
+(220,  2,   '公告管理',     2, 1, '/platform/notify', 'platform/notify/index',  'platform:notify:list',       'Message',        3, 1, NOW()),
+(2201, 220, '发送公告',     3, 1, NULL,               NULL,                     'platform:notify:send',       NULL,             1, 1, NOW());
+
+-- ---------- 默认租户 admin 的平台面授权 ----------
+-- A 语义下租户面隐式全量,这里只落 scope=1 的 13 个节点(2/200/2001/2002/210/2101/2102/2103/1105/1402/1502/220/2201)
+-- 谓词按 m.scope=1 一刀切,后建的域种子(V2/V3/V4)新增平台节点时无需改本段,各自文末补授即可
+INSERT INTO sys_role_menu (role_id, menu_id)
+SELECT r.role_id, m.menu_id
+FROM sys_role r
+CROSS JOIN sys_menu m
+WHERE r.tenant_id = 1
+  AND r.role_code = 'admin'
+  AND r.deleted = 0
+  AND m.scope = 1
+  AND m.deleted = 0;
 

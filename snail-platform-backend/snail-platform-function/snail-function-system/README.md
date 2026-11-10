@@ -106,7 +106,7 @@ dto/         record 形态的出入参与查询对象（VO 出参、*Request 入
 它同时是 framework-security 的 `UserAuthorityProvider` 端口实现。口径：
 
 - **语义 A**：`role_code=admin` 且 `is_system=1` 的启用角色隐式持有全部 `scope=2` 权限码；
-  平台面（`scope=1`）永远只认真实授权行——种子数据 `V4__seed_builtin_data.sql` 文末为默认租户 admin 显式补了这一段。
+  平台面（`scope=1`）永远只认真实授权行——种子数据 `V1__init_system.sql` 文末为默认租户 admin 显式补了这一段。
 - 用户本人停用或已删 → 权限码整体清空，立即生效，不等令牌过期；停用角色整体剔除。
 - 节点自身或任一祖先停用/被删/成环 → 退出解析（`MenuChains`）；目录与外链没有 `perm_code`，不产生权限码。
 
@@ -185,8 +185,8 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
 
 ## 数据模型
 
-11 张表，全部 DDL 在 [`V1__init_system_schema.sql`](../../snail-platform-start/src/main/resources/db/migration/V1__init_system_schema.sql)，
-内置种子在 [`V4__seed_builtin_data.sql`](../../snail-platform-start/src/main/resources/db/migration/V4__seed_builtin_data.sql)。
+11 张表，全部 DDL 在 [`V1__init_system.sql`](../../snail-platform-start/src/main/resources/db/migration/system/V1__init_system.sql)，
+内置种子同文件后段。
 
 | 表 | 实体基类 | 拦截器 | 唯一键 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -403,7 +403,7 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
 | | `POST /system/profile/password` | 任何登录用户 | 改口令（成功后全设备重登） |
 | | `POST /system/profile/force-logout` | 任何登录用户 | 下线自己的全部会话 |
 
-内置权限码的种子清单在 `V4__seed_builtin_data.sql`；文件面与流程面的菜单权限码在 `V5`、`V6`，种子按域分文件、互不追加历史脚本。
+内置权限码的种子清单在 `V1__init_system.sql`；文件面、流程面、第三方面的菜单权限码在 `V2`、`V3`、`V4`，种子按域分文件、与各域建表同文件。
 
 ## 跨模块契约
 
@@ -441,7 +441,7 @@ mvn -pl snail-platform-start spring-boot:run          # dev profile，连本机 
 mvn -q -pl snail-platform-function/snail-function-system -am -DskipTests compile
 ```
 
-首次启动 Flyway 会依次执行 `V1`（系统建表）→ `V2`（文件）→ `V3`（流程）→ `V4`（系统种子）→ `V5` → `V6`。
+首次启动 Flyway 会依次执行 `V1`（系统）→ `V2`（文件）→ `V3`（流程）→ `V4`（第三方接入），每个文件建表与种子合一。
 `dev` profile 下 admin 口令用开发占位密文（即 `admin123` 的 BCrypt）；`prod` 必须提供 `SNAIL_SEED_ADMIN_PASSWORD`
 （**BCrypt 密文而非明文**，用与业务侧一致的 Hutool `BCrypt.hashpw(明文)` 离线生成），缺失则迁移失败、启动被拦。
 

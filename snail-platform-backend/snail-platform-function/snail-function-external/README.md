@@ -257,8 +257,8 @@ SMTP 厂商适配器，`extends AbstractExternalClient implements MailPort`，ve
 
 ## 存储与索引
 
-建表在 [`V8__init_external_schema.sql`](../../snail-platform-start/src/main/resources/db/migration/V8__init_external_schema.sql)，
-菜单与权限码种子在 [`V9__seed_external_menu.sql`](../../snail-platform-start/src/main/resources/db/migration/V9__seed_external_menu.sql)
+建表在 [`V4__init_external.sql`](../../snail-platform-start/src/main/resources/db/migration/external/V4__init_external.sql)，
+菜单与权限码种子同文件后段
 （`222` 第三方调用 / `platform:external:log`，默认租户 admin 平台面授权与 V6 同口径幂等）。
 
 | 表 | 租户 | 关键索引 | 说明 |

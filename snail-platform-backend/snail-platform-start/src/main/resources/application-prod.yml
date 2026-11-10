@@ -9,7 +9,7 @@ spring:
       url: ${SNAIL_REDIS_URL}
   flyway:
     placeholders:
-      # V2 种子写入 admin 口令所需,值为 BCrypt 密文(非明文);缺失则迁移失败、启动被拦
+      # V1 种子写入 admin 口令所需,值为 BCrypt 密文(非明文);缺失则迁移失败、启动被拦
       "[seedAdminPassword]": ${SNAIL_SEED_ADMIN_PASSWORD}
 
 # 文档端点在生产整体关闭

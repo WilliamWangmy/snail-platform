@@ -9,7 +9,7 @@ spring:
       url: ${SNAIL_REDIS_URL:redis://127.0.0.1:6379}
   flyway:
     placeholders:
-      # V4 种子写入 admin 口令所需:BCrypt 密文(非明文)。默认是 admin123 的密文,由首次登录强制改密兜底;
+      # V1 种子写入 admin 口令所需:BCrypt 密文(非明文)。默认是 admin123 的密文,由首次登录强制改密兜底;
       # 可用 SNAIL_SEED_ADMIN_PASSWORD 环境变量覆盖。不生成随机口令、不打印到日志。
       "[seedAdminPassword]": ${SNAIL_SEED_ADMIN_PASSWORD:$2a$10$DIo9lf8l8xeeBQPAsgZW0uexouQqyZ0TMR0XT6Yi3/m4Mye81/Hcu}
 

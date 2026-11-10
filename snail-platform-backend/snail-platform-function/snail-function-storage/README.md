@@ -327,8 +327,8 @@ PO 字段与列一一对应；`SysFileMapper` 是空 `BaseMapper`，查询全走
 
 ## 存储与索引
 
-建表在 [`V2__init_file_schema.sql`](../../snail-platform-start/src/main/resources/db/migration/V2__init_file_schema.sql)，
-菜单与权限码种子在 [`V5__seed_file_data.sql`](../../snail-platform-start/src/main/resources/db/migration/V5__seed_file_data.sql)。
+建表在 [`V2__init_storage.sql`](../../snail-platform-start/src/main/resources/db/migration/storage/V2__init_storage.sql)，
+菜单与权限码种子同文件后段。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |

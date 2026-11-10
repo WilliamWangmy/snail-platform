@@ -14,7 +14,7 @@ spring:
       max-request-size: 50MB
   flyway:
     enabled: true
-    # 单库单目录，脚本就放在本模块 resources/db/migration 下
+    # 单库，脚本集中在本模块 resources/db/migration，按 function 模块分子目录；Flyway 递归扫描，版本号全局递增
     locations: classpath:db/migration
   # 缓存规格不再走统一 spec:userSession 是会话态需要 expireAfterAccess+大容量,
   # 配置类缓存只需小容量——分规格声明迁至 com.snail.platform.config.CacheSpecConfig,

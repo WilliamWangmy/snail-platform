@@ -331,9 +331,8 @@ DTO 侧：两个查询 record 实现 `PageQuery`，紧凑构造器把 `pageNum` 
 
 ## 存储与索引
 
-建表在 [`V1__init_system_schema.sql`](../../snail-platform-start/src/main/resources/db/migration/V1__init_system_schema.sql)
-的通知段落，菜单与权限码种子在
-[`V4__seed_builtin_data.sql`](../../snail-platform-start/src/main/resources/db/migration/V4__seed_builtin_data.sql)
+建表在 [`V1__init_system.sql`](../../snail-platform-start/src/main/resources/db/migration/system/V1__init_system.sql)
+的通知段落，菜单与权限码种子在该文件种子段
 （`160` 通知中心 / `220` 公告管理 / `2201` 发送公告）。
 
 | 表 | 租户 | 关键索引 | 说明 |
