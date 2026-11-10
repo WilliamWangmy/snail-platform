@@ -20,6 +20,7 @@ const MENU_TYPES = [
   { value: 2, label: '菜单' },
   { value: 3, label: '按钮' },
 ];
+/** 全量三值供表格/只读展示;数据大屏(2)为内置固定菜单,新增表单不提供该选项。 */
 const TARGETS = [
   { value: 1, label: '管理端' },
   { value: 2, label: '数据大屏' },
@@ -116,15 +117,15 @@ const typeOptions = computed(() => {
 });
 
 /**
- * 展示端可选项:按钮恒站内(后端只收站内按钮,且必须带权限码);父在大屏树里就只能继续大屏,
- * 父在站内树里可选站内或外链;根层只给站内与大屏——外链不做根,它不能挂下级,而空目录会被导航剪掉。
+ * 展示端可选项:按钮恒站内(后端只收站内按钮,且必须带权限码);父在站内树里可选站内或外链;
+ * 根层只给站内——数据大屏树是内置固定菜单不做新增入口(见 canHaveChild),
+ * 外链不做根,它不能挂下级,而空目录会被导航剪掉。
  */
 const targetOptions = computed(() => {
   const p = parent.value;
   if (form.menuType === 3) return TARGETS.filter((item) => item.value === 1);
-  if (p && p.target === 2) return TARGETS.filter((item) => item.value === 2);
   if (p) return TARGETS.filter((item) => item.value === 1 || item.value === 3);
-  return TARGETS.filter((item) => item.value === 1 || item.value === 2);
+  return TARGETS.filter((item) => item.value === 1);
 });
 
 const scopeOptions = computed(() => {
@@ -178,7 +179,7 @@ const rules = computed<FormRules<MenuForm>>(() => ({
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 }));
 
-/** 从行内"新增下级"进来时带上父:面直接继承,展示端与类型也按父给一个合法默认(页面下最常见的下一步是按钮)。 */
+/** 从行内"新增下级"进来时带上父:面直接继承;能进来的父只可能是站内节点(大屏与外链已收掉入口),展示端默认管理端。 */
 function openCreate(root?: MenuNode): void {
   editingId.value = null;
   editingSystem.value = false;
@@ -187,7 +188,7 @@ function openCreate(root?: MenuNode): void {
   Object.assign(form, emptyForm);
   if (root) {
     form.scope = root.scope;
-    form.target = root.target === 2 ? 2 : 1;
+    form.target = 1;
     form.menuType = root.menuType === 1 ? 1 : 3;
   }
   formVisible.value = true;
@@ -262,9 +263,9 @@ async function submitForm(): Promise<void> {
   }
 }
 
-/** 按钮与外链不给"新增下级":后端 validateParent 直接拒,这里提前收掉入口 */
+/** 按钮与外链不给"新增下级":后端 validateParent 直接拒;数据大屏树固定内置,也不给挂下级 */
 function canHaveChild(node: MenuNode): boolean {
-  return node.menuType !== 3 && node.target !== 3;
+  return node.menuType !== 3 && node.target !== 3 && node.target !== 2;
 }
 
 async function remove(row: MenuNode): Promise<void> {
