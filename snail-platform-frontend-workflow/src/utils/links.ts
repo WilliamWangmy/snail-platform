@@ -1,5 +1,5 @@
 /** 跨端跳转:三端(管理端/数据大屏/流程平台)共用同一后端会话,跳转携带一次性 ssotoken,
- *  目标端守卫落地后立即剥离;大屏无登录态,收下 token 仅用于再次交接。 */
+ *  目标端守卫落地后立即剥离。 */
 
 const ADMIN_URL = import.meta.env.VITE_ADMIN_URL ?? 'http://localhost:8000/';
 const SCREEN_URL = import.meta.env.VITE_SCREEN_URL ?? 'http://localhost:8001/';

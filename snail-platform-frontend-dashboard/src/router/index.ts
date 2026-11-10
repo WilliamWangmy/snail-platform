@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { getToken } from '@/stores/auth';
+import { getToken, setToken } from '@/stores/auth';
 
 /**
  * 大屏路由:/login 登录页,/ 数据大屏本体(三维地图)。
@@ -25,6 +25,14 @@ const router = createRouter({
 
 /** 全局守卫:除公开页外一律要求登录态,未认证统一重定向登录页并记下来路。 */
 router.beforeEach((to) => {
+  // 管理端/流程平台免登录跳转:ssotoken 落地为本地会话后去参重走守卫,后续与 F5 恢复会话同路径
+  if (typeof to.query.ssotoken === 'string' && to.query.ssotoken) {
+    setToken(to.query.ssotoken);
+    const rest = { ...to.query };
+    delete rest.ssotoken;
+    return { path: to.path, query: rest, replace: true };
+  }
+
   const authed = Boolean(getToken());
   if (!to.meta.public && !authed) {
     return { name: 'login', query: { redirect: to.fullPath } };

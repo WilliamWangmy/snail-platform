@@ -57,6 +57,20 @@ export interface SmsAccountsResult {
   accounts: SmsAccountOption[];
 }
 
+/** 当前登录人:顶栏账号区只取展示所需字段(与后端 LoginUserVO 同口径,权限码大屏不消费)。 */
+export interface Me {
+  userId: number;
+  username: string;
+  nickname: string;
+  tenantId: number;
+  tenantName: string;
+  orgId: number;
+  orgName: string;
+  roles: { roleId: number; roleCode: string; roleName: string }[];
+  permissions: string[];
+  passwordChangeRequired: boolean;
+}
+
 export function fetchCaptcha(): Promise<Captcha> {
   return get<Captcha>('/system/auth/captcha');
 }
@@ -86,6 +100,11 @@ export function pickSmsAccount(payload: SmsPickPayload): Promise<LoginResult> {
 /** 服务端登出:令牌版本自增,当前用户全部设备立即失效。 */
 export function logout(): Promise<void> {
   return post<void>('/system/auth/logout');
+}
+
+/** 当前登录人:令牌失效时 http 层 401 直接踢回登录页,因此该调用同时充当会话有效性校验。 */
+export function fetchMe(): Promise<Me> {
+  return get<Me>('/system/auth/me');
 }
 
 /** login-sms 出参判别:响应含 pickKey 即多账号候选态。 */
