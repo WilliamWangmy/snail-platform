@@ -112,7 +112,7 @@ const saving = ref(false);
 /** 与后端 UserCreateRequest 的 @Pattern 同口径;失焦占用查询前先过它,脏输入不打接口 */
 const USERNAME_PATTERN = /^[A-Za-z0-9_.@-]+$/;
 
-/** 与后端 UserCreateRequest 的注解同口径,超限在前端先拦住;口令由服务端生成,不进表单 */
+/** 与后端 UserCreateRequest 的注解同口径,超限在前端先拦住;必填口径按需求收紧:除备注外全部必填 */
 const rules = computed<FormRules<UserForm>>(() => ({
   username:
     editingId.value === null
@@ -155,13 +155,49 @@ const rules = computed<FormRules<UserForm>>(() => ({
     { max: 30, message: '显示名过长', trigger: 'blur' },
   ],
   email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
     { type: 'email', message: '邮箱格式不正确', trigger: 'blur' },
     { max: 50, message: '邮箱过长', trigger: 'blur' },
   ],
-  phone: [{ max: 20, message: '手机号过长', trigger: 'blur' }],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    // 前端收紧为固定 11 位数字;后端仍是 max 20,松口径不改,防止其他入口复用契约被误伤
+    { pattern: /^\d{11}$/, message: '手机号必须为 11 位数字', trigger: 'blur' },
+  ],
   orgId: [{ required: true, message: '请选择所属组织', trigger: 'change' }],
+  // 角色只在新增态展示;无 system:role:list 权限时拿不到角色列表、字段隐藏,此时不拦截
+  roleIds:
+    editingId.value === null && roleOptions.value.length
+      ? [{ type: 'array', required: true, message: '请至少选择一个角色', trigger: 'change' }]
+      : [],
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 }));
+
+/** 手机号输入即清洗:剔除非数字并截断到 11 位,粘贴超长内容也会被就地裁掉 */
+function sanitizePhone(): void {
+  form.phone = form.phone.replace(/\D/g, '').slice(0, 11);
+}
+
+/** 复制成功的瞬时反馈:图标短暂变 ✓,1.6s 后还原 */
+const copiedField = ref<'form' | 'reset' | null>(null);
+let copyTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** 口令敏感,只进剪贴板不落日志;非安全上下文(如 http 内网直连)时降级为手动复制 */
+async function copyPassword(value: string, field: 'form' | 'reset'): Promise<void> {
+  if (!value) {
+    ElMessage.warning('还没有可复制的密码,请先点刷新图标生成');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    copiedField.value = field;
+    window.clearTimeout(copyTimer);
+    copyTimer = window.setTimeout(() => (copiedField.value = null), 1600);
+    ElMessage.success('密码已复制到剪贴板');
+  } catch {
+    ElMessage.error('复制失败,请手动选中复制');
+  }
+}
 
 function openCreate(): void {
   editingId.value = null;
@@ -554,96 +590,191 @@ async function kickUser(row: UserVO): Promise<void> {
     <ElDialog
       v-model="formVisible"
       :title="editingId === null ? '新增用户' : '修改用户'"
-      width="520px"
+      width="640px"
     >
+      <div
+        v-if="editingId === null"
+        class="form-banner"
+      >
+        <AppIcon
+          name="alert"
+          :size="14"
+        />
+        <span>除备注外均为必填项;初始口令创建成功后请线下告知本人</span>
+      </div>
       <ElForm
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="88px"
+        label-position="top"
       >
-        <ElFormItem
+        <div
           v-if="editingId === null"
-          label="登录名"
-          prop="username"
+          class="form-panel"
         >
-          <ElInput
-            v-model="form.username"
-            placeholder="登录后不可修改"
-          />
-        </ElFormItem>
-        <ElFormItem
-          v-if="editingId === null"
-          label="初始密码"
-          prop="password"
-        >
-          <div class="pwd-gen-row">
-            <PasswordHintInput v-model="form.password" />
-            <ElButton @click="form.password = generatePassword()">
-              生成
-            </ElButton>
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="lock"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">账号信息</span>
+            <span class="panel-hint">登录名与初始密码创建后不可修改</span>
           </div>
-        </ElFormItem>
+          <div class="form-grid">
+            <ElFormItem
+              label="登录名"
+              prop="username"
+            >
+              <ElInput
+                v-model="form.username"
+                placeholder="3-30 位,字母、数字或 _ . @ -"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="初始密码"
+              prop="password"
+            >
+              <PasswordHintInput
+                v-model="form.password"
+                class="mono-pwd"
+              >
+                <template #suffix>
+                  <button
+                    class="pwd-action"
+                    type="button"
+                    title="重新生成"
+                    @click="form.password = generatePassword()"
+                  >
+                    <AppIcon
+                      name="refresh"
+                      :size="15"
+                    />
+                  </button>
+                  <button
+                    class="pwd-action"
+                    :class="{ 'is-done': copiedField === 'form' }"
+                    type="button"
+                    :title="copiedField === 'form' ? '已复制' : '复制密码'"
+                    @click="copyPassword(form.password, 'form')"
+                  >
+                    <AppIcon
+                      :name="copiedField === 'form' ? 'check' : 'copy'"
+                      :size="15"
+                    />
+                  </button>
+                </template>
+              </PasswordHintInput>
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="user"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">基本信息</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="显示名"
+              prop="nickname"
+            >
+              <ElInput
+                v-model="form.nickname"
+                placeholder="列表与通知中展示的名称"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="所属组织"
+              prop="orgId"
+            >
+              <ElTreeSelect
+                v-model="form.orgId"
+                :data="orgTree"
+                node-key="orgId"
+                :props="{ label: 'name', children: 'children' }"
+                check-strictly
+                placeholder="请选择组织"
+                class="full"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="roleOptions.length && editingId === null"
+              label="角色"
+              prop="roleIds"
+              class="span-2"
+            >
+              <ElSelect
+                v-model="form.roleIds"
+                multiple
+                collapse-tags
+                placeholder="请至少选择一个角色"
+                class="full"
+              >
+                <ElOption
+                  v-for="role in roleOptions"
+                  :key="role.roleId"
+                  :label="role.roleName"
+                  :value="role.roleId"
+                />
+              </ElSelect>
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="phone"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">联系方式</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="手机号"
+              prop="phone"
+            >
+              <ElInput
+                v-model="form.phone"
+                maxlength="11"
+                show-word-limit
+                placeholder="11 位手机号"
+                @input="sanitizePhone"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="邮箱"
+              prop="email"
+            >
+              <ElInput
+                v-model="form.email"
+                placeholder="name@example.com"
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
         <ElFormItem
-          label="显示名"
-          prop="nickname"
-        >
-          <ElInput v-model="form.nickname" />
-        </ElFormItem>
-        <ElFormItem
-          label="所属组织"
-          prop="orgId"
-        >
-          <ElTreeSelect
-            v-model="form.orgId"
-            :data="orgTree"
-            node-key="orgId"
-            :props="{ label: 'name', children: 'children' }"
-            check-strictly
-            placeholder="请选择组织"
-            class="full"
-          />
-        </ElFormItem>
-        <ElFormItem
-          v-if="roleOptions.length && editingId === null"
-          label="角色"
-        >
-          <ElSelect
-            v-model="form.roleIds"
-            multiple
-            collapse-tags
-            placeholder="可留空,稍后分配"
-            class="full"
-          >
-            <ElOption
-              v-for="role in roleOptions"
-              :key="role.roleId"
-              :label="role.roleName"
-              :value="role.roleId"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem
-          label="手机号"
-          prop="phone"
-        >
-          <ElInput v-model="form.phone" />
-        </ElFormItem>
-        <ElFormItem
-          label="邮箱"
-          prop="email"
-        >
-          <ElInput v-model="form.email" />
-        </ElFormItem>
-        <ElFormItem
-          label="备注"
+          label="备注(选填)"
           prop="remark"
+          class="remark-item"
         >
           <ElInput
             v-model="form.remark"
             type="textarea"
             :rows="2"
             maxlength="500"
+            show-word-limit
+            placeholder="选填,最多 500 字"
           />
         </ElFormItem>
       </ElForm>
@@ -672,18 +803,37 @@ async function kickUser(row: UserVO): Promise<void> {
         show-icon
         title="提交后原密码与全部登录会话立即失效,新口令请线下告知本人。"
       />
-      <div
-        class="pwd-gen-row"
-        style="margin-top: 12px"
+      <PasswordHintInput
+        v-model="resetPassword"
+        class="pwd-reset mono-pwd"
+        placeholder="输入新口令或点刷新图标生成"
       >
-        <PasswordHintInput
-          v-model="resetPassword"
-          placeholder="输入新口令或点生成"
-        />
-        <ElButton @click="generateResetPassword">
-          生成
-        </ElButton>
-      </div>
+        <template #suffix>
+          <button
+            class="pwd-action"
+            type="button"
+            title="重新生成"
+            @click="generateResetPassword"
+          >
+            <AppIcon
+              name="refresh"
+              :size="15"
+            />
+          </button>
+          <button
+            class="pwd-action"
+            :class="{ 'is-done': copiedField === 'reset' }"
+            type="button"
+            :title="copiedField === 'reset' ? '已复制' : '复制密码'"
+            @click="copyPassword(resetPassword, 'reset')"
+          >
+            <AppIcon
+              :name="copiedField === 'reset' ? 'check' : 'copy'"
+              :size="15"
+            />
+          </button>
+        </template>
+      </PasswordHintInput>
       <template #footer>
         <ElButton @click="resetVisible = false">
           取消
@@ -779,16 +929,9 @@ async function kickUser(row: UserVO): Promise<void> {
   width: 100%;
 }
 
-.pwd-gen-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.pwd-gen-row :deep(.el-input__inner) {
-  font-family: monospace;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+/* 弹窗面板/横幅/口令动作等公共样式在 styles/index.css 的「弹窗表单套件」一节,全局单点维护 */
+.pwd-reset {
+  margin-top: 12px;
 }
 
 .identity-list {

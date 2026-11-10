@@ -65,10 +65,17 @@ function onHintFocusOut(event: FocusEvent): void {
       v-model="value"
       type="password"
       show-password
-      size="large"
       :autocomplete="autocomplete"
       :placeholder="placeholder"
-    />
+    >
+      <!-- 透传 suffix:调用方可把生成/复制等图标动作嵌进输入框内,与明文切换眼睛同排 -->
+      <template
+        v-if="$slots.suffix"
+        #suffix
+      >
+        <slot name="suffix"></slot>
+      </template>
+    </ElInput>
     <Transition name="pwd-hint">
       <div
         v-if="hintVisible"

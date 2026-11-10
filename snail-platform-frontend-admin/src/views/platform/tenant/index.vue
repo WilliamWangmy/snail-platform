@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
 import {
@@ -62,7 +62,8 @@ const editingId = ref<number | null>(null);
 const form = reactive<TenantForm>({ ...emptyForm });
 const saving = ref(false);
 
-const rules: FormRules<TenantForm> = {
+/** 必填口径按需求收紧:开通态除备注外全部必填;修改态保持"留空即清空"的原语义不拦截 */
+const rules = computed<FormRules<TenantForm>>(() => ({
   tenantCode: [
     { required: true, message: '请输入租户标识', trigger: 'blur' },
     { min: 2, max: 64, message: '租户标识长度 2-64', trigger: 'blur' },
@@ -76,8 +77,17 @@ const rules: FormRules<TenantForm> = {
     { required: true, message: '请输入租户名称', trigger: 'blur' },
     { max: 50, message: '租户名称过长', trigger: 'blur' },
   ],
-  contactUser: [{ max: 30, message: '联系人过长', trigger: 'blur' }],
-  contactPhone: [{ max: 20, message: '联系电话过长', trigger: 'blur' }],
+  contactUser: [
+    ...(editingId.value === null ? [{ required: true, message: '请输入联系人', trigger: 'blur' }] : []),
+    { max: 30, message: '联系人过长', trigger: 'blur' },
+  ],
+  contactPhone: [
+    ...(editingId.value === null ? [{ required: true, message: '请输入联系电话', trigger: 'blur' }] : []),
+    // 与用户管理同口径:前端收紧为固定 11 位数字;后端仍 max 20 不动
+    { pattern: /^\d{11}$/, message: '联系电话必须为 11 位数字', trigger: 'blur' },
+  ],
+  expireTime: editingId.value === null ? [{ required: true, message: '请选择到期时间', trigger: 'change' }] : [],
+  accountLimit: editingId.value === null ? [{ required: true, message: '请输入账号上限', trigger: 'blur' }] : [],
   adminUsername: [
     { required: true, message: '请输入管理员登录名', trigger: 'blur' },
     { min: 3, max: 30, message: '登录名长度 3-30', trigger: 'blur' },
@@ -109,7 +119,33 @@ const rules: FormRules<TenantForm> = {
     },
   ],
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
-};
+}));
+
+/** 联系电话输入即清洗:剔除非数字并截断到 11 位,粘贴超长内容也会被就地裁掉 */
+function sanitizeContactPhone(): void {
+  form.contactPhone = form.contactPhone.replace(/\D/g, '').slice(0, 11);
+}
+
+/** 复制成功的瞬时反馈:图标短暂变 ✓,1.6s 后还原 */
+const copied = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** 口令敏感,只进剪贴板不落日志;非安全上下文(如 http 内网直连)时降级为手动复制 */
+async function copyAdminPassword(): Promise<void> {
+  if (!form.adminPassword) {
+    ElMessage.warning('还没有可复制的密码,请先点刷新图标生成');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(form.adminPassword);
+    copied.value = true;
+    window.clearTimeout(copyTimer);
+    copyTimer = window.setTimeout(() => (copied.value = false), 1600);
+    ElMessage.success('密码已复制到剪贴板');
+  } catch {
+    ElMessage.error('复制失败,请手动选中复制');
+  }
+}
 
 function openCreate(): void {
   editingId.value = null;
@@ -399,100 +435,212 @@ async function toggleStatus(row: TenantVO): Promise<void> {
     <ElDialog
       v-model="formVisible"
       :title="editingId === null ? '开通租户' : '修改租户'"
-      width="560px"
+      width="640px"
     >
+      <div
+        v-if="editingId === null"
+        class="form-banner"
+      >
+        <AppIcon
+          name="alert"
+          :size="14"
+        />
+        <span>除备注外均为必填项;管理员初始口令开通后请线下告知租户</span>
+      </div>
       <ElForm
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="108px"
+        label-position="top"
       >
-        <ElFormItem
-          label="租户标识"
-          prop="tenantCode"
-        >
-          <ElInput
-            v-model="form.tenantCode"
-            :disabled="editingId !== null"
-            placeholder="建后不可修改"
-          />
-        </ElFormItem>
-        <ElFormItem
-          label="租户名称"
-          prop="name"
-        >
-          <ElInput v-model="form.name" />
-        </ElFormItem>
-        <ElFormItem
-          v-if="editingId === null"
-          label="管理员登录名"
-          prop="adminUsername"
-        >
-          <ElInput
-            v-model="form.adminUsername"
-            placeholder="全站唯一"
-          />
-        </ElFormItem>
-        <ElFormItem
-          v-if="editingId === null"
-          label="初始密码"
-          prop="adminPassword"
-        >
-          <div class="pwd-gen-row">
-            <PasswordHintInput v-model="form.adminPassword" />
-            <ElButton @click="form.adminPassword = generatePassword()">
-              生成
-            </ElButton>
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="box"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">租户信息</span>
+            <span class="panel-hint">标识开通后不可修改</span>
           </div>
-        </ElFormItem>
-        <ElFormItem
-          label="联系人"
-          prop="contactUser"
+          <div class="form-grid">
+            <ElFormItem
+              label="租户标识"
+              prop="tenantCode"
+            >
+              <ElInput
+                v-model="form.tenantCode"
+                :disabled="editingId !== null"
+                placeholder="2-64 位小写,字母、数字或 _ . -"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="租户名称"
+              prop="name"
+            >
+              <ElInput
+                v-model="form.name"
+                placeholder="列表与授权页展示的名称"
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div
+          v-if="editingId === null"
+          class="form-panel"
         >
-          <ElInput v-model="form.contactUser" />
-        </ElFormItem>
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="shield"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">管理员账号</span>
+            <span class="panel-hint">初始口令请线下转交租户</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="登录名"
+              prop="adminUsername"
+            >
+              <ElInput
+                v-model="form.adminUsername"
+                placeholder="3-30 位,全站唯一"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="初始密码"
+              prop="adminPassword"
+            >
+              <PasswordHintInput
+                v-model="form.adminPassword"
+                class="mono-pwd"
+              >
+                <template #suffix>
+                  <button
+                    class="pwd-action"
+                    type="button"
+                    title="重新生成"
+                    @click="form.adminPassword = generatePassword()"
+                  >
+                    <AppIcon
+                      name="refresh"
+                      :size="15"
+                    />
+                  </button>
+                  <button
+                    class="pwd-action"
+                    :class="{ 'is-done': copied }"
+                    type="button"
+                    :title="copied ? '已复制' : '复制密码'"
+                    @click="copyAdminPassword"
+                  >
+                    <AppIcon
+                      :name="copied ? 'check' : 'copy'"
+                      :size="15"
+                    />
+                  </button>
+                </template>
+              </PasswordHintInput>
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="phone"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">联系方式</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="联系人"
+              prop="contactUser"
+            >
+              <ElInput
+                v-model="form.contactUser"
+                placeholder="租户方对接人姓名"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="联系电话"
+              prop="contactPhone"
+            >
+              <ElInput
+                v-model="form.contactPhone"
+                maxlength="11"
+                show-word-limit
+                placeholder="11 位手机号"
+                @input="sanitizeContactPhone"
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="clock"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">使用限制</span>
+            <span class="panel-hint">
+              {{ editingId === null ? '开通后可在修改中随时调整' : '留空即恢复不限' }}
+            </span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="到期时间"
+              prop="expireTime"
+            >
+              <!-- value-format 给的是 ISO 本地时间串,后端 LocalDateTime 直接绑定;修改态清空即提交 null=不限期 -->
+              <ElDatePicker
+                v-model="form.expireTime"
+                type="datetime"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+                :disabled-date="editingId === null ? isPastDay : undefined"
+                :placeholder="editingId === null ? '请选择到期时间' : '留空不限'"
+                class="full"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="账号上限"
+              prop="accountLimit"
+            >
+              <!-- min=1 是有意的:后端只认 null 为不限,0 会被当成"一个账号都不许建";修改态留空仍是不限 -->
+              <ElInputNumber
+                v-model="form.accountLimit"
+                :min="1"
+                :precision="0"
+                controls-position="right"
+                :placeholder="editingId === null ? '请输入上限数量' : '留空不限'"
+                class="full"
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
         <ElFormItem
-          label="联系电话"
-          prop="contactPhone"
-        >
-          <ElInput v-model="form.contactPhone" />
-        </ElFormItem>
-        <ElFormItem
-          label="到期时间"
-          prop="expireTime"
-        >
-          <!-- value-format 给的是 ISO 本地时间串,后端 LocalDateTime 直接绑定;清空即提交 null=不限期 -->
-          <ElDatePicker
-            v-model="form.expireTime"
-            type="datetime"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            :disabled-date="editingId === null ? isPastDay : undefined"
-            placeholder="留空不限"
-            class="full"
-          />
-        </ElFormItem>
-        <ElFormItem
-          label="账号上限"
-          prop="accountLimit"
-        >
-          <!-- min=1 是有意的:后端只认 null 为不限,0 会被当成"一个账号都不许建" -->
-          <ElInputNumber
-            v-model="form.accountLimit"
-            :min="1"
-            :precision="0"
-            controls-position="right"
-            placeholder="留空不限"
-          />
-        </ElFormItem>
-        <ElFormItem
-          label="备注"
+          label="备注(选填)"
           prop="remark"
+          class="remark-item"
         >
           <ElInput
             v-model="form.remark"
             type="textarea"
             :rows="2"
             maxlength="500"
+            show-word-limit
+            placeholder="选填,最多 500 字"
           />
         </ElFormItem>
       </ElForm>
@@ -517,15 +665,5 @@ async function toggleStatus(row: TenantVO): Promise<void> {
   width: 100%;
 }
 
-.pwd-gen-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.pwd-gen-row :deep(.el-input__inner) {
-  font-family: monospace;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
+/* 弹窗面板/横幅/口令动作等公共样式在 styles/index.css 的「弹窗表单套件」一节,全局单点维护 */
 </style>

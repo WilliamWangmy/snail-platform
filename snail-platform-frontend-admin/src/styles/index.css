@@ -651,6 +651,128 @@ body {
   background: linear-gradient(90deg, rgba(var(--app-primary-rgb), 0.22), rgba(var(--app-primary-rgb), 0.03)) !important;
 }
 
+/* 弹窗表单套件:分组面板 + 必填提示横幅 + 口令框内嵌动作,供各弹窗表单页复用。
+   页面只负责按 fd 结构摆字段(<div class="form-panel"><div class="panel-head">…</div><div class="form-grid">…</div></div>),样式在此单点维护。 */
+.form-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--app-primary-rgb), 0.25);
+  border-radius: 8px;
+  background: rgba(var(--app-primary-rgb), 0.07);
+  color: #1f6f5f;
+  font-size: 12.5px;
+}
+
+.form-panel {
+  padding: 12px 14px 2px;
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  background: var(--app-bg);
+}
+
+.form-panel + .form-panel,
+.form-panel + .remark-item {
+  margin-top: 12px;
+}
+
+.form-panel .el-form-item {
+  margin-bottom: 14px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.panel-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 6px;
+  background: rgba(var(--app-primary-rgb), 0.12);
+  color: var(--app-primary);
+}
+
+.panel-title {
+  color: var(--app-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.panel-hint {
+  margin-left: auto;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.remark-item {
+  margin-bottom: 0;
+}
+
+/* 口令输入框内嵌的图标动作:与明文切换眼睛同排,默认弱化、悬停点亮主题色 */
+.pwd-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: 0 2px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--app-muted);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    background-color 0.2s,
+    transform 0.1s;
+}
+
+.pwd-action:hover {
+  color: var(--app-primary);
+  background: rgba(var(--app-primary-rgb), 0.1);
+}
+
+.pwd-action:active {
+  transform: scale(0.92);
+}
+
+.pwd-action.is-done {
+  color: var(--app-success);
+}
+
+/* 口令统一等宽字形,便于逐位核对;class 加在 PasswordHintInput 根元素上 */
+.mono-pwd .el-input__inner {
+  font-family: var(--app-font-mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* 标识/编码类输入(类型标识、字典值等)的等宽字形,弱化加粗以区别于口令 */
+.mono-input .el-input__inner {
+  font-family: var(--app-font-mono);
+  letter-spacing: 0.02em;
+}
+
 @media (max-width: 760px) {
   .page-head {
     align-items: flex-start;
