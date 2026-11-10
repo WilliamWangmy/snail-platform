@@ -6,8 +6,9 @@ import com.snail.platform.framework.core.exception.BizException;
  * 职责:登录校验链的失败分类——同一条 BizException 文本之下,三类失败的处置手段完全不同。
  * 凭证(口令错/账号不存在)进 LoginFailGuard 的 IP+用户名桶;验证码进 CaptchaService 的 IP 桶;
  * 准入(租户停用/到期、账号停用)是运营状态,重试无意义,一律不计数。
- * 上游:AuthService、CaptchaService;下游:仍然按 BizException 被 GlobalExceptionHandler 翻成响应,
- * 分类只服务计数,不改变对外文案与错误码。
+ * 上游:AuthService、CaptchaService;下游:仍然按 BizException 被 GlobalExceptionHandler 翻成响应。
+ * 分类既决定计数桶,也决定对外文案:凭证与验证码原样回各自文案(验证码在定位用户之前,不泄露账号存在性),
+ * 准入类由登录链统一改写成"账号或密码错误"防枚举;错误码始终是 400。
  */
 final class LoginRejects {
 

@@ -50,7 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 每步拒绝的文案即口径;业务拒绝与成功必落一条登录日志,用户定位前的失败归属记 tenant_id=0
  * (基础设施故障走 500,不落登录日志,由应用日志排障)。
  * 上游:AuthController;下游:sys_user/sys_tenant 读、sys_login_log 写、JWT 签发。
- * 防账号枚举:用户不存在与口令错误回同一文案。
+ * 防账号枚举:用户不存在、口令错误与定位后的准入类拒绝统一回"账号或密码错误";
+ * 验证码在定位用户之前核销,失败不携带账号存在性,原样回自己的细粒度文案(请输入/已过期/错误/次数过多)。
  * 计数口径:失败按类型分流(LoginRejects)——只有凭证失败累加 IP+登录名锁定,
  * 验证码失败由 CaptchaService 按 IP 自计,租户/账号停用属运营状态不计数;
  * 锁定分支自身不再累加:计数已过阈值,继续累加没有意义,窗口仍从首次失败起算。
@@ -258,6 +259,11 @@ public class AuthService {
                 failGuard.increaseCredentialFail(ip, username);
                 throw e;
             }
+            // 验证码在定位用户之前就核销,失败文案(请输入/已过期/错误/次数过多)不携带账号存在性,
+            // 原样回给前端不破坏防枚举;失败数由 CaptchaService 按 IP 自计,不进账号锁定桶
+            if (e instanceof LoginRejects.Captcha) {
+                throw e;
+            }
             throw new LoginRejects.Access("账号或密码错误");
         }
     }
@@ -373,8 +379,10 @@ public class AuthService {
             Long tenantId = chosen != null ? chosen.getTenantId() : 0L;
             writeLoginLog(http, tenantId, chosen != null ? chosen.getPhone() : "unknown",
                     chosen != null ? chosen.getUserId() : null, 0, e.getMessage(), LOGIN_TYPE_SMS);
-            throw e instanceof LoginRejects.Credential credential
-                    ? credential : new LoginRejects.Access("账号或密码错误");
+            // 只把准入类(租户/账号停用)统一成凭证文案防枚举;pickKey 失效等流程提示原样回,
+            // 否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
+            throw e instanceof LoginRejects.Access
+                    ? new LoginRejects.Access("账号或密码错误") : e;
         }
     }
 
@@ -581,8 +589,10 @@ public class AuthService {
             Long tenantId = chosen != null ? chosen.getTenantId() : 0L;
             writeLoginLog(http, tenantId, candidate.openId(), chosen != null ? chosen.getUserId() : null,
                     0, e.getMessage(), candidate.source());
-            throw e instanceof LoginRejects.Credential credential
-                    ? credential : new LoginRejects.Access("账号或密码错误");
+            // 只把准入类(租户/账号停用)统一成凭证文案防枚举;pickKey 失效等流程提示原样回,
+            // 否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
+            throw e instanceof LoginRejects.Access
+                    ? new LoginRejects.Access("账号或密码错误") : e;
         }
     }
 
