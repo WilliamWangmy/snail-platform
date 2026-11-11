@@ -87,7 +87,17 @@ function goSystem(url: string): void {
 /** 令牌失效时 http 层已 401 踢回登录页，其余异常不打断看大屏，可在面板内重试。 */
 async function loadMe(): Promise<void> {
   try {
-    me.value = await fetchMe();
+    const fetched = await fetchMe();
+    // 开通闸(租户管理增强 T10):租户未开通数据大屏 → 吊销服务端令牌并回登录页,
+    // denied 参数由登录页转成内联提示。tenantFeatures 是 /me 实时值(不进 JWT/登录快照),
+    // 平台管理员收回开关后刷新页面即被拦;字段缺失(旧后端)视为不拦,向后兼容。
+    if (fetched.tenantFeatures && !fetched.tenantFeatures.dashboardEnabled) {
+      me.value = null;
+      await signOutEverywhere();
+      await router.push({ name: 'login', query: { redirect: window.location.pathname, denied: 'dashboard' } });
+      return;
+    }
+    me.value = fetched;
   } catch {
     me.value = null;
   }

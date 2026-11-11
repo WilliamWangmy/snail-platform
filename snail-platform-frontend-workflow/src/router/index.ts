@@ -8,6 +8,7 @@
  * 5. 已登录访问 /login → /dashboard。
  */
 import { createRouter, createWebHistory } from 'vue-router';
+import { ElMessage } from 'element-plus';
 
 import { routes } from '@/router/routes';
 import { useAuthStore } from '@/stores/auth';
@@ -45,6 +46,15 @@ router.beforeEach(async (to) => {
       // fetchMe 401 时拦截器已清态跳登录；其他错误同样按未认证处理
       return { path: '/login', query: { redirect: to.fullPath } };
     }
+  }
+
+  // 开通闸(租户管理增强 T10):租户未开通流程系统 → 登出+提示,ssotoken 免登落地同样被拦。
+  // tenantFeatures 是 /me 实时值(不进 JWT/登录快照),平台管理员收回开关后下一次路由即触发;
+  // 字段缺失(旧后端)视为不拦,向后兼容。
+  if (auth.loginUser?.tenantFeatures && !auth.loginUser.tenantFeatures.workflowEnabled) {
+    await auth.logout();
+    ElMessage.warning('所在租户未开通流程系统,请联系平台管理员');
+    return { path: '/login', query: { redirect: to.fullPath } };
   }
 
   return true;

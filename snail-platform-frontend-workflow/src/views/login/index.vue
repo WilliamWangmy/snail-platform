@@ -129,13 +129,16 @@ async function handleLoginSuccess(success: LoginSuccessVO): Promise<void> {
   await router.push(redirectTarget());
 }
 
+/** 本端登录端坐标(契约 §5.1):三链统一带 workflow——服务端按租户开通开关拦截未开通端 */
+const LOGIN_SCENE = 'workflow';
+
 async function handleSubmit(): Promise<void> {
   const valid = await formRef.value?.validate().catch(() => false);
   if (!valid) return;
 
   submitting.value = true;
   try {
-    await auth.login({ ...form });
+    await auth.login({ ...form, scene: LOGIN_SCENE });
     await router.push(redirectTarget());
   } finally {
     submitting.value = false;
@@ -171,7 +174,7 @@ async function handleSubmitSms(): Promise<void> {
   if (!valid) return;
   smsLoading.value = true;
   try {
-    const result = await loginBySms({ phone: smsForm.phone.trim(), smsCode: smsForm.smsCode.trim() });
+    const result = await loginBySms({ phone: smsForm.phone.trim(), smsCode: smsForm.smsCode.trim(), scene: LOGIN_SCENE });
     if (isLoginAccounts(result)) {
       smsPick.value = result;
     } else {
@@ -189,7 +192,7 @@ async function pickAccount(account: SmsAccountOption): Promise<void> {
   if (!smsPick.value || pickingUserId.value !== null) return;
   pickingUserId.value = account.userId;
   try {
-    const success = await pickSmsAccount({ pickKey: smsPick.value.pickKey, userId: account.userId });
+    const success = await pickSmsAccount({ pickKey: smsPick.value.pickKey, userId: account.userId, scene: LOGIN_SCENE });
     smsPick.value = null;
     await handleLoginSuccess(success);
   } catch {

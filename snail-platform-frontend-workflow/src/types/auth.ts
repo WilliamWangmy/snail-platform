@@ -15,6 +15,8 @@ export interface LoginRequest {
   password: string;
   captchaKey: string;
   captchaCode: string;
+  /** 登录端坐标(租户管理增强 §5.1):本端固定 workflow;非法值后端 400「非法的登录端」 */
+  scene?: string;
 }
 
 /** POST /system/auth/login 出参 */
@@ -28,7 +30,16 @@ export interface LoginSuccessVO {
   tenantName: string;
 }
 
-/** GET /system/auth/me 出参：身份 + 组织/租户名称 + 生效角色 */
+/** 租户五系统开通态(/me 实时值,不进 JWT/登录快照):对应开关 false 即本端登录被拒 */
+export interface TenantFeatures {
+  adminEnabled: boolean;
+  workflowEnabled: boolean;
+  mobileEnabled: boolean;
+  dashboardEnabled: boolean;
+  portalEnabled: boolean;
+}
+
+/** GET /system/auth/me 出参：身份 + 组织/租户名称 + 生效角色 + 租户五系统开通态 */
 export interface LoginUserVO {
   userId: number;
   username: string;
@@ -39,6 +50,8 @@ export interface LoginUserVO {
   orgName: string;
   roles: RoleInfo[];
   permissions: string[];
+  /** 路由守卫的消费面;旧后端不下发时为 null(守卫视为不拦,向后兼容) */
+  tenantFeatures: TenantFeatures | null;
 }
 
 export interface RoleInfo {
@@ -56,16 +69,19 @@ export interface SmsCaptchaRequest {
   captchaCode: string;
 }
 
-/** POST /system/auth/login-sms 入参：手机号 + 短信码，不含租户（跨租户定位） */
+/** POST /system/auth/login-sms 入参：手机号 + 短信码 + 登录端,不含租户（跨租户定位） */
 export interface SmsLoginRequest {
   phone: string;
   smsCode: string;
+  /** 登录端坐标:本端固定 workflow;多账号命中时由 pick 请求重传(v1.3 补口) */
+  scene?: string;
 }
 
-/** POST /system/auth/login-sms/pick 入参：pickKey 一次性凭证 + 选定账号 */
+/** POST /system/auth/login-sms/pick 入参：pickKey 一次性凭证 + 选定账号 + 登录端(pick 是独立二次调用,scene 须重传) */
 export interface SmsPickRequest {
   pickKey: string;
   userId: number;
+  scene?: string;
 }
 
 /** 多命中候选账号：最小暴露面，只有租户名/登录名/昵称 */

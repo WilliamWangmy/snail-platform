@@ -11,6 +11,8 @@ export interface LoginPayload {
   password: string;
   captchaKey: string;
   captchaCode: string;
+  /** 登录端坐标(租户管理增强 §5.1):本端固定 dashboard;非法值后端 400「非法的登录端」 */
+  scene?: string;
 }
 
 export interface LoginResult {
@@ -35,11 +37,15 @@ export interface SmsCaptchaPayload {
 export interface SmsLoginPayload {
   phone: string;
   smsCode: string;
+  /** 登录端坐标:本端固定 dashboard;多账号命中时由 pick 请求重传(v1.3 补口) */
+  scene?: string;
 }
 
 export interface SmsPickPayload {
   pickKey: string;
   userId: number;
+  /** 登录端坐标:pick 是独立二次调用,scene 须重传(v1.3 补口) */
+  scene?: string;
 }
 
 /** 多命中候选账号:最小暴露面,只有租户名/登录名/昵称(与后端 LoginAccountsVO.Account 同口径)。 */
@@ -57,6 +63,15 @@ export interface SmsAccountsResult {
   accounts: SmsAccountOption[];
 }
 
+/** 租户五系统开通态(/me 实时值,不进 JWT/登录快照):dashboardEnabled=false 即本端登录被顶栏守卫拦下 */
+export interface TenantFeatures {
+  adminEnabled: boolean;
+  workflowEnabled: boolean;
+  mobileEnabled: boolean;
+  dashboardEnabled: boolean;
+  portalEnabled: boolean;
+}
+
 /** 当前登录人:顶栏账号区只取展示所需字段(与后端 LoginUserVO 同口径,权限码大屏不消费)。 */
 export interface Me {
   userId: number;
@@ -69,6 +84,8 @@ export interface Me {
   roles: { roleId: number; roleCode: string; roleName: string }[];
   permissions: string[];
   passwordChangeRequired: boolean;
+  /** 顶栏守卫消费面;旧后端不下发时缺失(守卫视为不拦,向后兼容) */
+  tenantFeatures?: TenantFeatures;
 }
 
 export function fetchCaptcha(): Promise<Captcha> {

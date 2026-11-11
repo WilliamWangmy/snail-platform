@@ -43,6 +43,11 @@ function setNotice(kind: NoticeKind, text: string): void {
   notice.value = { kind, text };
 }
 
+/* 守卫回传:大屏顶栏 /me 开通闸未通过时带 denied 参数回登录页,这里落一条内联提示 */
+if (route.query.denied === 'dashboard') {
+  notice.value = { kind: 'info', text: '所在租户未开通数据大屏,请联系平台管理员开通' };
+}
+
 const statusLabel = computed(() => {
   if (captchaState.value === 'ready') return '系统运行正常';
   return captchaState.value === 'failed' ? '认证服务不可用' : '认证服务连接中';
@@ -140,6 +145,7 @@ async function submitPassword(): Promise<void> {
       password: form.value.password,
       captchaKey: captcha.value.captchaKey,
       captchaCode,
+      scene: 'dashboard',
     });
     writeRememberedAccount(remember.value ? username : '');
     await enter(result.token);
@@ -188,7 +194,7 @@ async function submitSms(): Promise<void> {
 
   smsLoading.value = true;
   try {
-    const result = await loginBySms({ phone, smsCode });
+    const result = await loginBySms({ phone, smsCode, scene: 'dashboard' });
     if (isSmsAccountsResult(result)) {
       smsPick.value = result;
       stage.value = 'pick';
@@ -209,7 +215,7 @@ async function pickAccount(account: SmsAccountOption): Promise<void> {
   if (!smsPick.value || picking.value !== null) return;
   picking.value = account.userId;
   try {
-    const result = await pickSmsAccount({ pickKey: smsPick.value.pickKey, userId: account.userId });
+    const result = await pickSmsAccount({ pickKey: smsPick.value.pickKey, userId: account.userId, scene: 'dashboard' });
     smsPick.value = null;
     await enter(result.token);
   } catch (error) {
