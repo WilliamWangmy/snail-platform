@@ -1,9 +1,9 @@
 package com.snail.platform.function.external.client;
 
 import cn.hutool.json.JSONObject;
-import com.snail.platform.function.external.api.ExternalCallException;
-import com.snail.platform.function.external.api.SocialAuthPort;
 import com.snail.platform.function.external.config.SnailExternalProperties;
+import com.snail.platform.function.external.api.ExternalCallException;
+
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -20,19 +20,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "snail.external.oauth.mock", havingValue = "false", matchIfMissing = true)
 public class WecomAuthClient extends AbstractSocialAuthClient {
 
-    /** PC 扫码授权页 */
-    private static final String AUTHORIZE = "https://login.work.weixin.qq.com/wwopen/sso/qrConnect";
-
-    /** 企业凭证:corpid+secret 换应用令牌 */
-    private static final String GETTOKEN = "https://qyapi.weixin.qq.com/cgi-bin/gettoken";
-
-    /** 授权码换用户 userid */
-    private static final String GETUSERINFO = "https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo";
-
-    /** 成员详情(姓名/头像/手机号) */
-    private static final String GETUSER = "https://qyapi.weixin.qq.com/cgi-bin/user/get";
-
-    /** 凭据与开关的类型化配置单点,取 snail.external.oauth.wecom 段 */
+    /** 凭据与 SSO 端点的类型化配置单点,取 snail.external.oauth.wecom 段(端点默认值住 external.yml) */
     private final SnailExternalProperties props;
 
     public WecomAuthClient(ExternalCallLedger ledger, SnailExternalProperties props) {
@@ -40,17 +28,21 @@ public class WecomAuthClient extends AbstractSocialAuthClient {
         this.props = props;
     }
 
-    /** 企业微信凭据;任一缺失时 available()=false 即入口不可用,不阻断启动 */
+    /** 企业微信凭据与端点;任一凭据缺失时 available()=false 即入口不可用,不阻断启动 */
+    private SnailExternalProperties.Wecom config() {
+        return props.getOauth().getWecom();
+    }
+
     private String corpId() {
-        return props.getOauth().getWecom().getCorpId();
+        return config().getCorpId();
     }
 
     private String agentId() {
-        return props.getOauth().getWecom().getAgentId();
+        return config().getAgentId();
     }
 
     private String corpSecret() {
-        return props.getOauth().getWecom().getCorpSecret();
+        return config().getCorpSecret();
     }
 
     @Override
@@ -70,7 +62,7 @@ public class WecomAuthClient extends AbstractSocialAuthClient {
 
     @Override
     public String authorizeUrl(String redirectUri, String state) {
-        return AUTHORIZE
+        return config().getAuthorizeUrl()
                 + "?appid=" + urlEncode(corpId())
                 + "&agentid=" + urlEncode(agentId())
                 + "&redirect_uri=" + urlEncode(redirectUri)
@@ -80,14 +72,14 @@ public class WecomAuthClient extends AbstractSocialAuthClient {
     @Override
     public SocialIdentity exchange(String code, String redirectUri) {
         // 1. 企业凭证换应用令牌:corpsecret 只在查询串,快照只落基址;首版每次现取不缓存(NFR-008)
-        JSONObject tokenResp = parse(getJson(GETTOKEN,
+        JSONObject tokenResp = parse(getJson(config().getCorpTokenUrl(),
                 Map.of("corpid", corpId(), "corpsecret", corpSecret()), null, "oauth-corp-token"),
                 "oauth-corp-token");
         assertWxworkOk(tokenResp, "oauth-corp-token");
         String accessToken = requireField(tokenResp, "access_token", "oauth-corp-token", "企业微信返回的应用令牌为空");
 
         // 2. 授权码换 userid
-        JSONObject userinfo = parse(getJson(GETUSERINFO,
+        JSONObject userinfo = parse(getJson(config().getUserIdUrl(),
                 Map.of("access_token", accessToken, "code", code), null, "oauth-userid"), "oauth-userid");
         assertWxworkOk(userinfo, "oauth-userid");
         String userid = requireField(userinfo, "userid", "oauth-userid", "企业微信返回的用户标识为空");
@@ -95,7 +87,7 @@ public class WecomAuthClient extends AbstractSocialAuthClient {
         // 3. 成员详情:非关键步骤,失败降级为仅有 userid,不影响登录身份判定(snail 实证口径)
         JSONObject detail;
         try {
-            detail = parse(getJson(GETUSER,
+            detail = parse(getJson(config().getUserDetailUrl(),
                     Map.of("access_token", accessToken, "userid", userid), null, "oauth-user-detail"),
                     "oauth-user-detail");
             assertWxworkOk(detail, "oauth-user-detail");

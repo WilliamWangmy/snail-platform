@@ -2,9 +2,9 @@ package com.snail.platform.function.external.client;
 
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
-import com.snail.platform.function.external.api.ExternalCallException;
-import com.snail.platform.function.external.api.SocialAuthPort;
 import com.snail.platform.function.external.config.SnailExternalProperties;
+import com.snail.platform.function.external.api.ExternalCallException;
+
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -20,16 +20,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "snail.external.oauth.mock", havingValue = "false", matchIfMissing = true)
 public class FeishuAuthClient extends AbstractSocialAuthClient {
 
-    /** 授权页(PC 扫码/网页授权) */
-    private static final String AUTHORIZE = "https://open.feishu.cn/open-apis/authen/v1/authorize";
-
-    /** 授权码换用户访问令牌(v2 端点,直接用 client_id/secret,无需先取应用令牌) */
-    private static final String TOKEN = "https://open.feishu.cn/open-apis/authen/v2/oauth/token";
-
-    /** 读取登录用户信息 */
-    private static final String USERINFO = "https://open.feishu.cn/open-apis/authen/v1/user_info";
-
-    /** 凭据与开关的类型化配置单点,取 snail.external.oauth.feishu 段 */
+    /** 凭据与 SSO 端点的类型化配置单点,取 snail.external.oauth.feishu 段(端点默认值住 external.yml) */
     private final SnailExternalProperties props;
 
     public FeishuAuthClient(ExternalCallLedger ledger, SnailExternalProperties props) {
@@ -37,13 +28,17 @@ public class FeishuAuthClient extends AbstractSocialAuthClient {
         this.props = props;
     }
 
-    /** 飞书凭据;凭据缺失时 available()=false 即入口不可用,不阻断启动 */
+    /** 飞书凭据与端点;凭据缺失时 available()=false 即入口不可用,不阻断启动 */
+    private SnailExternalProperties.Vendor config() {
+        return props.getOauth().getFeishu();
+    }
+
     private String appId() {
-        return props.getOauth().getFeishu().getAppId();
+        return config().getAppId();
     }
 
     private String appSecret() {
-        return props.getOauth().getFeishu().getAppSecret();
+        return config().getAppSecret();
     }
 
     @Override
@@ -63,7 +58,7 @@ public class FeishuAuthClient extends AbstractSocialAuthClient {
 
     @Override
     public String authorizeUrl(String redirectUri, String state) {
-        return AUTHORIZE
+        return config().getAuthorizeUrl()
                 + "?app_id=" + urlEncode(appId())
                 + "&redirect_uri=" + urlEncode(redirectUri)
                 + "&response_type=code"
@@ -82,11 +77,11 @@ public class FeishuAuthClient extends AbstractSocialAuthClient {
                 "client_secret", appSecret(),
                 "code", code,
                 "redirect_uri", redirectUri));
-        JSONObject tokenResp = parse(postJson(TOKEN, tokenBody, "oauth-token"), "oauth-token");
+        JSONObject tokenResp = parse(postJson(config().getTokenUrl(), tokenBody, "oauth-token"), "oauth-token");
         String accessToken = requireField(tokenResp, "access_token", "oauth-token", "飞书返回的访问令牌为空");
 
         // 2. 读取登录用户信息
-        JSONObject user = parse(getJson(USERINFO, null, Map.of("Authorization", "Bearer " + accessToken),
+        JSONObject user = parse(getJson(config().getUserInfoUrl(), null, Map.of("Authorization", "Bearer " + accessToken),
                 "oauth-userinfo"), "oauth-userinfo");
         String bizCode = user.getStr("code");
         if (bizCode != null && !"0".equals(bizCode)) {
