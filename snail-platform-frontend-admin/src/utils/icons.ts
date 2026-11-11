@@ -13,6 +13,7 @@ const ICON_MAP: Record<string, string> = {
   Menu: 'menu',
   Bell: 'bell',
   Message: 'mail',
+  Connection: 'external',
 };
 
 export function menuIcon(name?: string | null): string {
