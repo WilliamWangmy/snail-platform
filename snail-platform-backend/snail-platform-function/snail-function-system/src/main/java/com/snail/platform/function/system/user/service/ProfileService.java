@@ -8,6 +8,10 @@ import com.snail.platform.framework.redis.SnailRateGuard;
 import com.snail.platform.framework.redis.SnailRedisKeys;
 import com.snail.platform.function.system.org.entity.SysOrg;
 import com.snail.platform.function.system.org.mapper.SysOrgMapper;
+import com.snail.platform.function.system.role.entity.SysRole;
+import com.snail.platform.function.system.role.entity.SysUserRole;
+import com.snail.platform.function.system.role.mapper.SysRoleMapper;
+import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
 import com.snail.platform.function.system.support.CacheEvictor;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
@@ -15,10 +19,14 @@ import com.snail.platform.function.system.user.dto.ChangePasswordRequest;
 import com.snail.platform.function.system.user.dto.ForceChangePasswordRequest;
 import com.snail.platform.function.system.user.dto.ProfileVO;
 import com.snail.platform.function.system.user.dto.UpdateProfileRequest;
+import com.snail.platform.function.system.user.dto.UserIdentityVO;
 import com.snail.platform.function.system.user.entity.SysUser;
+import com.snail.platform.function.system.user.entity.SysUserIdentity;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
+import com.snail.platform.function.system.user.mapper.SysUserIdentityMapper;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,14 +64,28 @@ public class ProfileService {
     /** 本人快照缓存的点清出口 */
     private final CacheEvictor cacheEvictor;
 
+    /** 授权关系读:档案里的角色名快照 */
+    private final SysUserRoleMapper userRoleMapper;
+
+    /** 角色表读:roleId 回查角色名 */
+    private final SysRoleMapper roleMapper;
+
+    /** 第三方身份绑定读写:本人列表与自助解绑(豁免表,tenant_id 不参与过滤) */
+    private final SysUserIdentityMapper userIdentityMapper;
+
     public ProfileService(SysUserMapper userMapper, SysOrgMapper orgMapper, SysTenantMapper tenantMapper,
-                          SnailRateGuard rateGuard, UserService userService, CacheEvictor cacheEvictor) {
+                          SnailRateGuard rateGuard, UserService userService, CacheEvictor cacheEvictor,
+                          SysUserRoleMapper userRoleMapper, SysRoleMapper roleMapper,
+                          SysUserIdentityMapper userIdentityMapper) {
         this.userMapper = userMapper;
         this.orgMapper = orgMapper;
         this.tenantMapper = tenantMapper;
         this.rateGuard = rateGuard;
         this.userService = userService;
         this.cacheEvictor = cacheEvictor;
+        this.userRoleMapper = userRoleMapper;
+        this.roleMapper = roleMapper;
+        this.userIdentityMapper = userIdentityMapper;
     }
 
     /** 本人档案:租户拦截器圈定 + user_id 自证,读不到即异常 */
@@ -73,7 +95,36 @@ public class ProfileService {
         SysTenant tenant = tenantMapper.selectById(user.getTenantId());
         return new ProfileVO(user.getUserId(), user.getUsername(), user.getNickname(), user.getEmail(),
                 user.getPhone(), org == null ? null : org.getName(), tenant == null ? null : tenant.getName(),
-                user.getCreateTime());
+                roleNamesOf(userId), user.getCreateTime());
+    }
+
+    /** 角色名快照:授权关系在本租户内,roleId 回查角色名;未授权即空列表 */
+    private List<String> roleNamesOf(Long userId) {
+        List<Long> roleIds = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
+                        .eq(SysUserRole::getUserId, userId))
+                .stream().map(SysUserRole::getRoleId).toList();
+        if (roleIds.isEmpty()) {
+            return List.of();
+        }
+        return roleMapper.selectBatchIds(roleIds).stream().map(SysRole::getRoleName).toList();
+    }
+
+    /** 本人第三方绑定列表:userId 恒来自登录上下文,无越权面;按绑定先后升序 */
+    public List<UserIdentityVO> identities(Long userId) {
+        return userIdentityMapper.selectList(Wrappers.<SysUserIdentity>lambdaQuery()
+                        .eq(SysUserIdentity::getUserId, userId)
+                        .orderByAsc(SysUserIdentity::getCreateTime))
+                .stream().map(UserIdentityVO::of).toList();
+    }
+
+    /** 自助解绑:绑定行必须属于本人(防拿别人的绑定 ID 探测),错绑物理删;解绑后仍可用账号密码登录 */
+    @Transactional
+    public void unbindIdentity(Long userId, Long id) {
+        SysUserIdentity identity = userIdentityMapper.selectById(id);
+        if (identity == null || !userId.equals(identity.getUserId())) {
+            throw BizException.badRequest("绑定不存在或已解绑");
+        }
+        userIdentityMapper.deleteById(id);
     }
 
     /** 自助改资料:只动 nickname/email/phone;昵称变化让登录人快照失效;手机号与建号/改档同规则查重 */

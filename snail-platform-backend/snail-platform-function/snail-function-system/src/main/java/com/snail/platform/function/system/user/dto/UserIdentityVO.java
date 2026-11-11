@@ -5,9 +5,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
 /**
- * 职责:用户第三方绑定出参(只读)——来源、厂商身份与最近登录快照;
- * openId 原样展示不打码(管理员要与厂商后台核对排查易主/错绑)。解绑/换绑二期。
- * 上游:UserService.identitiesOf;下游:用户详情「第三方绑定」卡片。
+ * 职责:用户第三方绑定出参——来源、厂商身份与最近登录快照;
+ * openId 原样展示不打码(便于与厂商后台核对排查易主/错绑)。解绑:管理端只读,本人可在个人中心自助解绑。
+ * 上游:UserService.identitiesOf / ProfileService.identities;下游:用户详情「第三方绑定」卡片、个人中心。
  */
 @Schema(description = "用户第三方绑定")
 public record UserIdentityVO(

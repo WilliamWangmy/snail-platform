@@ -8,12 +8,16 @@ import com.snail.platform.function.system.user.dto.ChangePasswordRequest;
 import com.snail.platform.function.system.user.dto.ForceChangePasswordRequest;
 import com.snail.platform.function.system.user.dto.ProfileVO;
 import com.snail.platform.function.system.user.dto.UpdateProfileRequest;
+import com.snail.platform.function.system.user.dto.UserIdentityVO;
 import com.snail.platform.function.system.user.service.ProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,8 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 职责:个人中心入口——本人档案/自助改资料/自助改密/强制下线自己,全部只要求登录:
- * 操作对象恒为当前登录人自己,按钮权限码对"改自己"没有增量价值。
+ * 职责:个人中心入口——本人档案/自助改资料/自助改密/强制下线自己/第三方绑定查看与自助解绑,
+ * 全部只要求登录:操作对象恒为当前登录人自己,按钮权限码对"改自己"没有增量价值。
  * 上游:个人中心页面;下游:ProfileService。
  */
 @Tag(name = "个人中心")
@@ -68,6 +72,22 @@ public class ProfileController {
     @PostMapping("/password/force-change")
     public R<Void> forceChangePassword(@Valid @RequestBody ForceChangePasswordRequest request) {
         profileService.forceChangePassword(LoginUserContextHolder.userId(), request);
+        return R.ok(null);
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "本人第三方绑定列表")
+    @GetMapping("/identities")
+    public R<List<UserIdentityVO>> identities() {
+        return R.ok(profileService.identities(LoginUserContextHolder.userId()));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "解绑本人的第三方账号(解绑后仍可用账号密码登录)")
+    @OperLog(module = "个人中心", businessType = BusinessType.DELETE)
+    @DeleteMapping("/identities/{id}")
+    public R<Void> unbindIdentity(@PathVariable Long id) {
+        profileService.unbindIdentity(LoginUserContextHolder.userId(), id);
         return R.ok(null);
     }
 
