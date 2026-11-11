@@ -12,9 +12,10 @@ import java.util.Map;
 /**
  * 职责:三家厂商适配器的公共中转基类——统一出站超时、快照口径(只落 URL 基址,
  * 密钥/令牌/授权码根本不进流水)、响应解析与字段校验;协议差异全部留在子类。
+ * public:mock 子类住 client.mock 子包(开发态 mock 归拢),跨包继承需要公开基类。
  * 上游:三家 SocialAuthPort 实现;下游:AbstractExternalClient 模板方法与 ExternalCallLedger。
  */
-abstract class AbstractSocialAuthClient extends AbstractExternalClient implements SocialAuthPort {
+public abstract class AbstractSocialAuthClient extends AbstractExternalClient implements SocialAuthPort {
 
     /** 连接超时:认证是登录主链路,短超时快速失败,文案由消费方统一转译 */
     static final int CONNECT_TIMEOUT_MS = 3000;
@@ -22,11 +23,11 @@ abstract class AbstractSocialAuthClient extends AbstractExternalClient implement
     /** 读超时:同上 */
     static final int READ_TIMEOUT_MS = 5000;
 
-    /** 流水 caller:调用方恒为 auth 登录链 */
-    static final String CALLER = "auth";
+    /** 流水 caller:调用方恒为 auth 登录链;protected 供跨包的 mock 子类复用 */
+    protected static final String CALLER = "auth";
 
-    /** 流水 biz_type */
-    static final String BIZ_TYPE = "sso-login";
+    /** 流水 biz_type;protected 供跨包的 mock 子类复用 */
+    protected static final String BIZ_TYPE = "sso-login";
 
     protected AbstractSocialAuthClient(ExternalCallLedger ledger) {
         super(ledger);

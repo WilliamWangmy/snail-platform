@@ -98,8 +98,9 @@ public abstract class AbstractExternalClient {
     /**
      * 把一段明文转成可嵌入 JSON 字符串的字面量(转义反斜杠/引号/控制字符)——
      * 客户端拼请求快照用;刻意不引 JSON 库:快照是给人排查看的摘要,不是机器契约。
+     * protected:子类(含 client.mock 子包的开发态 mock)跨包复用。
      */
-    static String jsonString(String text) {
+    protected static String jsonString(String text) {
         if (text == null) {
             return "";
         }

@@ -1,8 +1,11 @@
-package com.snail.platform.function.external.client;
+package com.snail.platform.function.external.client.mock;
 
-import com.snail.platform.function.external.api.SmsPort;
 import com.snail.platform.function.external.config.SnailExternalProperties;
-import java.util.Map;
+import com.snail.platform.function.external.api.SmsPort;
+import com.snail.platform.function.external.client.AbstractExternalClient;
+import com.snail.platform.function.external.client.ExternalCallLedger;
+import com.snail.platform.function.external.client.ExternalInvocation;
+import com.snail.platform.function.external.client.ExternalMasker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -10,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 职责:开发态短信厂商适配——把验证码"发送"动作变成一条日志,使短信登录在无阿里云账号时
- * 也能端到端联调;snail.external.sms.mock=true 时注册,生产缺省缺席,由 AliyunSmsClient(M2)顶位。
+ * 也能端到端联调;snail.external.sms.mock=true 时注册,生产缺省缺席,由 AliyunSmsClient 顶位。
  * 与真实通道同一留痕口径:经模板方法落 sys_external_call_log,手机号先经 ExternalMasker 打码;
  * 码值任何日志都不输出——mock 只是替换传输方式,不放宽隐私口径。本地自测要从
  * Valkey 取 snail:auth:sms:{phone},或显式开 snail.external.sms.mock-echo-code(仅限开发环境)。
