@@ -55,35 +55,5 @@ async function onLogout(): Promise<void> {
 }
 </script>
 
-<style lang="scss" scoped>
-.page {
-  min-height: 100vh;
-  padding: 32rpx 24rpx;
-  box-sizing: border-box;
-}
 
-.hero {
-  background: #1d9e75;
-  border-radius: 24rpx;
-  padding: 48rpx 40rpx;
-  margin-bottom: 32rpx;
-  color: #ffffff;
-
-  .hello {
-    display: block;
-    font-size: 36rpx;
-    font-weight: 500;
-  }
-
-  .tenant {
-    display: block;
-    margin-top: 12rpx;
-    font-size: 24rpx;
-    opacity: 0.85;
-  }
-}
-
-:deep(.logout-btn) {
-  margin-top: 48rpx;
-}
-</style>
+<style lang="scss" src="./index.scss" scoped></style>

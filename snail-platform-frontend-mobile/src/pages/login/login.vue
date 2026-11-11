@@ -171,13 +171,7 @@ import { onMounted } from 'vue';
 import { onUnload } from '@dcloudio/uni-app';
 import { reactive, ref } from 'vue';
 import { useToast } from 'wot-design-uni';
-import {
-  isSmsAccountsResult,
-  loginBySms,
-  pickSmsAccount,
-  sendSmsCaptcha,
-} from '@/api/auth';
-import type { SmsAccountOption } from '@/api/auth';
+import { isSmsAccountsResult, type SmsAccountOption } from '@/api/auth';
 import { useAuthStore } from '@/stores/auth';
 
 /** 记住的是账号名而非登录态(与 admin 同口径)。 */
@@ -267,11 +261,7 @@ async function onSendSms(): Promise<void> {
     return;
   }
   try {
-    await sendSmsCaptcha({
-      phone: smsForm.phone,
-      captchaKey: auth.captcha.captchaKey,
-      captchaCode: smsForm.captchaCode,
-    });
+    await auth.sendSmsCaptcha(smsForm.phone, auth.captcha.captchaKey, smsForm.captchaCode);
     toast.show({ msg: '验证码已发送' });
     smsCooldown.value = SMS_RESEND_SECONDS;
     cooldownTimer = setInterval(() => {
@@ -299,7 +289,7 @@ async function onSmsLogin(): Promise<void> {
   }
   submitting.value = true;
   try {
-    const result = await loginBySms({ phone: smsForm.phone, smsCode: smsForm.smsCode });
+    const result = await auth.loginSms({ phone: smsForm.phone, smsCode: smsForm.smsCode });
     if (isSmsAccountsResult(result)) {
       await pickAccount(result.pickKey, result.accounts);
     } else {
@@ -323,7 +313,7 @@ async function pickAccount(pickKey: string, accounts: SmsAccountOption[]): Promi
     });
   });
   try {
-    const result = await pickSmsAccount({ pickKey, userId: picked.userId });
+    const result = await auth.pickSmsAccount(pickKey, picked.userId);
     afterLogin(result.passwordChangeRequired);
   } catch (error) {
     failHint(error);
@@ -364,271 +354,5 @@ function hint(msg: string): void {
 }
 </script>
 
-<style lang="scss" scoped>
-.page {
-  min-height: 100vh;
-  padding: 140rpx 48rpx 64rpx;
-  box-sizing: border-box;
-}
 
-/* 品牌区 */
-.brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 56rpx;
-
-  .logo {
-    width: 128rpx;
-    height: 128rpx;
-    border-radius: 36rpx;
-    background: #1d9e75;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24rpx;
-  }
-
-  .title {
-    font-size: 40rpx;
-    font-weight: 500;
-    color: #2c2c2a;
-  }
-
-  .subtitle {
-    margin-top: 8rpx;
-    font-size: 24rpx;
-    color: #888780;
-  }
-}
-
-/* 分段 Tab */
-.tabs {
-  display: flex;
-  background: #eceef1;
-  border-radius: 24rpx;
-  padding: 8rpx;
-  margin-bottom: 40rpx;
-
-  .tab {
-    flex: 1;
-    height: 76rpx;
-    line-height: 76rpx;
-    text-align: center;
-    border-radius: 18rpx;
-    font-size: 28rpx;
-    color: #888780;
-    transition: all 0.2s;
-
-    &.on {
-      background: #ffffff;
-      color: #2c2c2a;
-      font-weight: 500;
-      box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
-    }
-  }
-}
-
-/* 输入行 */
-.field {
-  display: flex;
-  align-items: center;
-  background: #ffffff;
-  border: 1rpx solid rgba(0, 0, 0, 0.08);
-  border-radius: 24rpx;
-  padding: 0 28rpx;
-  height: 100rpx;
-  margin-bottom: 28rpx;
-
-  .input {
-    flex: 1;
-    margin-left: 20rpx;
-    font-size: 30rpx;
-    color: #2c2c2a;
-  }
-
-  .eye {
-    padding-left: 16rpx;
-  }
-
-  .captcha-img {
-    width: 208rpx;
-    height: 72rpx;
-    margin-left: 16rpx;
-    border-radius: 16rpx;
-    background: #eef4f1;
-  }
-
-  .captcha-refresh {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .sms-btn {
-    flex-shrink: 0;
-    margin-left: 16rpx;
-    font-size: 24rpx;
-    color: #1d9e75;
-    border: 1rpx solid #1d9e75;
-    background: #e1f5ee;
-    border-radius: 16rpx;
-    padding: 12rpx 18rpx;
-    white-space: nowrap;
-
-    &.disabled {
-      color: #b4b2a9;
-      border-color: rgba(0, 0, 0, 0.08);
-      background: #f1f1f1;
-    }
-  }
-}
-
-/* 记住账号 / 忘记密码 */
-.row-between {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 4rpx 4rpx 40rpx;
-
-  .remember {
-    display: flex;
-    align-items: center;
-
-    .remember-text {
-      margin-left: 14rpx;
-      font-size: 26rpx;
-      color: #888780;
-    }
-  }
-
-  .forgot {
-    font-size: 26rpx;
-    color: #1d9e75;
-  }
-}
-
-/* 复选框 */
-.checkbox {
-  width: 34rpx;
-  height: 34rpx;
-  border-radius: 10rpx;
-  border: 3rpx solid #b4b2a9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-
-  &.on {
-    background: #1d9e75;
-    border-color: #1d9e75;
-  }
-}
-
-/* 登录按钮 */
-.btn-primary {
-  height: 96rpx;
-  line-height: 96rpx;
-  text-align: center;
-  border-radius: 48rpx;
-  background: #1d9e75;
-  color: #ffffff;
-  font-size: 32rpx;
-  font-weight: 500;
-
-  &:active {
-    background: #157a5a;
-  }
-
-  &.loading {
-    opacity: 0.7;
-  }
-}
-
-/* 分割线 */
-.divider {
-  display: flex;
-  align-items: center;
-  margin: 52rpx 0 36rpx;
-
-  &::before,
-  &::after {
-    content: '';
-    flex: 1;
-    height: 1rpx;
-    background: rgba(0, 0, 0, 0.08);
-  }
-
-  .divider-text {
-    padding: 0 28rpx;
-    font-size: 24rpx;
-    color: #b4b2a9;
-  }
-}
-
-/* SSO */
-.sso-row {
-  display: flex;
-  justify-content: center;
-  gap: 68rpx;
-
-  .sso-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    .sso-ico {
-      width: 96rpx;
-      height: 96rpx;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 36rpx;
-      font-weight: 500;
-      color: #ffffff;
-
-      &.ding {
-        background: #1a6cfb;
-      }
-
-      &.fei {
-        background: #00d6b9;
-      }
-
-      &.wecom {
-        background: #2e7d32;
-      }
-    }
-
-    .sso-label {
-      margin-top: 14rpx;
-      font-size: 22rpx;
-      color: #888780;
-    }
-
-    &:active .sso-ico {
-      transform: scale(0.92);
-    }
-  }
-}
-
-/* 协议 */
-.agreement {
-  display: flex;
-  align-items: flex-start;
-  margin-top: 44rpx;
-
-  .agreement-text {
-    margin-left: 14rpx;
-    font-size: 22rpx;
-    color: #888780;
-    line-height: 1.5;
-    flex: 1;
-  }
-
-  .agreement-link {
-    color: #1d9e75;
-  }
-}
-</style>
+<style lang="scss" src="./login.scss" scoped></style>

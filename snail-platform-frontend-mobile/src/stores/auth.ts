@@ -4,8 +4,12 @@ import {
   fetchCaptcha,
   fetchLoginUser,
   login as loginApi,
+  loginBySms as loginBySmsApi,
   logout as logoutApi,
+  pickSmsAccount as pickSmsAccountApi,
+  sendSmsCaptcha as sendSmsCaptchaApi,
   type LoginUser,
+  type SmsAccountsResult,
 } from '@/api/auth';
 import type { Captcha, LoginPayload, LoginResult } from '@/api/types';
 import { clearToken, getToken, setToken } from '@/utils/token';
@@ -76,6 +80,25 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /* ------------------------- 短信登录 ------------------------- */
+
+  /** 发送短信验证码(与后端 60s 间隔闸对齐,倒计时归页面管)。 */
+  async function sendSmsCaptcha(phone: string, captchaKey: string, captchaCode: string): Promise<void> {
+    await sendSmsCaptchaApi({ phone, captchaKey, captchaCode });
+  }
+
+  /** 短信验证码登录:出参两态,多账号(pickKey)需再调 pickSmsAccount。 */
+  async function loginSms(payload: { phone: string; smsCode: string }): Promise<LoginResult | SmsAccountsResult> {
+    return loginBySmsApi(payload);
+  }
+
+  /** 选定租户账号换正式令牌:pickKey 一次一用,成功即落会话。 */
+  async function pickSmsAccount(pickKey: string, userId: number): Promise<LoginResult> {
+    return applySession(await pickSmsAccountApi({ pickKey, userId }));
+  }
+
+  /* ------------------------- 会话 ------------------------- */
+
   /** 冷启动恢复:token 还有效时拉一次富快照,失败(过期)由请求层 401 统一回登录页。 */
   async function loadSession(): Promise<void> {
     if (!isLoggedIn.value || user.value) return;
@@ -86,5 +109,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, captcha, isLoggedIn, refreshCaptcha, applySession, login, logout, loadSession };
+  return {
+    token,
+    user,
+    captcha,
+    isLoggedIn,
+    refreshCaptcha,
+    applySession,
+    sendSmsCaptcha,
+    loginSms,
+    pickSmsAccount,
+    login,
+    logout,
+    loadSession,
+  };
 });
