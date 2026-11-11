@@ -3,11 +3,13 @@ package com.snail.platform.function.storage.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
+import com.snail.platform.function.storage.dto.StorageUsageVO;
 import com.snail.platform.function.storage.entity.SysFile;
 import com.snail.platform.function.storage.mapper.SysFileMapper;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
@@ -85,6 +87,30 @@ public class FileQuotaService {
                 Wrappers.<SysFile>query().select(USED_SIZE_SELECT));
         Object first = totals.isEmpty() ? null : totals.get(0);
         return first instanceof Number number ? number.longValue() : 0L;
+    }
+
+    /**
+     * 租户存储用量(平台侧详情统计,统计层设计 §5.5):总量 SUM + 文件数 COUNT 一条聚合,
+     * 不按分类(ext)细分(2026-11-11 收窄口径)。
+     * 平台侧变体必须 withoutTenant + 显式 eq(tenant_id)——调用方是平台管理员,上下文是其自身租户,
+     * 拦截器注入会查成平台自己的数据(AC-9 专项);租户侧配额校验链(:47-59/:67-80)仍走拦截器口径不动,
+     * 两个变体的 WHERE 条件完全一致(deleted=0 由 MP 逻辑删自动追加),统计与"上传被拒"同口径(D-05)。
+     * 走 (tenant_id,...) 前缀索引(V2:30-32),千文件量级毫秒级(NFR-1)。
+     */
+    public StorageUsageVO usage(Long tenantId) {
+        List<Map<String, Object>> rows = TenantContextHolder.withoutTenant(() -> fileMapper.selectMaps(
+                Wrappers.<SysFile>query()
+                        .select("COALESCE(SUM(`size`), 0) AS used_bytes", "COUNT(*) AS file_count")
+                        // 聚合 select 需要原生列名,故用 QueryWrapper 而非 Lambda;eq 同步用字符串列名
+                        .eq("tenant_id", tenantId)));
+        Map<String, Object> agg = rows.isEmpty() ? Map.of() : rows.get(0);
+        long usedBytes = agg.get("used_bytes") instanceof Number n ? n.longValue() : 0L;
+        long fileCount = agg.get("file_count") instanceof Number n ? n.longValue() : 0L;
+        // 配额取自 sys_tenant(豁免表,按 ID 定点取无租户条件问题);租户行缺失按不限兜底,
+        // 存量令牌已被租户域作废,这里只是防御性出口
+        SysTenant tenant = tenantMapper.selectById(tenantId);
+        Long limitMb = tenant == null ? null : tenant.getStorageLimitMb();
+        return new StorageUsageVO(limitMb, usedBytes, fileCount);
     }
 
     private static long limitBytes(SysTenant tenant) {
