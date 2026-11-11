@@ -79,13 +79,14 @@ const emptyForm: TenantForm = {
 /**
  * 五系统开通项元数据:面板顺序与文案按原型 B 块;开关列与登录端 scene 的映射见契约 5.1
  * (admin→管理系统、workflow→流程系统、app/miniapp→移动端共用一开关、dashboard→大屏、portal→门户)。
+ * icon 仅详情抽屉的功能行使用,弹窗芯片与列表 tag 不消费。
  */
-const FEATURE_META: Array<{ key: keyof TenantFeatureFlags; label: string; hint: string }> = [
-  { key: 'adminEnabled', label: '管理系统', hint: '开通后可登录管理后台' },
-  { key: 'workflowEnabled', label: '流程系统', hint: '开通后可登录流程平台' },
-  { key: 'mobileEnabled', label: '移动端', hint: 'app 与小程序共用' },
-  { key: 'dashboardEnabled', label: '数据大屏', hint: '开通后可登录大屏查看看板' },
-  { key: 'portalEnabled', label: '企业门户', hint: '门户立项前为配置先行' },
+const FEATURE_META: Array<{ key: keyof TenantFeatureFlags; label: string; hint: string; icon: string }> = [
+  { key: 'adminEnabled', label: '管理系统', hint: '开通后可登录管理后台', icon: 'shield' },
+  { key: 'workflowEnabled', label: '流程系统', hint: '开通后可登录流程平台', icon: 'flow' },
+  { key: 'mobileEnabled', label: '移动端', hint: 'app 与小程序共用', icon: 'chat' },
+  { key: 'dashboardEnabled', label: '数据大屏', hint: '开通后可登录大屏查看看板', icon: 'chart' },
+  { key: 'portalEnabled', label: '企业门户', hint: '门户立项前为配置先行', icon: 'external' },
 ];
 
 /** 列表功能开通 tag 的短文案:列宽有限,取单字/双字 */
@@ -96,6 +97,14 @@ const FEATURE_SHORT: Record<keyof TenantFeatureFlags, string> = {
   dashboardEnabled: '大屏',
   portalEnabled: '门户',
 };
+
+/** 抽屉「系统使用」分端统计行:与 UsageStatsVO.scenes 的键一一对应;门户不参与(契约 BR-8 占位行) */
+const SCENE_ROWS: Array<{ key: 'admin' | 'workflow' | 'mobile' | 'dashboard'; label: string }> = [
+  { key: 'admin', label: '管理系统' },
+  { key: 'workflow', label: '流程系统' },
+  { key: 'mobile', label: '移动端' },
+  { key: 'dashboard', label: '数据大屏' },
+];
 
 const formVisible = ref(false);
 const formRef = ref<FormInstance>();
@@ -345,6 +354,26 @@ const storagePercent = computed<number | null>(() => {
     100,
     Math.round((storage.value.usedBytes / (storage.value.limitMb * 1024 * 1024)) * 100),
   );
+});
+
+/** 存储超额判定:已用字节越过配额时,进度条与百分比转危险色提示尽快扩容 */
+const storageOver = computed<boolean>(() => {
+  if (!storage.value || storage.value.limitMb == null) return false;
+  return storage.value.usedBytes > storage.value.limitMb * 1024 * 1024;
+});
+
+/** 到期已过判定(不限期不警示):到期时间在抽屉里标警示色,提示平台侧留意续期 */
+const expirePassed = computed<boolean>(() => {
+  const t = drawerTenant.value?.expireTime;
+  if (!t) return false;
+  return new Date(t).getTime() < Date.now();
+});
+
+/** 已开通系统数:展示在「功能开通」分区标题右侧,一眼看清开通规模 */
+const featureOnCount = computed<number>(() => {
+  const t = drawerTenant.value;
+  if (!t) return 0;
+  return FEATURE_META.filter((item) => t[item.key] === 1).length;
 });
 
 /** 剩余配额文案:limitMb 不限时返回空串(不渲染);负数(超额)钳到 0 */
@@ -845,21 +874,29 @@ function ratePercent(rate: number): string {
       </template>
     </ElDialog>
 
-    <!-- 详情抽屉(原型 C 块):四区各自独立加载,单接口失败只降级所在分区 -->
+    <!-- 详情抽屉(原型 C 块):头部品牌化 + 四区块面板化,复用全局 panel 套件;单接口失败只降级所在分区 -->
     <ElDrawer
       v-model="drawerVisible"
-      size="560px"
+      size="620px"
     >
       <template #header>
-        <div class="drawer-head">
-          <h3>{{ drawerTenant?.name ?? '租户详情' }}</h3>
-          <span
-            class="status-pill"
-            :class="drawerTenant?.status === 0 ? 'success' : 'info'"
-          >
-            {{ drawerTenant?.status === 0 ? '正常' : '停用' }}
-          </span>
-          <span class="drawer-sub">tenant_id {{ drawerTenant?.tenantId }} · {{ drawerTenant?.tenantCode }}</span>
+        <div
+          v-if="drawerTenant"
+          class="drawer-head"
+        >
+          <span class="t-avatar">{{ drawerTenant.name?.charAt(0) || '租' }}</span>
+          <div class="t-meta">
+            <div class="t-name-row">
+              <h3>{{ drawerTenant.name }}</h3>
+              <span
+                class="status-pill"
+                :class="drawerTenant.status === 0 ? 'success' : 'info'"
+              >
+                {{ drawerTenant.status === 0 ? '正常' : '停用' }}
+              </span>
+            </div>
+            <div class="t-code">#{{ drawerTenant.tenantCode }} · ID {{ drawerTenant.tenantId }}</div>
+          </div>
         </div>
       </template>
 
@@ -867,38 +904,92 @@ function ratePercent(rate: number): string {
         v-if="drawerTenant"
         class="drawer-body"
       >
-        <!-- 区一:基础信息(列表行数据兜底,不单独发请求) -->
-        <div class="d-sec">
-          <h4>基础信息</h4>
-          <dl class="desc-grid">
-            <dt>联系人</dt>
-            <dd>{{ drawerTenant.contactUser ?? '—' }}</dd>
-            <dt>联系电话</dt>
-            <dd>{{ drawerTenant.contactPhone ?? '—' }}</dd>
-            <dt>开通时间</dt>
-            <dd>{{ dateTime(drawerTenant.createTime) }}</dd>
-            <dt>到期时间</dt>
-            <dd>{{ drawerTenant.expireTime ? dateTime(drawerTenant.expireTime) : '不限' }}</dd>
-            <dt>开通用户数</dt>
-            <dd>{{ drawerTenant.accountLimit ?? '不限' }}</dd>
-            <dt>存储配额</dt>
-            <dd>{{ mbToGbText(drawerTenant.storageLimitMb) }}</dd>
-            <dt>备注</dt>
-            <dd>{{ drawerTenant.remark ?? '—' }}</dd>
+        <!-- 区一:基础信息(列表行数据兜底,不单独发请求);编码/时间/数字用等宽字形与系统日志页同语言 -->
+        <section class="d-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="receipt"
+                :size="13"
+              />
+            </span>
+            <b class="panel-title">基础信息</b>
+          </div>
+          <dl class="info-grid">
+            <div class="info-item">
+              <dt>联系人</dt>
+              <dd>{{ drawerTenant.contactUser ?? '—' }}</dd>
+            </div>
+            <div class="info-item">
+              <dt>联系电话</dt>
+              <dd class="mono">
+                {{ drawerTenant.contactPhone ?? '—' }}
+              </dd>
+            </div>
+            <div class="info-item">
+              <dt>开通时间</dt>
+              <dd class="mono">
+                {{ dateTime(drawerTenant.createTime) }}
+              </dd>
+            </div>
+            <div class="info-item">
+              <dt>到期时间</dt>
+              <dd
+                class="mono"
+                :class="{ warn: expirePassed }"
+              >
+                {{ drawerTenant.expireTime ? dateTime(drawerTenant.expireTime) : '不限' }}
+              </dd>
+            </div>
+            <div class="info-item">
+              <dt>开通用户数</dt>
+              <dd class="mono">
+                {{ drawerTenant.accountLimit ?? '不限' }}
+              </dd>
+            </div>
+            <div class="info-item">
+              <dt>存储配额</dt>
+              <dd class="mono">
+                {{ mbToGbText(drawerTenant.storageLimitMb) }}
+              </dd>
+            </div>
+            <div class="info-item span-2">
+              <dt>备注</dt>
+              <dd>{{ drawerTenant.remark ?? '—' }}</dd>
+            </div>
           </dl>
-        </div>
+        </section>
 
-        <!-- 区二:功能开通(行数据已带五开关) -->
-        <div class="d-sec">
-          <h4>功能开通</h4>
-          <div class="feature-col">
+        <!-- 区二:功能开通(行数据已带五开关);每行配语义图标,点亮态走成功色系 -->
+        <section class="d-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="sliders"
+                :size="13"
+              />
+            </span>
+            <b class="panel-title">功能开通</b>
+            <span class="panel-hint">已开通 {{ featureOnCount }}/5</span>
+          </div>
+          <div class="feature-list">
             <div
               v-for="item in FEATURE_META"
               :key="item.key"
-              class="feature-row"
+              class="feature-line"
             >
+              <span
+                class="f-ico"
+                :class="{ on: drawerTenant[item.key] === 1 }"
+              >
+                <AppIcon
+                  :name="item.icon"
+                  :size="14"
+                />
+              </span>
               <div class="f-txt">
                 <b>{{ item.label }}</b>
+                <span>{{ item.hint }}</span>
               </div>
               <span
                 class="feature-tag big"
@@ -908,11 +999,19 @@ function ratePercent(rate: number): string {
               </span>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- 区三:系统使用(usage-stats):用户五卡+分端使用率表;门户行占位(契约 BR-8) -->
-        <div class="d-sec">
-          <h4>系统使用</h4>
+        <section class="d-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="chart"
+                :size="13"
+              />
+            </span>
+            <b class="panel-title">系统使用</b>
+          </div>
           <div
             v-if="usageFailed"
             class="sec-fallback"
@@ -947,55 +1046,19 @@ function ratePercent(rate: number): string {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>管理系统</td>
-                  <td>{{ usage.scenes.admin.loggedIn }}</td>
-                  <td>{{ usage.users.total }}</td>
+                <tr
+                  v-for="scene in SCENE_ROWS"
+                  :key="scene.key"
+                >
+                  <td>{{ scene.label }}</td>
+                  <td class="mono">{{ usage.scenes[scene.key].loggedIn }}</td>
+                  <td class="mono">{{ usage.users.total }}</td>
                   <td>
                     <div class="rate-wrap">
                       <div class="rate-bar">
-                        <i :style="{ width: ratePercent(usage.scenes.admin.rate) }" />
+                        <i :style="{ width: ratePercent(usage.scenes[scene.key].rate) }" />
                       </div>
-                      {{ ratePercent(usage.scenes.admin.rate) }}
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>流程系统</td>
-                  <td>{{ usage.scenes.workflow.loggedIn }}</td>
-                  <td>{{ usage.users.total }}</td>
-                  <td>
-                    <div class="rate-wrap">
-                      <div class="rate-bar">
-                        <i :style="{ width: ratePercent(usage.scenes.workflow.rate) }" />
-                      </div>
-                      {{ ratePercent(usage.scenes.workflow.rate) }}
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>移动端</td>
-                  <td>{{ usage.scenes.mobile.loggedIn }}</td>
-                  <td>{{ usage.users.total }}</td>
-                  <td>
-                    <div class="rate-wrap">
-                      <div class="rate-bar">
-                        <i :style="{ width: ratePercent(usage.scenes.mobile.rate) }" />
-                      </div>
-                      {{ ratePercent(usage.scenes.mobile.rate) }}
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td>数据大屏</td>
-                  <td>{{ usage.scenes.dashboard.loggedIn }}</td>
-                  <td>{{ usage.users.total }}</td>
-                  <td>
-                    <div class="rate-wrap">
-                      <div class="rate-bar">
-                        <i :style="{ width: ratePercent(usage.scenes.dashboard.rate) }" />
-                      </div>
-                      {{ ratePercent(usage.scenes.dashboard.rate) }}
+                      <span class="mono">{{ ratePercent(usage.scenes[scene.key].rate) }}</span>
                     </div>
                   </td>
                 </tr>
@@ -1017,11 +1080,23 @@ function ratePercent(rate: number): string {
           >
             加载中…
           </div>
-        </div>
+        </section>
 
-        <!-- 区四:存储使用(storage-usage):limitMb 不限时不渲染进度与百分比(契约 §5.5) -->
-        <div class="d-sec">
-          <h4>存储使用</h4>
+        <!-- 区四:存储使用(storage-usage):limitMb 不限时不渲染进度与百分比(契约 §5.5);超额转危险色 -->
+        <section class="d-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="box"
+                :size="13"
+              />
+            </span>
+            <b class="panel-title">存储使用</b>
+            <span
+              v-if="storage && storage.fileCount != null"
+              class="panel-hint"
+            >共 {{ storage.fileCount }} 个文件</span>
+          </div>
           <div
             v-if="storageFailed"
             class="sec-fallback"
@@ -1037,16 +1112,18 @@ function ratePercent(rate: number): string {
               <span
                 v-if="storagePercent !== null"
                 class="pct"
+                :class="{ over: storageOver }"
               >{{ storagePercent }}%</span>
             </div>
             <div
               v-if="storagePercent !== null"
               class="rate-bar big"
+              :class="{ over: storageOver }"
             >
               <i :style="{ width: storagePercent + '%' }" />
             </div>
             <div class="usage-sub">
-              共 {{ storage.fileCount }} 个文件<template v-if="storage.limitMb != null"> · 剩余 {{ storageRemainGbText }}</template>(配额可在「修改」中调整;存储不区分分类明细)
+              <template v-if="storage.limitMb != null">剩余 {{ storageRemainGbText }} · </template>配额可在「修改」中调整;存储不区分分类明细
             </div>
           </template>
           <div
@@ -1055,7 +1132,7 @@ function ratePercent(rate: number): string {
           >
             加载中…
           </div>
-        </div>
+        </section>
       </div>
     </ElDrawer>
   </div>
@@ -1152,18 +1229,129 @@ function ratePercent(rate: number): string {
   padding: 2px 12px;
 }
 
-/* 弹窗「功能开通」面板行:文案左、开关右,与原型 B 块同构 */
-.feature-col {
+/* 抽屉头部:主题色品牌头像 + 名称/状态行 + 等宽标识行,与登录页 brand-mark 同一视觉母题 */
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.t-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 12px;
+  color: var(--app-on-primary);
+  background: linear-gradient(135deg, var(--app-primary), var(--app-primary-tint));
+  box-shadow: 0 4px 12px rgba(var(--app-primary-rgb), 0.28);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.t-meta {
+  min-width: 0;
+}
+
+.t-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.t-name-row h3 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.t-code {
+  margin-top: 3px;
+  color: var(--app-muted);
+  font-family: var(--app-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+
+/* 抽屉区块面板:线框圆角软底,与弹窗表单套件(form-panel)同一语言;标题复用全局 panel-ico/panel-title */
+.d-panel {
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  background: var(--app-soft);
+}
+
+.d-panel .panel-head {
+  margin-bottom: 12px;
+}
+
+/* 基础信息两列网格:标签小字弱化,值走主题墨色;编码/时间/数字用等宽字形 */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.info-item dt {
+  margin-bottom: 3px;
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.info-item dd {
+  margin: 0;
+  color: var(--app-ink);
+  font-size: 12.5px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.info-item dd.mono {
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.info-item dd.warn {
+  color: var(--app-warning);
+}
+
+/* 功能开通行:语义图标方块(点亮态走成功色系)+ 名称/说明 + 状态胶囊 */
+.feature-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.feature-row {
+.feature-line {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+}
+
+.f-ico {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 1px solid var(--app-line);
+  border-radius: 9px;
+  color: var(--app-muted);
+  background: var(--app-soft-2);
+}
+
+.f-ico.on {
+  color: var(--app-success);
+  background: rgba(var(--app-success-rgb), 0.1);
+  border-color: rgba(var(--app-success-rgb), 0.35);
 }
 
 .f-txt {
@@ -1171,67 +1359,20 @@ function ratePercent(rate: number): string {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .f-txt b {
-  font-size: 13px;
-  color: var(--app-ink, #303133);
+  font-size: 12.5px;
+  color: var(--app-ink);
 }
 
 .f-txt span {
-  font-size: 12px;
-  color: var(--app-muted, #909399);
+  font-size: 10.5px;
+  color: var(--app-muted);
 }
 
-/* 抽屉四区:与原型 C 块同构 */
-.drawer-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.drawer-head h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.drawer-sub {
-  color: var(--app-muted, #909399);
-  font-size: 12px;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.d-sec {
-  margin-bottom: 22px;
-}
-
-.d-sec h4 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--app-muted, #606266);
-}
-
-.desc-grid {
-  display: grid;
-  grid-template-columns: 84px 1fr 84px 1fr;
-  gap: 8px 10px;
-  margin: 0;
-  font-size: 13px;
-}
-
-.desc-grid dt {
-  color: var(--app-muted, #909399);
-}
-
-.desc-grid dd {
-  margin: 0;
-  color: var(--app-ink, #303133);
-  word-break: break-all;
-}
-
+/* 用户五卡:面板内的白卡层次,数字等宽;在线卡主题点亮 */
 .user-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1240,29 +1381,32 @@ function ratePercent(rate: number): string {
 }
 
 .stat {
-  background: var(--app-soft, #f7f9fc);
-  border-radius: 8px;
-  padding: 10px 8px;
+  padding: 10px 6px;
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  background: var(--app-card);
   text-align: center;
 }
 
 .stat b {
   display: block;
-  font-size: 18px;
-  color: var(--app-ink, #303133);
+  font-family: var(--app-font-mono);
+  font-size: 17px;
+  color: var(--app-ink);
 }
 
 .stat span {
-  font-size: 12px;
-  color: var(--app-muted, #909399);
+  font-size: 10px;
+  color: var(--app-muted);
 }
 
 .stat.hl {
+  border-color: rgba(var(--app-primary-rgb), 0.32);
   background: rgba(var(--app-primary-rgb), 0.08);
 }
 
 .stat.hl b {
-  color: var(--app-primary, #409eff);
+  color: var(--app-primary);
 }
 
 .mini-table {
@@ -1275,12 +1419,18 @@ function ratePercent(rate: number): string {
 .mini-table td {
   padding: 6px 8px;
   text-align: left;
-  border-bottom: 1px solid var(--app-line, #ebeef5);
+  border-bottom: 1px solid var(--app-line);
 }
 
 .mini-table th {
-  color: var(--app-muted, #909399);
+  color: var(--app-muted);
+  font-size: 10.5px;
   font-weight: 500;
+}
+
+.mini-table td.mono {
+  font-family: var(--app-font-mono);
+  font-size: 11.5px;
 }
 
 .rate-wrap {
@@ -1289,10 +1439,17 @@ function ratePercent(rate: number): string {
   gap: 8px;
 }
 
+.rate-wrap .mono {
+  min-width: 34px;
+  text-align: right;
+  font-family: var(--app-font-mono);
+  font-size: 11px;
+}
+
 .rate-bar {
   flex: 1;
   height: 6px;
-  background: var(--app-line, #ebeef5);
+  background: var(--app-soft-2);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -1300,13 +1457,22 @@ function ratePercent(rate: number): string {
 .rate-bar i {
   display: block;
   height: 100%;
-  background: var(--app-primary, #409eff);
+  background: linear-gradient(90deg, var(--app-primary), var(--app-primary-tint));
   border-radius: 3px;
 }
 
 .rate-bar.big {
   height: 10px;
   border-radius: 5px;
+}
+
+.rate-bar.over,
+.rate-bar.over i {
+  background: var(--app-soft-2);
+}
+
+.rate-bar.over i {
+  background: linear-gradient(90deg, var(--app-danger), color-mix(in srgb, var(--app-danger) 70%, white));
 }
 
 .usage-top {
@@ -1317,46 +1483,52 @@ function ratePercent(rate: number): string {
 }
 
 .usage-top .num {
+  font-family: var(--app-font-mono);
   font-size: 20px;
   font-weight: 600;
-  color: var(--app-ink, #303133);
+  color: var(--app-ink);
 }
 
 .usage-top .num small {
   font-size: 12px;
   font-weight: 400;
-  color: var(--app-muted, #909399);
+  color: var(--app-muted);
   margin-left: 4px;
 }
 
 .usage-top .pct {
+  font-family: var(--app-font-mono);
   font-size: 13px;
-  color: var(--app-primary, #409eff);
   font-weight: 600;
+  color: var(--app-primary);
+}
+
+.usage-top .pct.over {
+  color: var(--app-danger);
 }
 
 .usage-sub {
   font-size: 12px;
-  color: var(--app-muted, #909399);
+  color: var(--app-muted);
   margin-top: 10px;
 }
 
 .sec-fallback {
   font-size: 12px;
-  color: var(--app-muted, #909399);
-  background: var(--app-soft, #f7f9fc);
+  color: var(--app-muted);
+  background: var(--app-soft-2);
   padding: 14px;
   border-radius: 8px;
 }
 
 .sec-loading {
   font-size: 12px;
-  color: var(--app-muted, #909399);
+  color: var(--app-muted);
   padding: 6px 0;
 }
 
 .portal-note {
-  color: var(--app-muted, #909399);
+  color: var(--app-muted);
 }
 
 /* 弹窗面板/横幅/口令动作等公共样式在 styles/index.css 的「弹窗表单套件」一节,全局单点维护 */
