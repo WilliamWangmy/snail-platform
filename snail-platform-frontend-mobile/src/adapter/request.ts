@@ -6,7 +6,17 @@ import { clearToken, getToken } from '@/utils/token';
  * code===0 → data;401 → 清会话并回登录页;其余 → ApiError。
  */
 
-const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '';
+const CONFIGURED_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '';
+
+/** H5 开发期走 vite 同源代理(见 vite.config.ts),其余端无代理必须直连后端。 */
+function resolveBaseUrl(): string {
+  // #ifdef H5
+  if (import.meta.env.DEV) return '';
+  // #endif
+  return CONFIGURED_BASE_URL;
+}
+
+const BASE_URL = resolveBaseUrl();
 const TIMEOUT = 20000;
 
 /** 业务失败统一异常:code 为后端信封码,-1 表示网络异常。 */
