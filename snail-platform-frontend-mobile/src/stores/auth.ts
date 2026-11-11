@@ -1,0 +1,90 @@
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
+import {
+  fetchCaptcha,
+  fetchLoginUser,
+  login as loginApi,
+  logout as logoutApi,
+  type LoginUser,
+} from '@/api/auth';
+import type { Captcha, LoginPayload, LoginResult } from '@/api/types';
+import { clearToken, getToken, setToken } from '@/utils/token';
+
+/** 会话快照:登录成功后由 LoginResult/LoginUser 提炼,供工作台展示。 */
+export interface SessionUser {
+  userId: number;
+  username: string;
+  nickname: string;
+  tenantId: number;
+  tenantName: string;
+  passwordChangeRequired: boolean;
+}
+
+function toSession(result: LoginResult): SessionUser {
+  return {
+    userId: result.userId,
+    username: result.username,
+    nickname: result.nickname,
+    tenantId: result.tenantId,
+    tenantName: result.tenantName,
+    passwordChangeRequired: result.passwordChangeRequired,
+  };
+}
+
+function fromLoginUser(user: LoginUser): SessionUser {
+  return {
+    userId: user.userId,
+    username: user.username,
+    nickname: user.nickname,
+    tenantId: user.tenantId,
+    tenantName: user.tenantName,
+    passwordChangeRequired: user.passwordChangeRequired,
+  };
+}
+
+export const useAuthStore = defineStore('auth', () => {
+  const token = ref<string>(getToken());
+  const user = ref<SessionUser | null>(null);
+  const captcha = ref<Captcha | null>(null);
+
+  const isLoggedIn = computed(() => token.value !== '');
+
+  async function refreshCaptcha(): Promise<void> {
+    captcha.value = await fetchCaptcha();
+  }
+
+  /** 登录成功(密码/短信/选号)统一落会话。 */
+  function applySession(result: LoginResult): LoginResult {
+    token.value = result.token;
+    user.value = toSession(result);
+    setToken(result.token);
+    return result;
+  }
+
+  async function login(payload: Omit<LoginPayload, 'captchaKey'>): Promise<LoginResult> {
+    if (!captcha.value) throw new Error('验证码未就绪');
+    return applySession(await loginApi({ ...payload, captchaKey: captcha.value.captchaKey }));
+  }
+
+  async function logout(): Promise<void> {
+    try {
+      await logoutApi();
+    } finally {
+      token.value = '';
+      user.value = null;
+      clearToken();
+    }
+  }
+
+  /** 冷启动恢复:token 还有效时拉一次富快照,失败(过期)由请求层 401 统一回登录页。 */
+  async function loadSession(): Promise<void> {
+    if (!isLoggedIn.value || user.value) return;
+    try {
+      user.value = fromLoginUser(await fetchLoginUser());
+    } catch {
+      /* 快照失败不阻断进入,工作台显示"未登录"兜底 */
+    }
+  }
+
+  return { token, user, captcha, isLoggedIn, refreshCaptcha, applySession, login, logout, loadSession };
+});
