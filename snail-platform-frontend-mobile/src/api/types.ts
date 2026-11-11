@@ -8,6 +8,12 @@ export interface Envelope<T> {
   data: T;
 }
 
+/** 分页请求参数(对齐 snail-framework-core 的 PageParams)。 */
+export interface PageParams {
+  page?: number;
+  pageSize?: number;
+}
+
 /** 分页信封(对齐 snail-framework-core 的 PageResult)。 */
 export interface PageResult<T> {
   list: T[];

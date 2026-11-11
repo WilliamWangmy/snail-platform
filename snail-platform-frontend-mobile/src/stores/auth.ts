@@ -13,6 +13,7 @@ import {
 } from '@/api/auth';
 import type { Captcha, LoginPayload, LoginResult } from '@/api/types';
 import { clearToken, getToken, setToken } from '@/utils/token';
+import { useNotifyStore } from '@/stores/notify';
 
 /** 会话快照:登录成功后由 LoginResult/LoginUser 提炼,供工作台展示。 */
 export interface SessionUser {
@@ -74,10 +75,16 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await logoutApi();
     } finally {
-      token.value = '';
-      user.value = null;
-      clearToken();
+      clearLocal();
     }
+  }
+
+  /** 仅清本地会话,不调登出接口——改密/令牌失效后旧 token 已不可用,直接清。 */
+  function clearLocal(): void {
+    token.value = '';
+    user.value = null;
+    clearToken();
+    useNotifyStore().reset();
   }
 
   /* ------------------------- 短信登录 ------------------------- */
@@ -121,6 +128,7 @@ export const useAuthStore = defineStore('auth', () => {
     pickSmsAccount,
     login,
     logout,
+    clearLocal,
     loadSession,
   };
 });
