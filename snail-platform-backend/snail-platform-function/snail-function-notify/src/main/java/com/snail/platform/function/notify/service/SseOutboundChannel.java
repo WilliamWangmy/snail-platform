@@ -1,7 +1,7 @@
 package com.snail.platform.function.notify.service;
 
+import com.snail.platform.function.notify.SnailNotifyProperties;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -26,10 +26,10 @@ public class SseOutboundChannel implements OutboundChannel {
     private final ObjectMapper objectMapper;
 
     public SseOutboundChannel(StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
-                              @Value("${snail.notify.push.enabled:true}") boolean enabled) {
+                              SnailNotifyProperties props) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
-        this.enabled = enabled;
+        this.enabled = props.getPush().isEnabled();
     }
 
     @Override

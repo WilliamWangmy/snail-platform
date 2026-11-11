@@ -1,10 +1,10 @@
 package com.snail.platform.function.external.client;
 
 import com.snail.platform.function.external.api.SmsPort;
+import com.snail.platform.function.external.config.SnailExternalProperties;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -25,10 +25,9 @@ public class MockSmsClient extends AbstractExternalClient implements SmsPort {
     /** 开发自测便利开关:打开后码值随日志回显,默认关闭守住"码不落日志"口径 */
     private final boolean echoCode;
 
-    public MockSmsClient(ExternalCallLedger ledger,
-                         @Value("${snail.external.sms.mock-echo-code:false}") boolean echoCode) {
+    public MockSmsClient(ExternalCallLedger ledger, SnailExternalProperties props) {
         super(ledger);
-        this.echoCode = echoCode;
+        this.echoCode = props.getSms().isMockEchoCode();
     }
 
     @Override

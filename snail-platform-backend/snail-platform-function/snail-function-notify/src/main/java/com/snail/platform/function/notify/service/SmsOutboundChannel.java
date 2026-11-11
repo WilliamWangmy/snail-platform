@@ -2,8 +2,8 @@ package com.snail.platform.function.notify.service;
 
 import cn.hutool.core.util.StrUtil;
 import com.snail.platform.function.external.api.SmsPort;
+import com.snail.platform.function.notify.SnailNotifyProperties;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,10 +21,9 @@ public class SmsOutboundChannel implements OutboundChannel {
     /** 流程待办通用模板编码:阿里云报备后回填,缺省空 = 通道不可用 */
     private final String todoTemplateCode;
 
-    public SmsOutboundChannel(ObjectProvider<SmsPort> smsPort,
-                              @Value("${snail.notify.sms.templates.todo:}") String todoTemplateCode) {
+    public SmsOutboundChannel(ObjectProvider<SmsPort> smsPort, SnailNotifyProperties props) {
         this.smsPort = smsPort;
-        this.todoTemplateCode = todoTemplateCode;
+        this.todoTemplateCode = props.getSms().getTemplates().getTodo();
     }
 
     @Override

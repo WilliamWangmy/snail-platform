@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.snail.platform.function.external.api.SmsPort;
+import com.snail.platform.function.notify.SnailNotifyProperties;
 import com.snail.platform.function.notify.service.OutboundChannel.OutboundMessage;
 import com.snail.platform.function.notify.service.OutboundChannel.OutboundTarget;
 import java.util.List;
@@ -25,27 +26,34 @@ class SmsOutboundChannelTest {
 
     private final SmsPort smsPort = mock(SmsPort.class);
 
+    /** 待办模板编码注入配置类实例,等价原散参 */
+    private static SnailNotifyProperties propsWithTodo(String todo) {
+        SnailNotifyProperties props = new SnailNotifyProperties();
+        props.getSms().getTemplates().setTodo(todo);
+        return props;
+    }
+
     @Test
     void unavailableWhenTemplateBlank() {
         when(smsPort.available()).thenReturn(true);
-        assertThat(new SmsOutboundChannel(providerOf(smsPort), "  ").available()).isFalse();
+        assertThat(new SmsOutboundChannel(providerOf(smsPort), propsWithTodo("  ")).available()).isFalse();
     }
 
     @Test
     void unavailableWhenPortAbsent() {
-        assertThat(new SmsOutboundChannel(providerOf(null), "SMS_TODO").available()).isFalse();
+        assertThat(new SmsOutboundChannel(providerOf(null), propsWithTodo("SMS_TODO")).available()).isFalse();
     }
 
     @Test
     void availableWhenPortReadyAndTemplateConfigured() {
         when(smsPort.available()).thenReturn(true);
-        assertThat(new SmsOutboundChannel(providerOf(smsPort), "SMS_TODO").available()).isTrue();
+        assertThat(new SmsOutboundChannel(providerOf(smsPort), propsWithTodo("SMS_TODO")).available()).isTrue();
     }
 
     @Test
     void sendSkipsBlankPhonesAndSendsEachNumber() throws Exception {
         when(smsPort.available()).thenReturn(true);
-        SmsOutboundChannel channel = new SmsOutboundChannel(providerOf(smsPort), "SMS_TODO");
+        SmsOutboundChannel channel = new SmsOutboundChannel(providerOf(smsPort), propsWithTodo("SMS_TODO"));
         OutboundMessage message = new OutboundMessage(42L, "待办提醒", "内容", "workflow",
                 List.of(new OutboundTarget(1L, null, "13800000001"),
                         new OutboundTarget(2L, null, null),
@@ -71,7 +79,7 @@ class SmsOutboundChannelTest {
     @Test
     void sendWithAllBlankPhonesIsSilentSuccess() throws Exception {
         when(smsPort.available()).thenReturn(true);
-        SmsOutboundChannel channel = new SmsOutboundChannel(providerOf(smsPort), "SMS_TODO");
+        SmsOutboundChannel channel = new SmsOutboundChannel(providerOf(smsPort), propsWithTodo("SMS_TODO"));
         OutboundMessage message = new OutboundMessage(1L, "t", "c", "workflow",
                 List.of(new OutboundTarget(1L, null, null)), null);
 

@@ -4,8 +4,8 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.snail.platform.function.external.api.ExternalCallException;
 import com.snail.platform.function.external.api.SocialAuthPort;
+import com.snail.platform.function.external.config.SnailExternalProperties;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -29,16 +29,21 @@ public class FeishuAuthClient extends AbstractSocialAuthClient {
     /** 读取登录用户信息 */
     private static final String USERINFO = "https://open.feishu.cn/open-apis/authen/v1/user_info";
 
-    private final String appId;
+    /** 凭据与开关的类型化配置单点,取 snail.external.oauth.feishu 段 */
+    private final SnailExternalProperties props;
 
-    private final String appSecret;
-
-    public FeishuAuthClient(ExternalCallLedger ledger,
-                            @Value("${snail.external.oauth.feishu.app-id:}") String appId,
-                            @Value("${snail.external.oauth.feishu.app-secret:}") String appSecret) {
+    public FeishuAuthClient(ExternalCallLedger ledger, SnailExternalProperties props) {
         super(ledger);
-        this.appId = appId;
-        this.appSecret = appSecret;
+        this.props = props;
+    }
+
+    /** 飞书凭据;凭据缺失时 available()=false 即入口不可用,不阻断启动 */
+    private String appId() {
+        return props.getOauth().getFeishu().getAppId();
+    }
+
+    private String appSecret() {
+        return props.getOauth().getFeishu().getAppSecret();
     }
 
     @Override
@@ -53,13 +58,13 @@ public class FeishuAuthClient extends AbstractSocialAuthClient {
 
     @Override
     public boolean available() {
-        return notBlank(appId) && notBlank(appSecret);
+        return notBlank(appId()) && notBlank(appSecret());
     }
 
     @Override
     public String authorizeUrl(String redirectUri, String state) {
         return AUTHORIZE
-                + "?app_id=" + urlEncode(appId)
+                + "?app_id=" + urlEncode(appId())
                 + "&redirect_uri=" + urlEncode(redirectUri)
                 + "&response_type=code"
                 + "&state=" + urlEncode(state);
@@ -73,8 +78,8 @@ public class FeishuAuthClient extends AbstractSocialAuthClient {
         // 1. 授权码换用户访问令牌:clientSecret 只在请求体,快照不落密钥
         String tokenBody = JSONUtil.toJsonStr(Map.of(
                 "grant_type", "authorization_code",
-                "client_id", appId,
-                "client_secret", appSecret,
+                "client_id", appId(),
+                "client_secret", appSecret(),
                 "code", code,
                 "redirect_uri", redirectUri));
         JSONObject tokenResp = parse(postJson(TOKEN, tokenBody, "oauth-token"), "oauth-token");

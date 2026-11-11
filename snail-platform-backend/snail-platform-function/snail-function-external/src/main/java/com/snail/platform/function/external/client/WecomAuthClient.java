@@ -3,8 +3,8 @@ package com.snail.platform.function.external.client;
 import cn.hutool.json.JSONObject;
 import com.snail.platform.function.external.api.ExternalCallException;
 import com.snail.platform.function.external.api.SocialAuthPort;
+import com.snail.platform.function.external.config.SnailExternalProperties;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -32,20 +32,25 @@ public class WecomAuthClient extends AbstractSocialAuthClient {
     /** 成员详情(姓名/头像/手机号) */
     private static final String GETUSER = "https://qyapi.weixin.qq.com/cgi-bin/user/get";
 
-    private final String corpId;
+    /** 凭据与开关的类型化配置单点,取 snail.external.oauth.wecom 段 */
+    private final SnailExternalProperties props;
 
-    private final String agentId;
-
-    private final String corpSecret;
-
-    public WecomAuthClient(ExternalCallLedger ledger,
-                           @Value("${snail.external.oauth.wecom.corp-id:}") String corpId,
-                           @Value("${snail.external.oauth.wecom.agent-id:}") String agentId,
-                           @Value("${snail.external.oauth.wecom.corp-secret:}") String corpSecret) {
+    public WecomAuthClient(ExternalCallLedger ledger, SnailExternalProperties props) {
         super(ledger);
-        this.corpId = corpId;
-        this.agentId = agentId;
-        this.corpSecret = corpSecret;
+        this.props = props;
+    }
+
+    /** 企业微信凭据;任一缺失时 available()=false 即入口不可用,不阻断启动 */
+    private String corpId() {
+        return props.getOauth().getWecom().getCorpId();
+    }
+
+    private String agentId() {
+        return props.getOauth().getWecom().getAgentId();
+    }
+
+    private String corpSecret() {
+        return props.getOauth().getWecom().getCorpSecret();
     }
 
     @Override
@@ -60,14 +65,14 @@ public class WecomAuthClient extends AbstractSocialAuthClient {
 
     @Override
     public boolean available() {
-        return notBlank(corpId) && notBlank(agentId) && notBlank(corpSecret);
+        return notBlank(corpId()) && notBlank(agentId()) && notBlank(corpSecret());
     }
 
     @Override
     public String authorizeUrl(String redirectUri, String state) {
         return AUTHORIZE
-                + "?appid=" + urlEncode(corpId)
-                + "&agentid=" + urlEncode(agentId)
+                + "?appid=" + urlEncode(corpId())
+                + "&agentid=" + urlEncode(agentId())
                 + "&redirect_uri=" + urlEncode(redirectUri)
                 + "&state=" + urlEncode(state);
     }
@@ -76,7 +81,7 @@ public class WecomAuthClient extends AbstractSocialAuthClient {
     public SocialIdentity exchange(String code, String redirectUri) {
         // 1. 企业凭证换应用令牌:corpsecret 只在查询串,快照只落基址;首版每次现取不缓存(NFR-008)
         JSONObject tokenResp = parse(getJson(GETTOKEN,
-                Map.of("corpid", corpId, "corpsecret", corpSecret), null, "oauth-corp-token"),
+                Map.of("corpid", corpId(), "corpsecret", corpSecret()), null, "oauth-corp-token"),
                 "oauth-corp-token");
         assertWxworkOk(tokenResp, "oauth-corp-token");
         String accessToken = requireField(tokenResp, "access_token", "oauth-corp-token", "企业微信返回的应用令牌为空");

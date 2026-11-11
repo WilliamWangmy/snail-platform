@@ -1,5 +1,6 @@
 package com.snail.platform.function.auth.service;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import cn.hutool.extra.servlet.JakartaServletUtil;
 import cn.hutool.http.useragent.UserAgent;
@@ -11,6 +12,7 @@ import com.snail.platform.framework.security.token.JwtTokenService;
 import com.snail.platform.framework.security.token.SnailPrincipal;
 import com.snail.platform.framework.redis.SnailRateGuard;
 import com.snail.platform.framework.redis.SnailRedisKeys;
+import com.snail.platform.function.auth.SnailAuthProperties;
 import com.snail.platform.function.auth.dto.LoginAccountsVO;
 import com.snail.platform.function.auth.dto.LoginRequest;
 import com.snail.platform.function.auth.dto.LoginSuccessVO;
@@ -44,7 +46,6 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -179,13 +180,7 @@ public class AuthService {
                        OAuthStateService oauthStateService, OAuthPickService oauthPickService,
                        SysUserIdentityMapper userIdentityMapper, List<SocialAuthPort> socialAuthPorts,
                        SnailRateGuard rateGuard, StringRedisTemplate redisTemplate,
-                       @Value("${snail.auth.sms-login.enabled:true}") boolean smsLoginEnabled,
-                       @Value("${snail.external.sms.login-template-code:}") String smsLoginTemplateCode,
-                       @Value("${snail.auth.oauth.enabled:true}") boolean oauthEnabled,
-                       @Value("${snail.auth.oauth.phone-bind.enabled:true}") boolean oauthPhoneBindEnabled,
-                       @Value("${snail.auth.oauth.sources.dingtalk.redirect-uris:}") String dingtalkRedirectUris,
-                       @Value("${snail.auth.oauth.sources.feishu.redirect-uris:}") String feishuRedirectUris,
-                       @Value("${snail.auth.oauth.sources.wecom.redirect-uris:}") String wecomRedirectUris) {
+                       SnailAuthProperties authProps) {
         this.userMapper = userMapper;
         this.tenantMapper = tenantMapper;
         this.loginLogMapper = loginLogMapper;
@@ -202,13 +197,15 @@ public class AuthService {
         this.socialAuthPorts = socialAuthPorts;
         this.rateGuard = rateGuard;
         this.redisTemplate = redisTemplate;
-        this.smsLoginEnabled = smsLoginEnabled;
-        this.smsLoginTemplateCode = smsLoginTemplateCode;
-        this.oauthEnabled = oauthEnabled;
-        this.oauthPhoneBindEnabled = oauthPhoneBindEnabled;
-        this.dingtalkRedirectUris = parseRedirectUris(dingtalkRedirectUris);
-        this.feishuRedirectUris = parseRedirectUris(feishuRedirectUris);
-        this.wecomRedirectUris = parseRedirectUris(wecomRedirectUris);
+        // 开关与白名单收口在配置类:短信登录开关与模板、OAuth 总开关与 JIT 绑定、三来源回调白名单
+        this.smsLoginEnabled = authProps.getSmsLogin().isEnabled();
+        // 模板编码在共享 yml 以注释模板占位,解开前为 null;归一为空串对齐原 @Value 缺省口径
+        this.smsLoginTemplateCode = StrUtil.nullToEmpty(authProps.getSmsLogin().getLoginTemplateCode());
+        this.oauthEnabled = authProps.getOauth().isEnabled();
+        this.oauthPhoneBindEnabled = authProps.getOauth().getPhoneBind().isEnabled();
+        this.dingtalkRedirectUris = parseRedirectUris(authProps.getOauth().getSources().getDingtalk().getRedirectUris());
+        this.feishuRedirectUris = parseRedirectUris(authProps.getOauth().getSources().getFeishu().getRedirectUris());
+        this.wecomRedirectUris = parseRedirectUris(authProps.getOauth().getSources().getWecom().getRedirectUris());
     }
 
     /**

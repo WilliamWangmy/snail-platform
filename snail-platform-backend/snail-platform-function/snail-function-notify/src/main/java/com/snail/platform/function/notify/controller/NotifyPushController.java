@@ -1,10 +1,10 @@
 package com.snail.platform.function.notify.controller;
 
 import com.snail.platform.framework.core.exception.BizException;
+import com.snail.platform.function.notify.SnailNotifyProperties;
 import com.snail.platform.function.notify.service.NotifyPushService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,10 +29,9 @@ public class NotifyPushController {
     /** SSE 会话与推送单点 */
     private final NotifyPushService pushService;
 
-    public NotifyPushController(NotifyPushService pushService,
-                                @Value("${snail.notify.push.enabled:true}") boolean enabled) {
+    public NotifyPushController(NotifyPushService pushService, SnailNotifyProperties props) {
         this.pushService = pushService;
-        this.enabled = enabled;
+        this.enabled = props.getPush().isEnabled();
     }
 
     @PreAuthorize("isAuthenticated()")

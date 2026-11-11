@@ -2,12 +2,12 @@ package com.snail.platform.function.external.client;
 
 import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
+import com.snail.platform.function.external.config.SnailExternalProperties;
 import com.snail.platform.function.external.api.ExternalCallException;
 import com.snail.platform.function.external.api.MailPort;
 import jakarta.mail.internet.MimeMessage;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
@@ -22,16 +22,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class SmtpMailClient extends AbstractExternalClient implements MailPort {
 
-    /** 发件人地址,取邮件账号自身;JavaMailSender 在场时该配置必有值,缺省仅兜底占位 */
-    @Value("${spring.mail.username:snail-platform@noreply.local}")
-    private String from;
+    /** 发件人地址:取 snail.external.mail.from,yml 缺省回退 SMTP 账号自身(spring.mail.username) */
+    private final String from;
 
     /** 邮件发送器,可能缺席 */
     private final ObjectProvider<JavaMailSender> mailSenders;
 
-    public SmtpMailClient(ExternalCallLedger ledger, ObjectProvider<JavaMailSender> mailSenders) {
+    public SmtpMailClient(ExternalCallLedger ledger, ObjectProvider<JavaMailSender> mailSenders,
+                          SnailExternalProperties props) {
         super(ledger);
         this.mailSenders = mailSenders;
+        // 发件人在共享 yml 以注释模板占位,解开前为 null;兜底占位地址对齐原 @Value 缺省口径
+        this.from = StrUtil.blankToDefault(props.getMail().getFrom(), "snail-platform@noreply.local");
     }
 
     @Override

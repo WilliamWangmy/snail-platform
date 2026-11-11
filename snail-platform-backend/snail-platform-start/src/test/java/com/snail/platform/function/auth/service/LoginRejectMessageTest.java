@@ -14,6 +14,7 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.redis.SnailRateGuard;
 import com.snail.platform.framework.security.token.JwtTokenService;
+import com.snail.platform.function.auth.SnailAuthProperties;
 import com.snail.platform.function.auth.dto.LoginRequest;
 import com.snail.platform.function.external.api.SmsPort;
 import com.snail.platform.function.system.log.entity.SysLoginLog;
@@ -70,7 +71,8 @@ class LoginRejectMessageTest {
                 mock(SnailRateGuard.class),
                 // 统计键写入面:mock 桩,opsForSet 返回 null 触发的 NPE 由 writeLoginLog 内 try/catch 吞掉
                 mock(StringRedisTemplate.class),
-                true, "", true, true, "", "", "");
+                // 配置类用缺省实例:开关全 true、模板编码与白名单为空,与原散参 true,"",true,true,"","","" 等价
+                new SnailAuthProperties());
     }
 
     /** 验证码四种失败都要原样回给用户,且发生在定位用户之前、不进账号锁定桶 */
