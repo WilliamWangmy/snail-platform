@@ -50,6 +50,13 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '个人中心', icon: 'user', breadcrumb: ['个人中心'], viewName: 'ProfileView' },
       },
       {
+        // 系统设置:入口在顶栏账号下拉,不在侧栏菜单里
+        path: '/settings',
+        name: 'settings',
+        component: () => import('@/views/settings/index.vue'),
+        meta: { title: '系统设置', icon: 'settings', breadcrumb: ['系统设置'], viewName: 'SettingsView' },
+      },
+      {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/views/error/NotFound.vue'),

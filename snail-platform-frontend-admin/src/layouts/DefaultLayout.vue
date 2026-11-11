@@ -7,7 +7,6 @@ import NotifyToast from '@/components/NotifyToast.vue';
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import TabBar from '@/components/TabBar.vue';
-import ThemePicker from '@/components/ThemePicker.vue';
 import { fetchUnreadCount, pageInbox, type NotifyInboxItem } from '@/api/notify';
 import { useNotifyPush } from '@/composables/useNotifyPush';
 import { useAuthStore } from '@/stores/auth';
@@ -23,13 +22,6 @@ const layout = useLayoutStore();
 
 /** 布局内导航即登记页签;布局外路由(登录/403 等)不经过这里。 */
 watch(() => route.fullPath, () => tabs.addTab(route), { immediate: true });
-
-/** 页签/单页模式切换:切到单页时收敛页签只留当前页,再开页签时不会冒出一串旧页签。 */
-function toggleTabMode(): void {
-  const next = !layout.tabMode;
-  layout.setTabMode(next);
-  if (!next) tabs.closeOthers(route.fullPath);
-}
 
 /** 顶栏刷新当前页:经 /redirect 中转强制重载,页签与单页两种模式下都可用。 */
 function refreshCurrent(): void {
@@ -122,6 +114,7 @@ function handleUserCommand(command: string | number | object): void {
   if (command === 'logout') void signOut();
   else if (command === 'profile') profileVisible.value = true;
   else if (command === 'password') passwordVisible.value = true;
+  else if (command === 'settings') void router.push('/settings');
 }
 
 /* ------------------------- 通知:30s 轮询未读数(兜底),SSE 推送(加速) ------------------------- */
@@ -287,23 +280,6 @@ onBeforeUnmount(() => {
           />
         </ElButton>
         <ElTooltip
-          :content="layout.tabMode ? '当前：多页签模式，点击切换为单页' : '当前：单页模式，点击切换为多页签'"
-          placement="bottom"
-        >
-          <ElButton
-            text
-            circle
-            class="topbar-icon"
-            :aria-label="layout.tabMode ? '切换为单页模式' : '切换为多页签模式'"
-            @click="toggleTabMode"
-          >
-            <AppIcon
-              :name="layout.tabMode ? 'columns' : 'menu'"
-              :size="17"
-            />
-          </ElButton>
-        </ElTooltip>
-        <ElTooltip
           content="刷新当前页"
           placement="bottom"
         >
@@ -404,7 +380,6 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </ElPopover>
-          <ThemePicker />
           <ElDropdown
             trigger="click"
             popper-class="system-switch-popper"
@@ -475,6 +450,15 @@ onBeforeUnmount(() => {
                       :size="14"
                     />
                     个人信息
+                  </span>
+                </ElDropdownItem>
+                <ElDropdownItem command="settings">
+                  <span class="user-item">
+                    <AppIcon
+                      name="settings"
+                      :size="14"
+                    />
+                    系统设置
                   </span>
                 </ElDropdownItem>
                 <ElDropdownItem command="password">
