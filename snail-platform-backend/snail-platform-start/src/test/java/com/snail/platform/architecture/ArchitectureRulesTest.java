@@ -98,7 +98,10 @@ class ArchitectureRulesTest {
             "user->role", "user->org", "user->tenant",
             "role->user", "role->org", "role->menu",
             "org->user", "org->role",
-            "tenant->org", "tenant->role", "tenant->user");
+            "tenant->org", "tenant->role", "tenant->user",
+            // tenant->log 租户详情统计的分端登录回填(租户管理增强 §5.6:usage-stats lazy 自愈
+            // 按 sys_login_log 事实源回填,单条只读 SELECT;先改名单再改代码)
+            "tenant->log");
 
     /**
      * workflow 内登记在案的跨子域边:

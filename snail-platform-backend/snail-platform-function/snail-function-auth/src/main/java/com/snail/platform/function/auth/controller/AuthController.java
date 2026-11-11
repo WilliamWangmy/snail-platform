@@ -100,7 +100,7 @@ public class AuthController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "当前登录人(身份+组织/租户名称+生效角色)")
+    @Operation(summary = "当前登录人(身份+组织/租户名称+生效角色+租户五系统开通态)")
     @GetMapping("/me")
     public R<LoginUserVO> me() {
         LoginUser loginUser = LoginUserContextHolder.get();
@@ -108,6 +108,9 @@ public class AuthController {
         if (loginUser == null) {
             throw BizException.unauthorized("未认证");
         }
-        return R.ok(LoginUserVO.of(loginUser, authorityProvider.authoritiesOf(loginUser.userId())));
+        // tenantFeatures 实时查 sys_tenant(设计 v1.3 落点:me 组装在控制器,查询经 AuthService):
+        // 不进 JWT、不进登录快照,开关改动对下一次 /me 即时生效,workflow/dashboard 守卫据此踢会话
+        return R.ok(LoginUserVO.of(loginUser, authorityProvider.authoritiesOf(loginUser.userId()))
+                .withTenantFeatures(authService.tenantFeaturesOf(loginUser.tenantId())));
     }
 }

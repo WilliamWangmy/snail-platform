@@ -18,12 +18,13 @@ public record LoginLogVO(
         @Schema(description = "客户端IP") String ip,
         @Schema(description = "浏览器") String browser,
         @Schema(description = "操作系统") String os,
+        @Schema(description = "登录端:admin/workflow/app/miniapp/dashboard/portal,历史行 admin") String scene,
         @Schema(description = "结果:1成功 0失败") Integer status,
         @Schema(description = "结果说明") String msg,
         @Schema(description = "登录时间") LocalDateTime loginTime) {
 
     public static LoginLogVO of(SysLoginLog log) {
         return new LoginLogVO(log.getId(), log.getTenantId(), log.getUsername(), log.getUserId(),
-                log.getIp(), log.getBrowser(), log.getOs(), log.getStatus(), log.getMsg(), log.getLoginTime());
+                log.getIp(), log.getBrowser(), log.getOs(), log.getScene(), log.getStatus(), log.getMsg(), log.getLoginTime());
     }
 }

@@ -19,6 +19,12 @@ public final class SnailRedisKeys {
     /** 在线会话索引,按租户的 SET:snail:online:idx:{tenantId} */
     public static final String ONLINE_INDEX = PREFIX + "online:idx:";
 
+    /** 分端登录用户统计,按租户与登录端的永久 SET:snail:stat:login:{tenantId}:{scene} */
+    public static final String STAT_LOGIN = PREFIX + "stat:login:";
+
+    /** 分端日活跃统计,按租户与日期的 SET(48h 过期):snail:stat:active:{tenantId}:{yyyyMMdd} */
+    public static final String STAT_ACTIVE = PREFIX + "stat:active:";
+
     private SnailRedisKeys() {
     }
 
@@ -30,5 +36,19 @@ public final class SnailRedisKeys {
     /** 租户在线会话索引键(集合成员为用户 ID):snail:online:idx:{tenantId} */
     public static String onlineIndex(Long tenantId) {
         return ONLINE_INDEX + tenantId;
+    }
+
+    /**
+     * 分端登录用户统计键:snail:stat:login:{tenantId}:{scene}。
+     * 永久 SET,登录成功收尾 SADD;读侧 SCARD,键丢失由 sys_login_log lazy 自愈回填(统计层设计 §5.6),
+     * 无外部消费依赖,可整段清理重自愈。
+     */
+    public static String statLogin(Long tenantId, String scene) {
+        return STAT_LOGIN + tenantId + ":" + scene;
+    }
+
+    /** 分端日活跃统计键:snail:stat:active:{tenantId}:{yyyyMMdd},48h TTL,预留展示位 */
+    public static String statActive(Long tenantId, String day) {
+        return STAT_ACTIVE + tenantId + ":" + day;
     }
 }

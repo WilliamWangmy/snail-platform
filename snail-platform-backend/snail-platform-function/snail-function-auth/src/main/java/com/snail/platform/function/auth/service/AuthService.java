@@ -10,9 +10,11 @@ import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.security.token.JwtTokenService;
 import com.snail.platform.framework.security.token.SnailPrincipal;
 import com.snail.platform.framework.redis.SnailRateGuard;
+import com.snail.platform.framework.redis.SnailRedisKeys;
 import com.snail.platform.function.auth.dto.LoginAccountsVO;
 import com.snail.platform.function.auth.dto.LoginRequest;
 import com.snail.platform.function.auth.dto.LoginSuccessVO;
+import com.snail.platform.function.auth.dto.LoginUserVO;
 import com.snail.platform.function.auth.dto.OAuthAuthorizeVO;
 import com.snail.platform.function.auth.dto.OAuthLoginRequest;
 import com.snail.platform.function.auth.dto.OAuthPickRequest;
@@ -34,6 +36,7 @@ import com.snail.platform.function.system.user.mapper.SysUserIdentityMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +80,12 @@ public class AuthService {
 
     /** pick 成功后登录日志里的路径标注 */
     private static final String PICK_NOTE = "(选择租户)";
+
+    /** 日活跃统计键的日期段格式:snail:stat:active:{tenantId}:{yyyyMMdd} */
+    private static final DateTimeFormatter STAT_DAY = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    /** 日活跃统计键的过期窗口:48h(跨天余量,过期即昨日数据自然退场) */
+    private static final Duration STAT_ACTIVE_TTL = Duration.ofHours(48);
 
     /** 第三方登录方式编码,落登录日志 login_type 列,与 V10 迁移预留一致 */
     private static final String LOGIN_TYPE_DINGTALK = "dingtalk";
@@ -149,6 +159,9 @@ public class AuthService {
     /** 第三方扫码登录总开关,灰度/回滚用;false 时四端点统一报"登录方式未开放" */
     private final boolean oauthEnabled;
 
+    /** Valkey 存取:登录成功统计键(stat:login/stat:active)的写入面,统计层设计 §5.6 */
+    private final StringRedisTemplate redisTemplate;
+
     /** 手机号 JIT 绑定开关:未绑定身份按厂商实名手机号自动关联唯一可用账号并落绑定 */
     private final boolean oauthPhoneBindEnabled;
 
@@ -165,7 +178,7 @@ public class AuthService {
                        LoginPickService pickService, ObjectProvider<SmsPort> smsPortProvider,
                        OAuthStateService oauthStateService, OAuthPickService oauthPickService,
                        SysUserIdentityMapper userIdentityMapper, List<SocialAuthPort> socialAuthPorts,
-                       SnailRateGuard rateGuard,
+                       SnailRateGuard rateGuard, StringRedisTemplate redisTemplate,
                        @Value("${snail.auth.sms-login.enabled:true}") boolean smsLoginEnabled,
                        @Value("${snail.external.sms.login-template-code:}") String smsLoginTemplateCode,
                        @Value("${snail.auth.oauth.enabled:true}") boolean oauthEnabled,
@@ -188,6 +201,7 @@ public class AuthService {
         this.userIdentityMapper = userIdentityMapper;
         this.socialAuthPorts = socialAuthPorts;
         this.rateGuard = rateGuard;
+        this.redisTemplate = redisTemplate;
         this.smsLoginEnabled = smsLoginEnabled;
         this.smsLoginTemplateCode = smsLoginTemplateCode;
         this.oauthEnabled = oauthEnabled;
@@ -205,8 +219,10 @@ public class AuthService {
         // 先去空白:锁定键与用户定位必须用同一字面量,否则 "admin " 会分裂成另一个计数桶
         String username = request.username().trim();
         String ip = JakartaServletUtil.getClientIP(http);
+        // 登录端归一:请求不带 scene 按 admin(管理系统)处理;非法值已被 DTO @Pattern 在参数校验层拦下
+        String scene = LoginScene.normalize(request.scene());
         if (failGuard.isCredentialLocked(ip, username)) {
-            writeLoginLog(http, 0L, username, null, 0, LOCKED_MESSAGE, LOGIN_TYPE_PASSWORD);
+            writeLoginLog(http, 0L, username, null, 0, LOCKED_MESSAGE, LOGIN_TYPE_PASSWORD, scene);
             throw BizException.badRequest(LOCKED_MESSAGE);
         }
         SysUser user = null;
@@ -233,6 +249,9 @@ public class AuthService {
             if (Objects.equals(user.getStatus(), 1)) {
                 throw new LoginRejects.Access("账号已停用");
             }
+            // scene 闸:租户未开通该端即准入拒绝——加在状态检查后、密码比对前(D-02):
+            // 对外由 catch 统一改写"账号或密码错误"防枚举,细粒度原因「租户未开通{端名}」只进登录日志
+            requireSceneEnabled(tenant, scene);
             // 口令比对放在状态检查之后:前置步骤都不需要哈希,停用账号在这一步之前就被拒
             if (!BCrypt.checkpw(request.password(), user.getPassword())) {
                 throw new LoginRejects.Credential("账号或密码错误");
@@ -242,7 +261,7 @@ public class AuthService {
             String token = jwtTokenService.issue(
                     new SnailPrincipal(user.getUserId(), user.getTenantId(), user.getUsername(),
                             user.getOrgId(), user.getTokenVersion()));
-            writeLoginLog(http, user.getTenantId(), username, user.getUserId(), 1, "登录成功", LOGIN_TYPE_PASSWORD);
+            writeLoginLog(http, user.getTenantId(), username, user.getUserId(), 1, "登录成功", LOGIN_TYPE_PASSWORD, scene);
             return new LoginSuccessVO(token, "Bearer", jwtTokenService.expiresInSeconds(),
                     user.getUserId(), user.getUsername(), user.getNickname(),
                     user.getTenantId(), tenant.getName(),
@@ -254,7 +273,7 @@ public class AuthService {
             // 对外的准入类拒绝统一口径为"账号或密码错误"防账号枚举——验证码已过即可探测状态差异
             Long tenantId = user != null ? user.getTenantId() : 0L;
             Long userId = user != null ? user.getUserId() : null;
-            writeLoginLog(http, tenantId, username, userId, 0, e.getMessage(), LOGIN_TYPE_PASSWORD);
+            writeLoginLog(http, tenantId, username, userId, 0, e.getMessage(), LOGIN_TYPE_PASSWORD, scene);
             if (e instanceof LoginRejects.Credential) {
                 failGuard.increaseCredentialFail(ip, username);
                 throw e;
@@ -309,8 +328,10 @@ public class AuthService {
         requireSmsLoginEnabled();
         String phone = request.phone().trim();
         String ip = JakartaServletUtil.getClientIP(http);
+        // 登录端归一:多账号命中时该 scene 会由 SmsPickRequest 在 pick 链重传(v1.3),两处必须一致
+        String scene = LoginScene.normalize(request.scene());
         if (failGuard.isCredentialLocked(ip, phone)) {
-            writeLoginLog(http, 0L, phone, null, 0, LOCKED_MESSAGE, LOGIN_TYPE_SMS);
+            writeLoginLog(http, 0L, phone, null, 0, LOCKED_MESSAGE, LOGIN_TYPE_SMS, scene);
             throw BizException.badRequest(LOCKED_MESSAGE);
         }
         SysUser located = null;
@@ -323,14 +344,14 @@ public class AuthService {
             if (hits.size() == 1) {
                 SysUser user = hits.get(0);
                 located = user;
-                SysTenant tenant = requireAccessible(user);
-                return issueSmsToken(user, tenant, ip, phone, http, "");
+                SysTenant tenant = requireAccessible(user, scene);
+                return issueSmsToken(user, tenant, ip, phone, http, scene, "");
             }
-            // 多命中:候选按 user_id 升序(hits 已排序);停用/到期的候选静默剔除,全部被剔按统一口径拒
+            // 多命中:候选按 user_id 升序(hits 已排序);停用/到期/未开通该端的候选静默剔除,全部被剔按统一口径拒
             List<SysUser> candidates = hits.stream()
                     .filter(user -> {
                         try {
-                            requireAccessible(user);
+                            requireAccessible(user, scene);
                             return true;
                         } catch (BizException rejected) {
                             return false;
@@ -346,7 +367,7 @@ public class AuthService {
             // 定位失败记 0=归属不明;命中后拒绝的行带出租户与用户,日志留细粒度原因
             Long tenantId = located != null ? located.getTenantId() : 0L;
             Long userId = located != null ? located.getUserId() : null;
-            writeLoginLog(http, tenantId, phone, userId, 0, e.getMessage(), LOGIN_TYPE_SMS);
+            writeLoginLog(http, tenantId, phone, userId, 0, e.getMessage(), LOGIN_TYPE_SMS, scene);
             if (e instanceof LoginRejects.Credential) {
                 failGuard.increaseCredentialFail(ip, phone);
                 throw e;
@@ -372,13 +393,17 @@ public class AuthService {
             if (chosen == null) {
                 throw BizException.badRequest("选择已过期,请重新登录");
             }
-            SysTenant tenant = requireAccessible(chosen);
+            // pick 是独立二次调用,原 login-sms 的 scene 传不过来(v1.3):随选账号请求重传,
+            // 同一套 scene 闸在换令牌前再过一遍——选择等待期间租户可能被收回该端
+            String scene = LoginScene.normalize(request.scene());
+            SysTenant tenant = requireAccessible(chosen, scene);
             return issueSmsToken(chosen, tenant, JakartaServletUtil.getClientIP(http),
-                    chosen.getPhone(), http, PICK_NOTE);
+                    chosen.getPhone(), http, scene, PICK_NOTE);
         } catch (BizException e) {
             Long tenantId = chosen != null ? chosen.getTenantId() : 0L;
             writeLoginLog(http, tenantId, chosen != null ? chosen.getPhone() : "unknown",
-                    chosen != null ? chosen.getUserId() : null, 0, e.getMessage(), LOGIN_TYPE_SMS);
+                    chosen != null ? chosen.getUserId() : null, 0, e.getMessage(), LOGIN_TYPE_SMS,
+                    LoginScene.normalize(request.scene()));
             // 只把准入类(租户/账号停用)统一成凭证文案防枚举;pickKey 失效等流程提示原样回,
             // 否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
             throw e instanceof LoginRejects.Access
@@ -387,10 +412,12 @@ public class AuthService {
     }
 
     /**
-     * 租户/用户状态闸:租户行缺失与显式停用同口径报"租户已停用",到期另报;停用账号报"账号已停用"。
-     * 通过则返回租户行(签发 VO 要租户名);具体原因只进登录日志,对外由调用方统一文案。
+     * 租户/用户状态闸 + scene 开通闸:租户行缺失与显式停用同口径报"租户已停用",到期另报;
+     * 停用账号报"账号已停用";scene 对应端未开通报「租户未开通{端名}」——细粒度原因只进登录日志,
+     * 对外由调用方统一文案(D-02 防枚举)。
+     * 通过则返回租户行(签发 VO 要租户名)。
      */
-    private SysTenant requireAccessible(SysUser user) {
+    private SysTenant requireAccessible(SysUser user, String scene) {
         SysTenant tenant = tenantMapper.selectById(user.getTenantId());
         if (tenant == null || Objects.equals(tenant.getStatus(), 1)) {
             throw new LoginRejects.Access("租户已停用");
@@ -401,28 +428,53 @@ public class AuthService {
         if (Objects.equals(user.getStatus(), 1)) {
             throw new LoginRejects.Access("账号已停用");
         }
+        requireSceneEnabled(tenant, scene);
         return tenant;
+    }
+
+    /**
+     * scene 闸:按 LoginScene 常量集把 scene 映射到 sys_tenant 对应开关列——
+     * admin→admin_enabled、workflow→workflow_enabled、app/miniapp→mobile_enabled(D-06 单开关双 scene)、
+     * dashboard→dashboard_enabled、portal→portal_enabled。
+     * 未开通抛 LoginRejects.Access(准入类:不计失败数、对外统一文案);
+     * 开关实时读 sys_tenant 不走缓存(NFR-4:开关变更对新登录立即生效)。
+     * oauth 链本期缺省 admin(ASM-3),调用方直接传 LoginScene.ADMIN。
+     */
+    private void requireSceneEnabled(SysTenant tenant, String scene) {
+        boolean enabled = switch (scene) {
+            case LoginScene.ADMIN -> Integer.valueOf(1).equals(tenant.getAdminEnabled());
+            case LoginScene.WORKFLOW -> Integer.valueOf(1).equals(tenant.getWorkflowEnabled());
+            case LoginScene.APP, LoginScene.MINIAPP -> Integer.valueOf(1).equals(tenant.getMobileEnabled());
+            case LoginScene.DASHBOARD -> Integer.valueOf(1).equals(tenant.getDashboardEnabled());
+            case LoginScene.PORTAL -> Integer.valueOf(1).equals(tenant.getPortalEnabled());
+            // 理论不可达:DTO @Pattern 已在参数校验层拦下白名单外的值
+            default -> throw BizException.badRequest("非法的登录端");
+        };
+        if (!enabled) {
+            throw new LoginRejects.Access("租户未开通" + LoginScene.label(scene));
+        }
     }
 
     /** 签发短信登录令牌并落成功日志;计数清零键是"来源+手机号",与失败计数同一把尺 */
     private LoginSuccessVO issueSmsToken(SysUser user, SysTenant tenant, String ip,
-                                         String phone, HttpServletRequest http, String note) {
+                                         String phone, HttpServletRequest http, String scene, String note) {
         failGuard.clearCredentialFails(ip, phone);
-        return issueToken(user, tenant, http, phone, "短信登录成功", LOGIN_TYPE_SMS, note);
+        return issueToken(user, tenant, http, phone, "短信登录成功", LOGIN_TYPE_SMS, scene, note);
     }
 
     /**
-     * 签发登录令牌并落成功日志的公共收尾(密码/短信/第三方三链同一形态):
-     * 令牌 claims 取用户当前版本供过滤器比对,成功日志带登录方式编码,VO 组装式与既有链逐字一致。
-     * 计数清零由调用方按各自键(用户名/手机号/openId)先行——清零键必须与失败计数同一把尺。
+     * 签发登录令牌并落成功日志的公共收尾(短信/第三方两链同一形态,密码链内联不走这里):
+     * 令牌 claims 取用户当前版本供过滤器比对,成功日志带登录方式编码与登录端,VO 组装式与既有链逐字一致。
+     * scene 随成功日志落 sys_login_log,统计 SADD 亦由 writeLoginLog 成功分支收口(§5.6)。
+     * 计数清零由调用方按各自键(手机号/openId)先行——清零键必须与失败计数同一把尺。
      */
     private LoginSuccessVO issueToken(SysUser user, SysTenant tenant, HttpServletRequest http,
-                                      String logUsername, String msg, String loginType, String note) {
+                                      String logUsername, String msg, String loginType, String scene, String note) {
         String token = jwtTokenService.issue(
                 new SnailPrincipal(user.getUserId(), user.getTenantId(), user.getUsername(),
                         user.getOrgId(), user.getTokenVersion()));
         writeLoginLog(http, user.getTenantId(), logUsername, user.getUserId(), 1,
-                msg + (note == null ? "" : note), loginType);
+                msg + (note == null ? "" : note), loginType, scene);
         return new LoginSuccessVO(token, "Bearer", jwtTokenService.expiresInSeconds(),
                 user.getUserId(), user.getUsername(), user.getNickname(),
                 user.getTenantId(), tenant.getName(),
@@ -496,7 +548,7 @@ public class AuthService {
             openId = identity.openId();
             // 锁定检查在交换成功后:openId 此刻才可知;交换失败不产生计数(没有可锁定的身份)
             if (failGuard.isCredentialLocked(ip, openId)) {
-                writeLoginLog(http, 0L, openId, null, 0, LOCKED_MESSAGE, request.source());
+                writeLoginLog(http, 0L, openId, null, 0, LOCKED_MESSAGE, request.source(), LoginScene.ADMIN);
                 throw BizException.badRequest(LOCKED_MESSAGE);
             }
 
@@ -510,11 +562,12 @@ public class AuthService {
                     : accessibleCandidates(loadUsers(bindings.stream().map(SysUserIdentity::getUserId).toList()));
             if (candidates.size() == 1) {
                 located = candidates.get(0);
-                SysTenant tenant = requireAccessible(located);
+                // oauth 链本期缺省 admin(ASM-3):移动端/门户接入 oauth 时再透传 scene
+                SysTenant tenant = requireAccessible(located, LoginScene.ADMIN);
                 touchBinding(request.source(), openId, identity.nickname(), located);
                 failGuard.clearCredentialFails(ip, openId);
                 return issueToken(located, tenant, http, openId,
-                        sourceLabel(request.source()) + "登录成功", request.source(), "");
+                        sourceLabel(request.source()) + "登录成功", request.source(), LoginScene.ADMIN, "");
             }
             if (candidates.size() > 1) {
                 String pickKey = oauthPickService.issue(request.source(), openId,
@@ -532,25 +585,25 @@ public class AuthService {
             }
             if (usable.size() == 1) {
                 located = usable.get(0);
-                SysTenant tenant = requireAccessible(located);
+                SysTenant tenant = requireAccessible(located, LoginScene.ADMIN);
                 saveBinding(request.source(), openId, identity.unionId(), identity.nickname(), located);
                 failGuard.clearCredentialFails(ip, openId);
                 return issueToken(located, tenant, http, openId,
-                        sourceLabel(request.source()) + "登录成功", request.source(), "");
+                        sourceLabel(request.source()) + "登录成功", request.source(), LoginScene.ADMIN, "");
             }
             String pickKey = oauthPickService.issue(request.source(), openId,
                     usable.stream().map(SysUser::getUserId).toList());
             return new LoginAccountsVO(pickKey, accountsOf(usable));
         } catch (ExternalCallException e) {
             // 厂商交换失败:网关侧已留失败流水;对调用方统一文案,不透传厂商错因,不进锁定计数
-            writeLoginLog(http, 0L, "unknown", null, 0, e.getMessage(), request.source());
+            writeLoginLog(http, 0L, "unknown", null, 0, e.getMessage(), request.source(), LoginScene.ADMIN);
             throw BizException.badRequest("第三方登录失败,请稍后再试");
         } catch (BizException e) {
             // 定位失败记 0=归属不明;命中后拒绝的行带出租户与用户,日志留细粒度原因
             Long tenantId = located != null ? located.getTenantId() : 0L;
             Long userId = located != null ? located.getUserId() : null;
             writeLoginLog(http, tenantId, openId != null ? openId : "unknown", userId, 0, e.getMessage(),
-                    request.source());
+                    request.source(), LoginScene.ADMIN);
             if (e instanceof LoginRejects.Credential credential) {
                 if (openId != null) {
                     failGuard.increaseCredentialFail(ip, openId);
@@ -580,15 +633,15 @@ public class AuthService {
             if (chosen == null) {
                 throw BizException.badRequest("选择已过期,请重新登录");
             }
-            SysTenant tenant = requireAccessible(chosen);
+            SysTenant tenant = requireAccessible(chosen, LoginScene.ADMIN);
             saveBinding(candidate.source(), candidate.openId(), null, null, chosen);
             failGuard.clearCredentialFails(JakartaServletUtil.getClientIP(http), candidate.openId());
             return issueToken(chosen, tenant, http, candidate.openId(),
-                    sourceLabel(candidate.source()) + "登录成功", candidate.source(), PICK_NOTE);
+                    sourceLabel(candidate.source()) + "登录成功", candidate.source(), LoginScene.ADMIN, PICK_NOTE);
         } catch (BizException e) {
             Long tenantId = chosen != null ? chosen.getTenantId() : 0L;
             writeLoginLog(http, tenantId, candidate.openId(), chosen != null ? chosen.getUserId() : null,
-                    0, e.getMessage(), candidate.source());
+                    0, e.getMessage(), candidate.source(), LoginScene.ADMIN);
             // 只把准入类(租户/账号停用)统一成凭证文案防枚举;pickKey 失效等流程提示原样回,
             // 否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
             throw e instanceof LoginRejects.Access
@@ -638,12 +691,12 @@ public class AuthService {
         return uris.isEmpty() ? null : uris.get(0);
     }
 
-    /** 状态预筛:租户停用/到期、账号停用的候选静默剔除(与短信链同口径),全部被剔按统一文案拒 */
+    /** 状态预筛:租户停用/到期、账号停用、未开通 admin 端的候选静默剔除(与短信链同口径),全部被剔按统一文案拒 */
     private List<SysUser> accessibleCandidates(List<SysUser> hits) {
         return hits.stream()
                 .filter(user -> {
                     try {
-                        requireAccessible(user);
+                        requireAccessible(user, LoginScene.ADMIN);
                         return true;
                     } catch (BizException rejected) {
                         return false;
@@ -740,6 +793,25 @@ public class AuthService {
     }
 
     /**
+     * /me 的租户开通态:实时查 sys_tenant 组装(AuthController.me() 调用,设计 v1.3 落点)。
+     * 不进 JWT、不进登录快照(NFR-4 同源口径):开关改动对下一次 /me 即时生效,三端守卫据此踢会话。
+     * sys_tenant 在拦截器 ignore 清单,按 ID 定点取无租户条件问题;租户行缺失(销户)按全关兜底——
+     * 销户租户的存量令牌已被 invalidateTenantSessions 吊销,这里只是防御性出口。
+     */
+    public LoginUserVO.TenantFeatures tenantFeaturesOf(Long tenantId) {
+        SysTenant tenant = tenantMapper.selectById(tenantId);
+        if (tenant == null) {
+            return new LoginUserVO.TenantFeatures(false, false, false, false, false);
+        }
+        return new LoginUserVO.TenantFeatures(
+                Integer.valueOf(1).equals(tenant.getAdminEnabled()),
+                Integer.valueOf(1).equals(tenant.getWorkflowEnabled()),
+                Integer.valueOf(1).equals(tenant.getMobileEnabled()),
+                Integer.valueOf(1).equals(tenant.getDashboardEnabled()),
+                Integer.valueOf(1).equals(tenant.getPortalEnabled()));
+    }
+
+    /**
      * 登出:令牌版本自增,该用户全部设备立即失效;userSession 必须清掉,
      * 否则下次登录读到旧版本快照,新令牌会被过滤器判成已吊销。
      * 键里的租户段与 UserSessionService 的生产端同拼法(租户:用户);这里用上下文取租户,
@@ -758,9 +830,12 @@ public class AuthService {
         }
     }
 
-    /** 留痕写失败不许反过来影响登录响应——库都挂了的场景没有一致性问题可言 */
+    /**
+     * 留痕写失败不许反过来影响登录响应——库都挂了的场景没有一致性问题可言。
+     * scene 是登录端坐标(v1.3):随每条日志落库,统计 SADD 亦在此方法内收口(成功分支,§5.6)。
+     */
     private void writeLoginLog(HttpServletRequest http, Long tenantId, String username,
-                               Long userId, int status, String msg, String loginType) {
+                               Long userId, int status, String msg, String loginType, String scene) {
         UserAgent ua = UserAgentUtil.parse(http.getHeader("User-Agent"));
         SysLoginLog row = new SysLoginLog();
         row.setTenantId(tenantId);
@@ -770,6 +845,7 @@ public class AuthService {
         row.setBrowser(ua == null ? null : ua.getBrowser().getName());
         row.setOs(ua == null ? null : ua.getOs().getName());
         row.setLoginType(loginType);
+        row.setScene(scene);
         row.setStatus(status);
         row.setMsg(msg);
         row.setLoginTime(LocalDateTime.now());
@@ -778,6 +854,31 @@ public class AuthService {
         } catch (RuntimeException e) {
             // 留痕失败不阻断登录响应,但至少留一条 debug 便于发现日志链路故障
             log.debug("登录日志写入失败: username={}", username, e);
+        }
+        recordStatKeys(tenantId, scene, status, userId);
+    }
+
+    /**
+     * 统计层写入收口(统计层设计 §5.6):登录/活跃两键 SADD,写在成功日志单点——
+     * 密码链直调本方法与短信/OAuth 经 issueToken 全部汇于此,"三链一处生效"由此成立。
+     * 口径:只记成功(status=1)且归属明确(tenant_id>0,0=用户定位前失败,无租户可归);
+     * SADD 天然幂等,重复登录不重复计数,无去重写逻辑;scene 由调用方传登录端,分端归属与日志同源。
+     * try/catch 吞异常:统计故障绝不阻断登录响应,键丢失由读侧 lazy 自愈回填兜底(sys_login_log 是事实源)。
+     */
+    private void recordStatKeys(Long tenantId, String scene, int status, Long userId) {
+        if (status != 1 || tenantId == null || tenantId <= 0) {
+            return;
+        }
+        try {
+            String member = String.valueOf(userId);
+            // 分端登录用户:永久 SET,读侧 SCARD/mobile=SUNION 合并
+            redisTemplate.opsForSet().add(SnailRedisKeys.statLogin(tenantId, scene), member);
+            // 分端日活跃:日键 SET + 48h TTL,预留展示位,本期详情不主推
+            String activeKey = SnailRedisKeys.statActive(tenantId, STAT_DAY.format(LocalDateTime.now()));
+            redisTemplate.opsForSet().add(activeKey, member);
+            redisTemplate.expire(activeKey, STAT_ACTIVE_TTL);
+        } catch (RuntimeException e) {
+            log.debug("登录统计键写入失败(读侧自愈兜底): tenantId={} scene={}", tenantId, scene, e);
         }
     }
 }

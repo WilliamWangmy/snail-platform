@@ -38,6 +38,10 @@ public class LoginLogExportRow {
     @ExcelProperty("操作系统")
     private String os;
 
+    /** 登录端:admin/workflow/app/miniapp/dashboard/portal(租户管理增强新增投影列) */
+    @ExcelProperty("登录端")
+    private String scene;
+
     /** 结果中文标签 */
     @ExcelProperty("结果")
     private String statusLabel;
@@ -58,6 +62,7 @@ public class LoginLogExportRow {
         row.setIp(log.getIp());
         row.setBrowser(log.getBrowser());
         row.setOs(log.getOs());
+        row.setScene(log.getScene());
         row.setStatusLabel(Integer.valueOf(1).equals(log.getStatus()) ? "成功" : "失败");
         row.setMsg(log.getMsg());
         row.setLoginTime(log.getLoginTime());

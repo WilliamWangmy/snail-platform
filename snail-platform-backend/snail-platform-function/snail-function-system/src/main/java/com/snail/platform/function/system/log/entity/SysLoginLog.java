@@ -41,6 +41,9 @@ public class SysLoginLog {
     /** 登录方式编码:password/sms,后续 feishu/wecom/dingtalk */
     private String loginType;
 
+    /** 登录端:admin/workflow/app/miniapp/dashboard/portal;统计分端与租户开通闸的归属列,历史行吃默认值 admin */
+    private String scene;
+
     /** 结果:1 成功 0 失败 */
     private Integer status;
 

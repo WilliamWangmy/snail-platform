@@ -40,7 +40,10 @@ public record LoginUserVO(
         List<String> permissions,
 
         @Schema(description = "是否待强制改密:true=须先完成强制改密才能使用业务功能")
-        boolean passwordChangeRequired) {
+        boolean passwordChangeRequired,
+
+        @Schema(description = "租户五系统开通态,实时查 sys_tenant;登录快照不含此字段(仅 /me 组装时填充),开关改动对下一次 /me 即时生效")
+        TenantFeatures tenantFeatures) {
 
     @Schema(description = "角色摘要")
     public record RoleInfo(
@@ -55,6 +58,29 @@ public record LoginUserVO(
             String roleName) {
     }
 
+    /**
+     * 租户五系统开通态:三端路由守卫的消费面——对应开关为 false 即登录被拒/落地即踢。
+     * boolean 而非 Integer:开关语义在契约层就是"开通/未开通",0/1 编码留在表列层。
+     */
+    @Schema(description = "租户五系统开通态")
+    public record TenantFeatures(
+
+            @Schema(description = "管理系统开通")
+            boolean adminEnabled,
+
+            @Schema(description = "流程系统开通")
+            boolean workflowEnabled,
+
+            @Schema(description = "移动端(app 与小程序)开通")
+            boolean mobileEnabled,
+
+            @Schema(description = "数据大屏开通")
+            boolean dashboardEnabled,
+
+            @Schema(description = "企业门户开通")
+            boolean portalEnabled) {
+    }
+
     public static LoginUserVO of(LoginUser user, Collection<String> permissions) {
         return new LoginUserVO(user.userId(), user.username(), user.nickname(), user.tenantId(),
                 user.tenantName(), user.orgId(), user.orgName(),
@@ -62,6 +88,17 @@ public record LoginUserVO(
                         .map(role -> new RoleInfo(role.roleId(), role.roleCode(), role.roleName()))
                         .toList(),
                 permissions.stream().sorted().toList(),
-                user.passwordChangeRequired());
+                user.passwordChangeRequired(),
+                // 登录快照不含开通态(null 占位):开关改动要对着存量会话即时生效,快照填充会让改动滞后到重新登录
+                null);
+    }
+
+    /**
+     * /me 专用:在快照投影上补充实时开通态(record 不可变,拷贝式赋值)。
+     * 组装点在 AuthController.me()——AuthService 提供 tenantFeaturesOf 查询,快照与开通态在此汇合。
+     */
+    public LoginUserVO withTenantFeatures(TenantFeatures features) {
+        return new LoginUserVO(userId, username, nickname, tenantId, tenantName, orgId, orgName,
+                roles, permissions, passwordChangeRequired, features);
     }
 }
