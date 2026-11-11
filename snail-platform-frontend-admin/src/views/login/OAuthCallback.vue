@@ -116,16 +116,24 @@ function backToLogin(): void {
     <div class="callback-card">
       <template v-if="loading">
         <div class="callback-state">
-          <AppIcon name="shell" :size="34" />
+          <AppIcon
+            name="shell"
+            :size="34"
+          />
           <p>正在完成第三方登录…</p>
         </div>
       </template>
 
       <template v-else-if="pick">
         <h2>选择要进入的账号</h2>
-        <p class="callback-hint">该第三方身份命中多个账号,请选定本次登录的租户账号。</p>
+        <p class="callback-hint">
+          该第三方身份命中多个账号,请选定本次登录的租户账号。
+        </p>
         <ul class="callback-accounts">
-          <li v-for="account in pick.accounts" :key="account.userId">
+          <li
+            v-for="account in pick.accounts"
+            :key="account.userId"
+          >
             <button
               class="account-item"
               :disabled="pickingUserId !== null"
@@ -145,10 +153,20 @@ function backToLogin(): void {
 
       <template v-else>
         <div class="callback-state">
-          <AppIcon name="info" :size="34" />
+          <AppIcon
+            name="info"
+            :size="34"
+          />
           <p>第三方登录未完成</p>
-          <p class="callback-hint">授权状态可能已过期,请返回登录页重新发起。</p>
-          <button class="callback-back" @click="backToLogin">返回登录</button>
+          <p class="callback-hint">
+            授权状态可能已过期,请返回登录页重新发起。
+          </p>
+          <button
+            class="callback-back"
+            @click="backToLogin"
+          >
+            返回登录
+          </button>
         </div>
       </template>
     </div>
