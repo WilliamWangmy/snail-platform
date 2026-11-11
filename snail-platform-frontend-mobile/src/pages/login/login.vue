@@ -323,8 +323,9 @@ async function pickAccount(pickKey: string, accounts: SmsAccountOption[]): Promi
 
 function afterLogin(passwordChangeRequired: boolean): void {
   if (passwordChangeRequired) {
-    // TODO: 强制改密页(对齐 admin ForceChangePasswordDialog 语义)
-    uni.showToast({ title: '首次登录请尽快修改密码', icon: 'none' });
+    // 强制改密:只录新密码,成功后引导重登(对齐 admin ForceChangePasswordDialog 语义)
+    uni.reLaunch({ url: '/pages/profile/change-password?mode=force' });
+    return;
   }
   uni.reLaunch({ url: '/pages/index/index' });
 }
