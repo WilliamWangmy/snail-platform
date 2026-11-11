@@ -1,0 +1,44 @@
+# 三方出站凭据/通道域(对应模块:snail-function-external,消费方 SnailExternalProperties):
+# 厂商应用凭据、短信通道、邮件发件人。
+# 键已解开生效,真实值仍由环境变量注入,秘钥不落 yml;未接入的厂商可注释对应键,
+# 配置类字段为空则对应入口 available()=false 自然降级、不阻断启动。
+snail:
+  external:
+    oauth:
+      # 厂商应用凭据与 SSO 端点(钉钉/飞书/企业微信);端点默认值为官方公网地址,
+      # 专有钉钉/私有化网关等非公网部署时用 SNAIL_*_AUTHORIZE_URL 等覆盖,客户端零改动
+      dingtalk:
+        app-id: ${SNAIL_DINGTALK_APP_ID:}
+        app-secret: ${SNAIL_DINGTALK_APP_SECRET:}
+        authorize-url: ${SNAIL_DINGTALK_AUTHORIZE_URL:https://login.dingtalk.com/oauth2/auth}
+        token-url: ${SNAIL_DINGTALK_TOKEN_URL:https://api.dingtalk.com/v1.0/oauth2/userAccessToken}
+        user-info-url: ${SNAIL_DINGTALK_USER_INFO_URL:https://api.dingtalk.com/v1.0/contact/users/me}
+      feishu:
+        app-id: ${SNAIL_FEISHU_APP_ID:}
+        app-secret: ${SNAIL_FEISHU_APP_SECRET:}
+        authorize-url: ${SNAIL_FEISHU_AUTHORIZE_URL:https://open.feishu.cn/open-apis/authen/v1/authorize}
+        token-url: ${SNAIL_FEISHU_TOKEN_URL:https://open.feishu.cn/open-apis/authen/v2/oauth/token}
+        user-info-url: ${SNAIL_FEISHU_USER_INFO_URL:https://open.feishu.cn/open-apis/authen/v1/user_info}
+      wecom:
+        corp-id: ${SNAIL_WECOM_CORP_ID:}
+        agent-id: ${SNAIL_WECOM_AGENT_ID:}
+        corp-secret: ${SNAIL_WECOM_CORP_SECRET:}
+        authorize-url: ${SNAIL_WECOM_AUTHORIZE_URL:https://login.work.weixin.qq.com/wwopen/sso/qrConnect}
+        corp-token-url: ${SNAIL_WECOM_CORP_TOKEN_URL:https://qyapi.weixin.qq.com/cgi-bin/gettoken}
+        user-id-url: ${SNAIL_WECOM_USER_ID_URL:https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo}
+        user-detail-url: ${SNAIL_WECOM_USER_DETAIL_URL:https://qyapi.weixin.qq.com/cgi-bin/user/get}
+    sms:
+      # 阿里云短信通道(号码认证服务 SendSmsVerifyCode,验证码由平台自管);
+      # region 是装配开关,配置后装配 AsyncClient;
+      # AK/SK 都留空走默认凭证链(环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID/SECRET),密钥不落 yml
+      access-key-id: ${SNAIL_SMS_ACCESS_KEY_ID:}
+      access-key-secret: ${SNAIL_SMS_ACCESS_KEY_SECRET:}
+      region: ${SNAIL_SMS_REGION:cn-chengdu}
+      region-endpoint: ${SNAIL_SMS_REGION_ENDPOINT:dypnsapi.aliyuncs.com}
+      # 签名与验证码有效分钟数:签名须与阿里云报备一致;模板编码在各业务侧(auth 登录/notify 待办)各自配置
+      sign-name: ${SNAIL_SMS_SIGN_NAME:速通互联验证码}
+      code-valid-minutes: ${SNAIL_SMS_CODE_VALID_MINUTES:5}
+    mail:
+      # 发件人地址(SMTP 连接参数住 spring.mail.*,由 Boot 自动配置消费);
+      # 缺省由 SmtpMailClient 兜底占位发件人;显式 noreply 别名用 SNAIL_MAIL_FROM 覆盖
+      from: ${SNAIL_MAIL_FROM:${spring.mail.username:snail-platform@noreply.local}}

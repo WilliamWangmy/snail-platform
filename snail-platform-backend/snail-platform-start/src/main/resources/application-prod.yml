@@ -24,3 +24,32 @@ snail:
     jwt:
       # 生产签名密钥必填(共享配置无默认值),缺失启动即失败;短于 32 字符拒绝启动
       secret: ${SNAIL_JWT_SECRET}
+  auth:
+    oauth:
+      sources:
+        # 生产 OAuth 回调白名单:由环境变量登记真实域名;不登记则来源不可用(回调按空白名单拒绝)
+        dingtalk:
+          redirect-uris: ${SNAIL_OAUTH_DINGTALK_REDIRECT_URIS:}
+        feishu:
+          redirect-uris: ${SNAIL_OAUTH_FEISHU_REDIRECT_URIS:}
+        wecom:
+          redirect-uris: ${SNAIL_OAUTH_WECOM_REDIRECT_URIS:}
+  db:
+    tenant:
+      # 租户过滤豁免清单：平台级表、纯关系表、只增日志表；口径详见 docs/system-business-design.md
+      ignore-tables:
+        - sys_tenant
+        - sys_user_role
+        - sys_login_log
+        - sys_oper_log
+        - sys_menu
+        - sys_role_menu
+        - sys_notify_outbound
+        # 第三方调用流水:落账在异步线程,租户/操作人靠行内快照列
+        - sys_external_call_log
+        # 流程模板与菜单同口径:平台维护一份全局目录,租户只读来建模型,本身不带租户列
+        - sys_workflow_template
+        # 第三方身份绑定:登录按(source,open_id)跨租户定位,tenant_id 只是绑定时刻的展示快照
+        - sys_user_identity
+  pagination:
+    max-limit: 500

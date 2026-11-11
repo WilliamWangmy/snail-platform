@@ -18,16 +18,6 @@ logging:
     com.snail.platform: DEBUG
 
 snail:
-  auth:
-    oauth:
-      sources:
-        # 本机两端 dev 回调白名单:admin :8000 / workflow :8002;mock 通道与真实厂商联调都走这里,生产域名另行登记
-        dingtalk:
-          redirect-uris: http://localhost:8000/oauth-callback/dingtalk,http://localhost:8002/oauth-callback/dingtalk
-        feishu:
-          redirect-uris: http://localhost:8000/oauth-callback/feishu,http://localhost:8002/oauth-callback/feishu
-        wecom:
-          redirect-uris: http://localhost:8000/oauth-callback/wecom,http://localhost:8002/oauth-callback/wecom
   security:
     jwt:
       # 开发占位密钥只住 dev profile;生产密钥必须由 SNAIL_JWT_SECRET 提供,共享配置无默认可漏
@@ -37,12 +27,12 @@ snail:
       # 开发态短信走 mock 通道:发送动作同走网关留痕(sys_external_call_log),手机号打码;
       # 码值默认不落日志,从 Valkey GET snail:auth:sms:{phone} 取;
       # 本机自测要直接看码可开 mock-echo-code,生产 profile 两个开关都不存在,天然关闭
-      mock: ${SNAIL_SMS_MOCK:true}
-      mock-echo-code: ${SNAIL_SMS_MOCK_ECHO_CODE:true}
+      mock: ${SNAIL_SMS_MOCK:false}
+      mock-echo-code: ${SNAIL_SMS_MOCK_ECHO_CODE:false}
     oauth:
       # 开发态厂商调用走 mock 通道:authorizeUrl 直接造成本地回调,不申请厂商应用即可端到端跑通;
       # 生产 profile 无此键,@ConditionalOnProperty 缺省走真实客户端
-      mock: ${SNAIL_OAUTH_MOCK:true}
+      mock: ${SNAIL_OAUTH_MOCK:false}
       # mock 身份的实名手机号:改成与本地库某用户 sys_user.phone 一致即可验证 JIT 绑定与多租户 pick
       mock-mobile: ${SNAIL_OAUTH_MOCK_MOBILE:13800000000}
   storage:
@@ -54,3 +44,22 @@ snail:
       base-dir: ${SNAIL_SFTP_BASE_DIR:/data/snail/files}
       # 本机存储多为自签指纹;生产保持严格校验并按 known-hosts 带外分发
       strict-host-key-checking: ${SNAIL_SFTP_STRICT_HOST_KEY:false}
+  db:
+    tenant:
+      # 租户过滤豁免清单：平台级表、纯关系表、只增日志表；口径详见 docs/system-business-design.md
+      ignore-tables:
+        - sys_tenant
+        - sys_user_role
+        - sys_login_log
+        - sys_oper_log
+        - sys_menu
+        - sys_role_menu
+        - sys_notify_outbound
+        # 第三方调用流水:落账在异步线程,租户/操作人靠行内快照列
+        - sys_external_call_log
+        # 流程模板与菜单同口径:平台维护一份全局目录,租户只读来建模型,本身不带租户列
+        - sys_workflow_template
+        # 第三方身份绑定:登录按(source,open_id)跨租户定位,tenant_id 只是绑定时刻的展示快照
+        - sys_user_identity
+  pagination:
+    max-limit: 500

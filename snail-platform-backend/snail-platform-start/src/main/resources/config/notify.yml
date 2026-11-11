@@ -1,0 +1,10 @@
+# 消息触达:站内实时推送开关与业务短信模板(消费方:SnailNotifyProperties)
+snail:
+  notify:
+    push:
+      # 站内消息实时推送(SSE)总开关:关闭即退化为 30s 轮询,订阅端点按"未开启"拒绝
+      enabled: ${SNAIL_NOTIFY_PUSH_ENABLED:true}
+    sms:
+      templates:
+        # 流程待办通用短信模板编码:阿里云报备后回填(O1);缺省空 = 短信通道不可用,投递器跳过
+        todo: ${SNAIL_NOTIFY_SMS_TODO_TEMPLATE:}
