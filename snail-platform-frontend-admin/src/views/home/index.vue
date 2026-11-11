@@ -1,4 +1,6 @@
 <script setup lang="ts">
+/** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
+defineOptions({ name: 'HomeView' });
 import AppIcon from '@/components/AppIcon.vue';
 import { dateTime } from '@/utils/format';
 import { menuIcon } from '@/utils/icons';

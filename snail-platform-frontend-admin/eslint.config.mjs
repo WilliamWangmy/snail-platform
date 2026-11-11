@@ -31,6 +31,7 @@ export default tseslint.config(
         HTMLInputElement: 'readonly',
         Event: 'readonly',
         FocusEvent: 'readonly',
+        MouseEvent: 'readonly',
         Node: 'readonly',
         crypto: 'readonly',
         location: 'readonly',

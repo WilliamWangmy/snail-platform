@@ -11,6 +11,19 @@ const missing = () => import('@/views/error/NotFound.vue');
 /** 布局路由名,动态菜单全部挂它下面。 */
 export const WORKSPACE = 'workspace';
 
+/**
+ * 由组件路径推导视图组件名(system/user/index → SystemUser),供页签 KeepAlive include 匹配。
+ * 视图侧须用 defineOptions 声明同名 name,否则该页不进缓存。
+ */
+function viewNameOf(component: string): string {
+  return component
+    .replace(/\/index$/, '')
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join('');
+}
+
 const dynamicNames: string[] = [];
 
 /** 目录不建路由,外链走侧栏新标签;菜单按 path 直接注册为绝对路径子路由。 */
@@ -23,11 +36,12 @@ export function installMenuRoutes(router: Router, menus: MenuRoute[]): void {
     if (router.hasRoute(name)) return;
     // 拼出的键必须与 glob 键同形(../views/<component>.vue);对不上就退回兜底组件,不抛错
     const loader = node.component ? registry[`../views/${node.component}.vue`] : undefined;
+    const viewName = node.component ? viewNameOf(node.component) : undefined;
     const route: RouteRecordRaw = {
       path: node.path,
       name,
       component: loader ?? missing,
-      meta: { title: node.menuName, icon: menuIcon(node.icon), breadcrumb },
+      meta: { title: node.menuName, icon: menuIcon(node.icon), breadcrumb, viewName },
     };
     router.addRoute(WORKSPACE, route);
     dynamicNames.push(name);

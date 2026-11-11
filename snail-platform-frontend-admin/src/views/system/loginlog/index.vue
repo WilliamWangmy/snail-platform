@@ -1,4 +1,6 @@
 <script setup lang="ts">
+/** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
+defineOptions({ name: 'SystemLoginlog' });
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';

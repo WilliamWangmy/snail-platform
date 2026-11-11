@@ -1,4 +1,6 @@
 <script setup lang="ts">
+/** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
+defineOptions({ name: 'PlatformTenant' });
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
@@ -657,7 +659,7 @@ function ratePercent(rate: number): string {
       >
         <!-- 分区标题轻量化:无边框面板盒,字段两列舒展;功能开通改一行点亮芯片,单击切换 -->
         <div class="sec-head">
-          <i class="bar" />
+          <i class="bar"></i>
           <b>基本信息</b>
           <span>标识开通后不可修改</span>
         </div>
@@ -687,7 +689,7 @@ function ratePercent(rate: number): string {
           v-if="editingId === null"
           class="sec-head"
         >
-          <i class="bar" />
+          <i class="bar"></i>
           <b>管理员账号</b>
           <span>初始口令请线下转交租户</span>
         </div>
@@ -742,7 +744,7 @@ function ratePercent(rate: number): string {
         </div>
 
         <div class="sec-head">
-          <i class="bar" />
+          <i class="bar"></i>
           <b>联系方式</b>
         </div>
         <div class="form-grid">
@@ -770,7 +772,7 @@ function ratePercent(rate: number): string {
         </div>
 
         <div class="sec-head">
-          <i class="bar" />
+          <i class="bar"></i>
           <b>使用限制</b>
           <span>{{ editingId === null ? '账号数与存储配额留空即不限,开通后可随时调整' : '留空即恢复不限' }}</span>
         </div>
@@ -820,7 +822,7 @@ function ratePercent(rate: number): string {
         </div>
 
         <div class="sec-head">
-          <i class="bar" />
+          <i class="bar"></i>
           <b>功能开通</b>
           <span>点亮即开通;未点亮的端用户无法登录,默认全部关闭</span>
         </div>
@@ -895,7 +897,9 @@ function ratePercent(rate: number): string {
                 {{ drawerTenant.status === 0 ? '正常' : '停用' }}
               </span>
             </div>
-            <div class="t-code">#{{ drawerTenant.tenantCode }} · ID {{ drawerTenant.tenantId }}</div>
+            <div class="t-code">
+              #{{ drawerTenant.tenantCode }} · ID {{ drawerTenant.tenantId }}
+            </div>
           </div>
         </div>
       </template>
@@ -1051,12 +1055,16 @@ function ratePercent(rate: number): string {
                   :key="scene.key"
                 >
                   <td>{{ scene.label }}</td>
-                  <td class="mono">{{ usage.scenes[scene.key].loggedIn }}</td>
-                  <td class="mono">{{ usage.users.total }}</td>
+                  <td class="mono">
+                    {{ usage.scenes[scene.key].loggedIn }}
+                  </td>
+                  <td class="mono">
+                    {{ usage.users.total }}
+                  </td>
                   <td>
                     <div class="rate-wrap">
                       <div class="rate-bar">
-                        <i :style="{ width: ratePercent(usage.scenes[scene.key].rate) }" />
+                        <i :style="{ width: ratePercent(usage.scenes[scene.key].rate) }"></i>
                       </div>
                       <span class="mono">{{ ratePercent(usage.scenes[scene.key].rate) }}</span>
                     </div>
@@ -1120,10 +1128,12 @@ function ratePercent(rate: number): string {
               class="rate-bar big"
               :class="{ over: storageOver }"
             >
-              <i :style="{ width: storagePercent + '%' }" />
+              <i :style="{ width: storagePercent + '%' }"></i>
             </div>
             <div class="usage-sub">
-              <template v-if="storage.limitMb != null">剩余 {{ storageRemainGbText }} · </template>配额可在「修改」中调整;存储不区分分类明细
+              <template v-if="storage.limitMb != null">
+                剩余 {{ storageRemainGbText }} ·
+              </template>配额可在「修改」中调整;存储不区分分类明细
             </div>
           </template>
           <div

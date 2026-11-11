@@ -1,4 +1,6 @@
 <script setup lang="ts">
+/** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
+defineOptions({ name: 'PlatformFile' });
 import { onMounted, reactive } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import { pagePlatformFiles, type FileQuery, type FileVO } from '@/api/file';

@@ -31,22 +31,29 @@ const routes: RouteRecordRaw[] = [
     redirect: '/home',
     children: [
       {
+        // 页签刷新中转:/redirect/<path>?<query> 落这里,挂载后原样跳回,配合 KeepAlive 实现强制重载
+        path: '/redirect/:path(.*)',
+        name: 'redirect',
+        component: () => import('@/views/redirect/index.vue'),
+        meta: { title: '刷新中转', hideTab: true },
+      },
+      {
         path: '/home',
         name: 'home',
         component: () => import('@/views/home/index.vue'),
-        meta: { title: '工作台', icon: 'grid', breadcrumb: ['工作台'] },
+        meta: { title: '工作台', icon: 'grid', breadcrumb: ['工作台'], affix: true, viewName: 'HomeView' },
       },
       {
         path: '/profile',
         name: 'profile',
         component: () => import('@/views/profile/index.vue'),
-        meta: { title: '个人中心', icon: 'user', breadcrumb: ['个人中心'] },
+        meta: { title: '个人中心', icon: 'user', breadcrumb: ['个人中心'], viewName: 'ProfileView' },
       },
       {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/views/error/NotFound.vue'),
-        meta: { title: '页面不存在' },
+        meta: { title: '页面不存在', hideTab: true },
       },
     ],
   },

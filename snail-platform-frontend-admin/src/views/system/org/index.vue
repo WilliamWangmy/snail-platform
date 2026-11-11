@@ -1,4 +1,6 @@
 <script setup lang="ts">
+/** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
+defineOptions({ name: 'SystemOrg' });
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import {

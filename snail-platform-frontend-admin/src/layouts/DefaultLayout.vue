@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppIcon from '@/components/AppIcon.vue';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
 import NotifyToast from '@/components/NotifyToast.vue';
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
+import TabBar from '@/components/TabBar.vue';
 import ThemePicker from '@/components/ThemePicker.vue';
 import { fetchUnreadCount, pageInbox, type NotifyInboxItem } from '@/api/notify';
 import { useNotifyPush } from '@/composables/useNotifyPush';
 import { useAuthStore } from '@/stores/auth';
+import { useTabsStore } from '@/stores/tabs';
 import { resetMenuRoutes } from '@/router/menuRoutes';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const tabs = useTabsStore();
+
+/** 布局内导航即登记页签;布局外路由(登录/403 等)不经过这里。 */
+watch(() => route.fullPath, () => tabs.addTab(route), { immediate: true });
 
 const collapsed = ref(false);
 const mobile = ref(window.innerWidth <= 1024);
@@ -70,6 +76,7 @@ async function signOut(): Promise<void> {
   notifyPush.stop();
   await auth.signOutEverywhere();
   resetMenuRoutes(router);
+  tabs.reset();
   void router.push('/login');
 }
 
@@ -448,6 +455,8 @@ onBeforeUnmount(() => {
         </div>
       </ElHeader>
 
+      <TabBar />
+
       <ElMain class="page-main">
         <div class="page-wrap">
           <RouterView v-slot="{ Component }">
@@ -455,7 +464,12 @@ onBeforeUnmount(() => {
               name="page"
               mode="out-in"
             >
-              <component :is="Component" />
+              <KeepAlive :include="tabs.cachedViews">
+                <component
+                  :is="Component"
+                  :key="route.fullPath"
+                />
+              </KeepAlive>
             </Transition>
           </RouterView>
         </div>
