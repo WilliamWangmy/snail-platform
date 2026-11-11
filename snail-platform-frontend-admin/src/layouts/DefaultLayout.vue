@@ -11,6 +11,7 @@ import ThemePicker from '@/components/ThemePicker.vue';
 import { fetchUnreadCount, pageInbox, type NotifyInboxItem } from '@/api/notify';
 import { useNotifyPush } from '@/composables/useNotifyPush';
 import { useAuthStore } from '@/stores/auth';
+import { useLayoutStore } from '@/stores/layout';
 import { useTabsStore } from '@/stores/tabs';
 import { resetMenuRoutes } from '@/router/menuRoutes';
 
@@ -18,9 +19,23 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const tabs = useTabsStore();
+const layout = useLayoutStore();
 
 /** 布局内导航即登记页签;布局外路由(登录/403 等)不经过这里。 */
 watch(() => route.fullPath, () => tabs.addTab(route), { immediate: true });
+
+/** 页签/单页模式切换:切到单页时收敛页签只留当前页,再开页签时不会冒出一串旧页签。 */
+function toggleTabMode(): void {
+  const next = !layout.tabMode;
+  layout.setTabMode(next);
+  if (!next) tabs.closeOthers(route.fullPath);
+}
+
+/** 顶栏刷新当前页:经 /redirect 中转强制重载,页签与单页两种模式下都可用。 */
+function refreshCurrent(): void {
+  tabs.markRefresh(route.meta.viewName as string | undefined);
+  void router.replace(`/redirect${route.fullPath}`);
+}
 
 const collapsed = ref(false);
 const mobile = ref(window.innerWidth <= 1024);
@@ -271,6 +286,40 @@ onBeforeUnmount(() => {
             :size="19"
           />
         </ElButton>
+        <ElTooltip
+          :content="layout.tabMode ? '当前：多页签模式，点击切换为单页' : '当前：单页模式，点击切换为多页签'"
+          placement="bottom"
+        >
+          <ElButton
+            text
+            circle
+            class="topbar-icon"
+            :aria-label="layout.tabMode ? '切换为单页模式' : '切换为多页签模式'"
+            @click="toggleTabMode"
+          >
+            <AppIcon
+              :name="layout.tabMode ? 'columns' : 'menu'"
+              :size="17"
+            />
+          </ElButton>
+        </ElTooltip>
+        <ElTooltip
+          content="刷新当前页"
+          placement="bottom"
+        >
+          <ElButton
+            text
+            circle
+            class="topbar-icon"
+            aria-label="刷新当前页"
+            @click="refreshCurrent"
+          >
+            <AppIcon
+              name="refresh"
+              :size="16"
+            />
+          </ElButton>
+        </ElTooltip>
         <ElBreadcrumb
           separator="/"
           class="topbar-breadcrumb"
@@ -455,7 +504,7 @@ onBeforeUnmount(() => {
         </div>
       </ElHeader>
 
-      <TabBar />
+      <TabBar v-if="layout.tabMode" />
 
       <ElMain class="page-main">
         <div class="page-wrap">
@@ -464,7 +513,8 @@ onBeforeUnmount(() => {
               name="page"
               mode="out-in"
             >
-              <KeepAlive :include="tabs.cachedViews">
+              <!-- 单页模式 include 置空:不做缓存,点菜单即整页替换,与页签模式二选一 -->
+              <KeepAlive :include="layout.tabMode ? tabs.cachedViews : []">
                 <component
                   :is="Component"
                   :key="route.fullPath"
