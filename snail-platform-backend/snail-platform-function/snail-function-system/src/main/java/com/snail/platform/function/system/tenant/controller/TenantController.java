@@ -9,6 +9,7 @@ import com.snail.platform.function.system.tenant.dto.TenantCreatedVO;
 import com.snail.platform.function.system.tenant.dto.TenantQuery;
 import com.snail.platform.function.system.tenant.dto.TenantUpdateRequest;
 import com.snail.platform.function.system.tenant.dto.TenantVO;
+import com.snail.platform.function.system.tenant.dto.UsageStatsVO;
 import com.snail.platform.function.system.tenant.service.TenantService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,6 +53,20 @@ public class TenantController {
     @GetMapping("/page")
     public R<PageResult<TenantVO>> page(@Valid TenantQuery query) {
         return R.ok(tenantService.page(query));
+    }
+
+    @PreAuthorize("hasAuthority('platform:tenant:list')")
+    @Operation(summary = "租户详情(五系统开通开关/存储配额随行,详情抽屉与修改回显共用;权限同列表读面,不新增权限码)")
+    @GetMapping("/{tenantId}")
+    public R<TenantVO> detail(@PathVariable Long tenantId) {
+        return R.ok(tenantService.detail(tenantId));
+    }
+
+    @PreAuthorize("hasAuthority('platform:tenant:list')")
+    @Operation(summary = "租户使用统计(用户五项计数+五端登录/使用率;门户区 null 占位,契约 §5.4)")
+    @GetMapping("/{tenantId}/usage-stats")
+    public R<UsageStatsVO> usageStats(@PathVariable Long tenantId) {
+        return R.ok(tenantService.usageStats(tenantId));
     }
 
     @PreAuthorize("hasAuthority('platform:tenant:create')")

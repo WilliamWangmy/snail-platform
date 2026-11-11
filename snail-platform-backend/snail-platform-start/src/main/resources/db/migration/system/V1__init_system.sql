@@ -30,6 +30,11 @@ CREATE TABLE sys_tenant (
     expire_time   DATETIME     DEFAULT NULL COMMENT '到期时间,NULL 为不限',
     account_limit INT          DEFAULT NULL COMMENT '账号数上限,NULL 为不限',
     storage_limit_mb BIGINT    DEFAULT NULL COMMENT '存储配额 MB,NULL 为不限',
+    admin_enabled     TINYINT   NOT NULL DEFAULT 0 COMMENT '管理系统开通:0 未开通 1 已开通;未开通则 scene=admin 登录被拒',
+    workflow_enabled  TINYINT   NOT NULL DEFAULT 0 COMMENT '流程系统开通:0 未开通 1 已开通;未开通则 scene=workflow 登录被拒',
+    mobile_enabled    TINYINT   NOT NULL DEFAULT 0 COMMENT '移动端(app与小程序)开通:0 未开通 1 已开通;未开通则 scene=app/miniapp 登录被拒',
+    dashboard_enabled TINYINT   NOT NULL DEFAULT 0 COMMENT '数据大屏开通:0 未开通 1 已开通;未开通则 scene=dashboard 登录被拒',
+    portal_enabled    TINYINT   NOT NULL DEFAULT 0 COMMENT '企业门户开通:0 未开通 1 已开通;门户立项前为配置先行',
     status        TINYINT      NOT NULL DEFAULT 0 COMMENT '状态:0 正常 1 停用',
     remark        VARCHAR(500) DEFAULT NULL COMMENT '备注',
     create_by     BIGINT       DEFAULT NULL COMMENT '创建人用户ID',
@@ -190,6 +195,7 @@ CREATE TABLE sys_login_log (
     browser    VARCHAR(100) DEFAULT NULL COMMENT '浏览器',
     os         VARCHAR(100) DEFAULT NULL COMMENT '操作系统',
     login_type VARCHAR(20)  NOT NULL DEFAULT 'password' COMMENT '登录方式编码:password/sms,后续 feishu/wecom/dingtalk',
+    scene      VARCHAR(20)  NOT NULL DEFAULT 'admin' COMMENT '登录端:admin/workflow/app/miniapp/dashboard/portal;统计分端与租户开通闸的归属列',
     status     TINYINT      NOT NULL COMMENT '结果:1 成功 0 失败',
     msg        VARCHAR(255) DEFAULT NULL COMMENT '失败原因',
     login_time DATETIME(3)  NOT NULL COMMENT '登录时间',
@@ -308,8 +314,11 @@ CREATE TABLE sys_user_identity (
 -- =========================================================
 
 -- ---------- 默认租户与初始组织 ----------
-INSERT INTO sys_tenant (tenant_id, tenant_code, name, status, create_time)
-VALUES (1, 'default', '默认租户', 0, NOW());
+-- 五开关显式全 1:default 是平台自身——平台管理员要在 admin 管租户/在 workflow 做平台面模板管理/在 admin 管大屏菜单树,
+-- 这是平台运转的功能前提,不是"存量保留";新租户由开通表单自选(默认全关,平台管理员按需开通)
+INSERT INTO sys_tenant
+(tenant_id, tenant_code, name, admin_enabled, workflow_enabled, mobile_enabled, dashboard_enabled, portal_enabled, status, create_time)
+VALUES (1, 'default', '默认租户', 1, 1, 1, 1, 1, 0, NOW());
 
 INSERT INTO sys_org (org_id, tenant_id, parent_id, name, ancestors, sort, create_time)
 VALUES (1, 1, 0, 'Snail', '0', 0, NOW());

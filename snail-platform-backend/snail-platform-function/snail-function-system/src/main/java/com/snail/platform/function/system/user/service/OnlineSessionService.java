@@ -116,6 +116,25 @@ public class OnlineSessionService implements SessionHeartbeatPort {
         return PageResult.of(rows, all.size());
     }
 
+    /**
+     * 租户在线数:租户详情"系统使用"卡片的在线用户数(D-04)。
+     * 显式收 tenantId 参数——调用方是平台侧租户详情,上下文是平台管理员自己的租户,
+     * 复用 page() 的 TenantContextHolder.get() 会读错租户;Valkey 键显式拼租户段,不经任何拦截器。
+     * 计数口径与 page() 完全一致(:104-108):索引成员逐个核对会话键,读不到快照(已过期残留)不算在线,
+     * 不裸 SCARD——否则数字会比在线列表页偏大(AC-8 对账项)。
+     */
+    public int count(Long tenantId) {
+        Set<String> members = redisTemplate.opsForSet().members(SnailRedisKeys.onlineIndex(tenantId));
+        if (members == null || members.isEmpty()) {
+            return 0;
+        }
+        return (int) members.stream()
+                .map(Long::valueOf)
+                .map(userId -> read(tenantId, userId))
+                .filter(Objects::nonNull)
+                .count();
+    }
+
     /** 强制下线:不能踢自己;令牌版本自增是真吊销,redis 清理是尽力而为 */
     public void kick(Long userId) {
         Long operator = LoginUserContextHolder.userId();

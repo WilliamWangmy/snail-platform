@@ -8,6 +8,8 @@ import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
+import com.snail.platform.framework.redis.SnailRedisKeys;
+import com.snail.platform.function.system.log.mapper.SysLoginLogMapper;
 import com.snail.platform.function.system.org.entity.SysOrg;
 import com.snail.platform.function.system.org.mapper.SysOrgMapper;
 import com.snail.platform.function.system.role.entity.SysRole;
@@ -20,15 +22,21 @@ import com.snail.platform.function.system.tenant.dto.TenantCreatedVO;
 import com.snail.platform.function.system.tenant.dto.TenantQuery;
 import com.snail.platform.function.system.tenant.dto.TenantUpdateRequest;
 import com.snail.platform.function.system.tenant.dto.TenantVO;
+import com.snail.platform.function.system.tenant.dto.UsageStatsVO;
 import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
+import com.snail.platform.function.system.user.service.OnlineSessionService;
 import com.snail.platform.function.system.user.service.PasswordPolicy;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +52,13 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class TenantService {
+
+    /** scene 契约字面量(统计层设计 §5.1 冻结,前后端字典对齐):app/miniapp 同属移动端产品位(D-06) */
+    private static final String SCENE_ADMIN = "admin";
+    private static final String SCENE_WORKFLOW = "workflow";
+    private static final String SCENE_APP = "app";
+    private static final String SCENE_MINIAPP = "miniapp";
+    private static final String SCENE_DASHBOARD = "dashboard";
 
     /** 租户表读写,ignore 表 */
     private final SysTenantMapper tenantMapper;
@@ -63,15 +78,28 @@ public class TenantService {
     /** 本租户登录快照的点清出口 */
     private final CacheEvictor cacheEvictor;
 
+    /** 在线会话索引读:详情统计的在线数出口(tenant->user 登记边) */
+    private final OnlineSessionService onlineSessionService;
+
+    /** 登录日志读:统计键丢失时的分端回填事实源(tenant->log 登记边,ArchitectureRulesTest 白名单) */
+    private final SysLoginLogMapper loginLogMapper;
+
+    /** Valkey 存取:分端登录统计键的读与自愈回填面(统计层设计 §5.6) */
+    private final StringRedisTemplate redisTemplate;
+
     public TenantService(SysTenantMapper tenantMapper, SysOrgMapper orgMapper, SysRoleMapper roleMapper,
                          SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
-                         CacheEvictor cacheEvictor) {
+                         CacheEvictor cacheEvictor, OnlineSessionService onlineSessionService,
+                         SysLoginLogMapper loginLogMapper, StringRedisTemplate redisTemplate) {
         this.tenantMapper = tenantMapper;
         this.orgMapper = orgMapper;
         this.roleMapper = roleMapper;
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.cacheEvictor = cacheEvictor;
+        this.onlineSessionService = onlineSessionService;
+        this.loginLogMapper = loginLogMapper;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
@@ -126,6 +154,15 @@ public class TenantService {
         tenant.setContactPhone(request.contactPhone());
         tenant.setExpireTime(request.expireTime());
         tenant.setAccountLimit(request.accountLimit());
+        // 存储配额透传:前端 GB×1024→MB 提交,null=不限;与配额校验链(FileQuotaService)同一列
+        tenant.setStorageLimitMb(request.storageLimitMb());
+        // 五系统开通开关透传:不传按未开通(0)落库——insert 走 MP 字段策略,null 字段省略、列默认值 0 兜底,
+        // 开通语义是"平台管理员显式点开",缺省即关(2026-11-11 拍板口径)
+        tenant.setAdminEnabled(request.adminEnabled());
+        tenant.setWorkflowEnabled(request.workflowEnabled());
+        tenant.setMobileEnabled(request.mobileEnabled());
+        tenant.setDashboardEnabled(request.dashboardEnabled());
+        tenant.setPortalEnabled(request.portalEnabled());
         tenant.setStatus(0);
         tenant.setRemark(request.remark());
         try {
@@ -168,10 +205,12 @@ public class TenantService {
     }
 
     /**
-     * 修改资料:整份覆盖。六个业务字段无条件 set,表单留空即清空;status 是唯一"不传即不动"的字段,
+     * 修改资料:整份覆盖。业务字段无条件 set,表单留空即清空;status 是唯一"不传即不动"的字段,
      * 停用/启用的正路仍是 changeStatus 端点(带幂等短路)。
-     * 失效只点这一户:登录快照里带租户名,改名要刷;停用与到期时间变更是资格问题,同 invalidateTenantSessions
-     * 一起作废。只改联系人/上限/备注不碰任何人的登录态,也不波及别的租户。
+     * 五系统开关按"非 1 即 0"归一落库(列 NOT NULL,留空即关闭);任一开关 1→0 属资格收口,
+     * 与停用/到期变更同口径作废该租户全部存量令牌(OQ-1 默认拍板:全租户作废,粒度=租户;
+     * 若拍"仅守卫踢"则删掉 anySwitchDisabled 这一处 invalidate 调用即可)。
+     * 失效只点这一户:登录快照里带租户名,改名要刷;只改联系人/上限/备注不碰任何人的登录态,也不波及别的租户。
      */
     @Transactional
     public void update(Long tenantId, TenantUpdateRequest request) {
@@ -183,28 +222,136 @@ public class TenantService {
         boolean expireChanged = !Objects.equals(existing.getExpireTime(), request.expireTime());
         // 租户名进了登录快照(顶栏显示),改名后必须让该租户的会话重取一次
         boolean nameChanged = !Objects.equals(existing.getName(), request.name().trim());
+        // 开关资格收口:任一开关从 1 改成 0(该端被收回),全租户令牌作废(OQ-1 默认口径)
+        boolean anySwitchDisabled = switchTurnedOff(existing.getAdminEnabled(), request.adminEnabled())
+                || switchTurnedOff(existing.getWorkflowEnabled(), request.workflowEnabled())
+                || switchTurnedOff(existing.getMobileEnabled(), request.mobileEnabled())
+                || switchTurnedOff(existing.getDashboardEnabled(), request.dashboardEnabled())
+                || switchTurnedOff(existing.getPortalEnabled(), request.portalEnabled());
         // 收口只能收到未来:把到期时间写成过去,等于绕开停用端点做一次无留痕的软下线。
         // 判的是"变更",存量已过期的租户原样回传现值不算改,不然它连备注都改不动
         if (expireChanged && request.expireTime() != null
                 && request.expireTime().isBefore(LocalDateTime.now())) {
             throw BizException.badRequest("到期时间必须晚于当前时间");
         }
-        // updateById 会跳过 null,而"清空到期时间/账号上限"恰是合法意图,故逐字段显式 set
+        // updateById 会跳过 null,而"清空到期时间/账号上限"恰是合法意图,故逐字段显式 set;
+        // 开关列 NOT NULL,以"非 1 即 0"归一(整份覆盖口径:留空即关闭),直接 set null 会撞约束
         tenantMapper.update(new SysTenant(), Wrappers.<SysTenant>lambdaUpdate()
                 .set(SysTenant::getName, request.name().trim())
                 .set(SysTenant::getContactUser, request.contactUser())
                 .set(SysTenant::getContactPhone, request.contactPhone())
                 .set(SysTenant::getExpireTime, request.expireTime())
                 .set(SysTenant::getAccountLimit, request.accountLimit())
-                .set(SysTenant::getRemark, request.remark())
+                .set(SysTenant::getStorageLimitMb, request.storageLimitMb())
+                .set(SysTenant::getAdminEnabled, switchValue(request.adminEnabled()))
+                .set(SysTenant::getWorkflowEnabled, switchValue(request.workflowEnabled()))
+                .set(SysTenant::getMobileEnabled, switchValue(request.mobileEnabled()))
+                .set(SysTenant::getDashboardEnabled, switchValue(request.dashboardEnabled()))
+                .set(SysTenant::getPortalEnabled, switchValue(request.portalEnabled()))
                 .set(request.status() != null, SysTenant::getStatus, request.status())
+                .set(SysTenant::getRemark, request.remark())
                 .eq(SysTenant::getTenantId, tenantId));
-        if (disabling || expireChanged) {
+        if (disabling || expireChanged || anySwitchDisabled) {
             invalidateTenantSessions(tenantId);
         }
         if (nameChanged || disabling || expireChanged) {
             evictTenantSessions(tenantId);
         }
+    }
+
+    /**
+     * 租户详情:列表/详情共用同一投影(TenantVO 已含五开关与存储配额),供详情抽屉与修改表单回显。
+     * 纯读,不挂事务。
+     */
+    public TenantVO detail(Long tenantId) {
+        return TenantVO.from(requireTenant(tenantId));
+    }
+
+    /**
+     * 租户使用统计(统计层设计 §5.4,契约冻结):users 单条 SQL 条件聚合 + scenes 全 Valkey 读,
+     * 目标 <100ms(NFR-1,千用户量级毫秒级);全程无定时任务、无缓存中间表(NFR-2)。
+     * users 区必须 withoutTenant+显式租户条件——调用方是平台管理员,上下文是其自身租户,
+     * 拦截器注入会查成平台自己的数据(AC-9 专项);deleted=0 由 MP 逻辑删自动追加。
+     * scenes 区 loggedIn 为 Valkey Set SCARD;mobile 是 app/miniapp 两键成员读回内存去重(D-06),
+     * 免临时键;键丢失走 sys_login_log lazy 自愈回填(D-03),累计不清零。
+     * portal 两字段恒 null 占位(BR-8/D-07:门户立项前无流量源,建表即空转)。
+     */
+    public UsageStatsVO usageStats(Long tenantId) {
+        requireTenant(tenantId);
+        // users:sys_user 单条条件聚合——四项计数一次取齐;分母即 ASM-1 的"租户总用户数"
+        List<Map<String, Object>> rows = TenantContextHolder.withoutTenant(() -> userMapper.selectMaps(
+                Wrappers.<SysUser>query()
+                        .select("COUNT(*) AS total",
+                                "SUM(status = 0) AS enabled",
+                                "SUM(status = 1) AS disabled",
+                                "SUM(password_modify_time IS NOT NULL) AS used")
+                        // 显式租户条件:平台管理员上下文 tenant_id=1,依赖拦截器注入会查错租户(AC-9)
+                        .eq("tenant_id", tenantId)));
+        Map<String, Object> agg = rows.isEmpty() ? Map.of() : rows.get(0);
+        long total = numberValue(agg.get("total"));
+        long online = onlineSessionService.count(tenantId);
+        UsageStatsVO.Users users = new UsageStatsVO.Users(
+                total, numberValue(agg.get("enabled")), numberValue(agg.get("disabled")),
+                numberValue(agg.get("used")), online);
+        // scenes:admin/workflow/dashboard 单键 SCARD;mobile 双键成员合并去重(D-06);portal null 占位
+        UsageStatsVO.Scenes scenes = new UsageStatsVO.Scenes(
+                sceneStat(tenantId, SCENE_ADMIN, total),
+                sceneStat(tenantId, SCENE_WORKFLOW, total),
+                mobileSceneStat(tenantId, total),
+                sceneStat(tenantId, SCENE_DASHBOARD, total),
+                new UsageStatsVO.PortalStat(null, null));
+        return new UsageStatsVO(users, scenes);
+    }
+
+    /**
+     * 单端登录统计:loggedIn=该 scene 统计键去重成员数;rate=loggedIn/total 两位小数,total=0 记 0
+     * (新租户还没人登录时除零保护,契约 §5.4)。
+     */
+    private UsageStatsVO.SceneStat sceneStat(Long tenantId, String scene, long total) {
+        long loggedIn = statLoginMembers(tenantId, scene).size();
+        return new UsageStatsVO.SceneStat(loggedIn, rate(loggedIn, total));
+    }
+
+    /**
+     * 移动端统计(D-06):app 与 miniapp 是同一产品位的两个 scene,开通共用 mobile_enabled 一列;
+     * 读侧把两键成员各读回、内存 Set 去重后计数(成员千级,微秒级),免 SUNIONSTORE 临时键。
+     */
+    private UsageStatsVO.SceneStat mobileSceneStat(Long tenantId, long total) {
+        Set<String> merged = new HashSet<>(statLoginMembers(tenantId, SCENE_APP));
+        merged.addAll(statLoginMembers(tenantId, SCENE_MINIAPP));
+        return new UsageStatsVO.SceneStat(merged.size(), rate(merged.size(), total));
+    }
+
+    /**
+     * 读某 scene 的登录统计成员,键丢失触发 lazy 自愈回填(D-03):
+     * SCARD=0 时不直接当 0——先按 sys_login_log 事实源查该租户该端的登录用户 DISTINCT 集合
+     * (tenant->log 登记边),有行则 SADD 回填后按回填值返回;无行才是真 0。
+     * 仅键丢失后首次发生一次表查,常驻读路径纯 Valkey O(1);login_log 与 Set 双写漂移只发生在键丢失,回填后归一。
+     */
+    private Set<String> statLoginMembers(Long tenantId, String scene) {
+        String key = SnailRedisKeys.statLogin(tenantId, scene);
+        Set<String> members = redisTemplate.opsForSet().members(key);
+        if (members != null && !members.isEmpty()) {
+            return members;
+        }
+        List<Long> userIds = TenantContextHolder.withoutTenant(() ->
+                loginLogMapper.selectDistinctUserIds(tenantId, scene));
+        if (userIds.isEmpty()) {
+            return Set.of();
+        }
+        String[] memberArray = userIds.stream().map(String::valueOf).toArray(String[]::new);
+        redisTemplate.opsForSet().add(key, memberArray);
+        return Set.of(memberArray);
+    }
+
+    /** 使用率换算:两位小数,total=0 时 rate=0(契约 §5.4) */
+    private static double rate(long loggedIn, long total) {
+        return total == 0 ? 0 : Math.round(loggedIn * 100.0 / total) / 100.0;
+    }
+
+    /** 聚合列取数归一:SUM/COUNT 在不同驱动下返回 Long/BigDecimal,统一按 Number 转 long;NULL 聚合记 0 */
+    private static long numberValue(Object value) {
+        return value instanceof Number number ? number.longValue() : 0L;
     }
 
     /**
@@ -259,6 +406,23 @@ public class TenantService {
             throw BizException.badRequest("租户不存在");
         }
         return tenant;
+    }
+
+    /**
+     * 开关落库归一:请求值为 1 才算开通,其余(null/0)一律按 0 落库。
+     * 依据:开关列 NOT NULL,整份覆盖口径下"留空即关闭";直接 set null 会撞 NOT NULL 约束,
+     * 归一同时把"前端漏传某个开关"的语义钉死为关闭而不是报错。
+     */
+    private static int switchValue(Integer requested) {
+        return Integer.valueOf(1).equals(requested) ? 1 : 0;
+    }
+
+    /**
+     * 开关资格收口判定:存量是 1 且本次归一后为 0,即"该端被收回"。
+     * 0→1(新开)与 1→1(维持)不触发会话作废——开通不需要踢人,收回才需要。
+     */
+    private static boolean switchTurnedOff(Integer existing, Integer requested) {
+        return Integer.valueOf(1).equals(existing) && switchValue(requested) == 0;
     }
 
     /**

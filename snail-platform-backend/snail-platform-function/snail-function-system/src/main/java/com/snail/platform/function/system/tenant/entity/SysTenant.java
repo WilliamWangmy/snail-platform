@@ -42,6 +42,21 @@ public class SysTenant extends AuditedEntity {
     /** 存储配额 MB,null 为不限 */
     private Long storageLimitMb;
 
+    /** 管理系统开通:0 未开通 1 已开通;未开通则 scene=admin 登录被拒 */
+    private Integer adminEnabled;
+
+    /** 流程系统开通:0 未开通 1 已开通;未开通则 scene=workflow 登录被拒 */
+    private Integer workflowEnabled;
+
+    /** 移动端(app 与小程序)开通:0 未开通 1 已开通;未开通则 scene=app/miniapp 登录被拒 */
+    private Integer mobileEnabled;
+
+    /** 数据大屏开通:0 未开通 1 已开通;未开通则 scene=dashboard 登录被拒 */
+    private Integer dashboardEnabled;
+
+    /** 企业门户开通:0 未开通 1 已开通;门户立项前为配置先行 */
+    private Integer portalEnabled;
+
     /** 状态:0 正常 1 停用 */
     private Integer status;
 
