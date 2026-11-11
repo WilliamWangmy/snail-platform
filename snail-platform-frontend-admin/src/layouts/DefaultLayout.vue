@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router';
 import AppIcon from '@/components/AppIcon.vue';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
 import NotifyToast from '@/components/NotifyToast.vue';
-import ProfileEditDialog from '@/components/ProfileEditDialog.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import TabBar from '@/components/TabBar.vue';
 import { fetchUnreadCount, pageInbox, type NotifyInboxItem } from '@/api/notify';
@@ -106,13 +105,12 @@ function handleSystemCommand(command: string | number | object): void {
   if (target) openStandalone(target.url);
 }
 
-/** 账号菜单三项:个人信息/修改密码开弹窗,退出登录直接走人 */
-const profileVisible = ref(false);
+/** 账号菜单:个人信息进个人中心页(资料/角色/第三方绑定/改密都在那里),修改密码开弹窗,退出登录直接走人 */
 const passwordVisible = ref(false);
 
 function handleUserCommand(command: string | number | object): void {
   if (command === 'logout') void signOut();
-  else if (command === 'profile') profileVisible.value = true;
+  else if (command === 'profile') void router.push('/profile');
   else if (command === 'password') passwordVisible.value = true;
   else if (command === 'settings') void router.push('/settings');
 }
@@ -510,10 +508,6 @@ onBeforeUnmount(() => {
       </ElMain>
     </ElContainer>
 
-    <ProfileEditDialog
-      :visible="profileVisible"
-      @closed="profileVisible = false"
-    />
     <ChangePasswordDialog
       :visible="passwordVisible"
       @closed="passwordVisible = false"
