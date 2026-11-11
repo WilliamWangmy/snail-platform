@@ -268,6 +268,8 @@ async function onSendSms(): Promise<void> {
       smsCooldown.value -= 1;
       if (smsCooldown.value <= 0) stopCooldownTimer();
     }, 1000);
+    // 图形码是发送闸的一次性凭据,发送成功即在后端核销:立即换新图,避免旧图挂着误导重发
+    await refreshCaptcha();
   } catch (error) {
     failHint(error);
   }
