@@ -11,6 +11,13 @@ export function dateTime(value?: string | null): string {
   return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm:ss') : value;
 }
 
+/** 仅日期(YYYY-MM-DD):列表列等不关心时分秒的场景,窄列友好;空值与解析失败口径同 dateTime。 */
+export function date(value?: string | null): string {
+  if (!value) return '—';
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : value;
+}
+
 /** 二进制千进单位,与操作系统文件管理器一致。 */
 const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 

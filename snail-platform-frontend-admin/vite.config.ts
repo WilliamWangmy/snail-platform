@@ -46,6 +46,13 @@ export default defineConfig(() => {
           // 只有 XHR(Accept 不含 text/html)才转给后端。
           bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
         },
+        // 平台面接口(/platform/file/** 等):此前未代理,XHR 被 dev server 回退成 index.html,
+        // 前端拿到 HTML 当 JSON 解析即"存储统计报错";bypass 口径与 /system 一致。
+        '/platform': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+          bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+        },
       },
     },
     build: {

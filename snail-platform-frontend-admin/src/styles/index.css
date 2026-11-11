@@ -662,7 +662,7 @@ body {
   border: 1px solid rgba(var(--app-primary-rgb), 0.25);
   border-radius: 8px;
   background: rgba(var(--app-primary-rgb), 0.07);
-  color: #1f6f5f;
+  color: var(--app-primary, #1f6f5f);
   font-size: 12.5px;
 }
 

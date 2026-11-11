@@ -6,13 +6,20 @@ import {
   changeTenantStatus,
   checkAdminUsername,
   createTenant,
+  getTenantDetail,
+  getTenantStorageUsage,
+  getTenantUsageStats,
   pageTenants,
   updateTenant,
+  type StorageUsageVO,
+  type TenantFeatureFlags,
   type TenantQuery,
+  type TenantUpdatePayload,
   type TenantVO,
+  type UsageStatsVO,
 } from '@/api/tenant';
 import { usePageList } from '@/composables/usePageList';
-import { dateTime } from '@/utils/format';
+import { date, dateTime } from '@/utils/format';
 import { generatePassword, validatePassword } from '@/utils/password';
 import PasswordHintInput from '@/components/PasswordHintInput.vue';
 
@@ -34,10 +41,15 @@ function reset(): void {
 interface TenantForm {
   tenantCode: string;
   name: string;
+  /** 五系统开通开关:boolean 表单口径,提交时换算 1/0;默认全关(2026-11-11 拍板"默认都是不开启") */
+  features: TenantFeatureFlags;
   contactUser: string;
   contactPhone: string;
   expireTime: string;
+  /** 开通用户数=后端 account_limit(原型文案「开通用户数」),null 为不限 */
   accountLimit: number | null;
+  /** 存储配额 GB 输入口径:提交 ×1024 换算 MB(契约 5.3),null 为不限 */
+  storageGb: number | null;
   remark: string;
   adminUsername: string;
   /** 首任管理员初始口令(P2-3):平台管理员自输或点生成,仅在开通态提交 */
@@ -47,13 +59,42 @@ interface TenantForm {
 const emptyForm: TenantForm = {
   tenantCode: '',
   name: '',
+  features: {
+    adminEnabled: false,
+    workflowEnabled: false,
+    mobileEnabled: false,
+    dashboardEnabled: false,
+    portalEnabled: false,
+  },
   contactUser: '',
   contactPhone: '',
   expireTime: '',
   accountLimit: null,
+  storageGb: null,
   remark: '',
   adminUsername: '',
   adminPassword: '',
+};
+
+/**
+ * 五系统开通项元数据:面板顺序与文案按原型 B 块;开关列与登录端 scene 的映射见契约 5.1
+ * (admin→管理系统、workflow→流程系统、app/miniapp→移动端共用一开关、dashboard→大屏、portal→门户)。
+ */
+const FEATURE_META: Array<{ key: keyof TenantFeatureFlags; label: string; hint: string }> = [
+  { key: 'adminEnabled', label: '管理系统', hint: '开通后可登录管理后台' },
+  { key: 'workflowEnabled', label: '流程系统', hint: '开通后可登录流程平台' },
+  { key: 'mobileEnabled', label: '移动端', hint: 'app 与小程序共用' },
+  { key: 'dashboardEnabled', label: '数据大屏', hint: '开通后可登录大屏查看看板' },
+  { key: 'portalEnabled', label: '企业门户', hint: '门户立项前为配置先行' },
+];
+
+/** 列表功能开通 tag 的短文案:列宽有限,取单字/双字 */
+const FEATURE_SHORT: Record<keyof TenantFeatureFlags, string> = {
+  adminEnabled: '管理',
+  workflowEnabled: '流程',
+  mobileEnabled: '移动',
+  dashboardEnabled: '大屏',
+  portalEnabled: '门户',
 };
 
 const formVisible = ref(false);
@@ -61,6 +102,11 @@ const formRef = ref<FormInstance>();
 const editingId = ref<number | null>(null);
 const form = reactive<TenantForm>({ ...emptyForm });
 const saving = ref(false);
+
+/** 功能开通芯片的切换出口:点亮=开通,再点收回;与开关面板同写 form.features,提交链路不变 */
+function toggleFeature(key: keyof TenantFeatureFlags, on: boolean): void {
+  form.features[key] = on;
+}
 
 /** 必填口径按需求收紧:开通态除备注外全部必填;修改态保持"留空即清空"的原语义不拦截 */
 const rules = computed<FormRules<TenantForm>>(() => ({
@@ -87,7 +133,7 @@ const rules = computed<FormRules<TenantForm>>(() => ({
     { pattern: /^\d{11}$/, message: '联系电话必须为 11 位数字', trigger: 'blur' },
   ],
   expireTime: editingId.value === null ? [{ required: true, message: '请选择到期时间', trigger: 'change' }] : [],
-  accountLimit: editingId.value === null ? [{ required: true, message: '请输入账号上限', trigger: 'blur' }] : [],
+  accountLimit: editingId.value === null ? [{ required: true, message: '请输入账户数量', trigger: 'blur' }] : [],
   adminUsername: [
     { required: true, message: '请输入管理员登录名', trigger: 'blur' },
     { min: 3, max: 30, message: '登录名长度 3-30', trigger: 'blur' },
@@ -149,20 +195,32 @@ async function copyAdminPassword(): Promise<void> {
 
 function openCreate(): void {
   editingId.value = null;
-  Object.assign(form, emptyForm);
+  Object.assign(form, emptyForm, {
+    // Object.assign 浅拷贝:features 是嵌套对象,必须整体重置,否则上一单的开关状态会残留进下一单
+    features: { ...emptyForm.features },
+  });
   formVisible.value = true;
 }
 
-/** 编辑回填:租户标识只读展示(后端修改载荷里没有它),管理员登录名清空——同一段模板只在开通态渲染。 */
+/** 编辑回填:租户标识只读展示(后端修改载荷里没有它),管理员登录名清空——同一段模板只在开通态渲染。
+ *  开关按行数据回填(列表投影已带五开关);存储配额 MB÷1024 折回 GB 输入口径。 */
 function openEdit(row: TenantVO): void {
   editingId.value = row.tenantId;
   Object.assign(form, {
     tenantCode: row.tenantCode,
     name: row.name,
+    features: {
+      adminEnabled: row.adminEnabled === 1,
+      workflowEnabled: row.workflowEnabled === 1,
+      mobileEnabled: row.mobileEnabled === 1,
+      dashboardEnabled: row.dashboardEnabled === 1,
+      portalEnabled: row.portalEnabled === 1,
+    },
     contactUser: row.contactUser ?? '',
     contactPhone: row.contactPhone ?? '',
     expireTime: row.expireTime ?? '',
     accountLimit: row.accountLimit,
+    storageGb: row.storageLimitMb == null ? null : row.storageLimitMb / 1024,
     remark: row.remark ?? '',
     adminUsername: '',
     adminPassword: '',
@@ -177,12 +235,21 @@ async function submitForm(): Promise<void> {
   try {
     // 空输入折成 null:后端把 null 读成"清空/不限",空串会被原样存进联系人这类可空列
     const text = (value: string): string | null => value.trim() || null;
-    const common = {
+    // 显式标注载荷类型:三元产生的 1/0 会被 TS 放宽成 number,靠注解收窄回 0|1 字面量口径
+    const common: TenantUpdatePayload = {
       name: form.name.trim(),
       contactUser: text(form.contactUser),
       contactPhone: text(form.contactPhone),
       expireTime: form.expireTime || null,
       accountLimit: form.accountLimit,
+      // 存储配额 GB×1024→MB(契约 5.3 冻结换算):留空即 null=不限;后端与配额校验链同一列
+      storageLimitMb: form.storageGb == null ? null : form.storageGb * 1024,
+      // 开关 boolean→0/1:不勾即 0,与后端"非 1 即 0"归一口径同向
+      adminEnabled: form.features.adminEnabled ? 1 : 0,
+      workflowEnabled: form.features.workflowEnabled ? 1 : 0,
+      mobileEnabled: form.features.mobileEnabled ? 1 : 0,
+      dashboardEnabled: form.features.dashboardEnabled ? 1 : 0,
+      portalEnabled: form.features.portalEnabled ? 1 : 0,
       remark: text(form.remark),
     };
     if (editingId.value === null) {
@@ -197,6 +264,7 @@ async function submitForm(): Promise<void> {
     } else {
       // 修改是整份提交:表单回填了现值,所以"留空即清空"在这里只在用户真删了内容时发生
       // status 不在载荷里:启停只走独立端点,弹窗里放开关等于给高危动作开第二条无确认的通路
+      // 开关收回(1→0)会作废该租户全部存量令牌,由后端判定,前端不重复提示
       await updateTenant(editingId.value, common);
       ElMessage.success('已保存修改');
     }
@@ -236,6 +304,72 @@ async function toggleStatus(row: TenantVO): Promise<void> {
   await changeTenantStatus(row.tenantId, next);
   row.status = next;
   ElMessage.success(next === 0 ? '已启用' : '已停用');
+}
+
+/* ------------------------------- 详情抽屉 --------------------------------- */
+
+/**
+ * 详情抽屉四区:基础/功能开通/系统使用/存储使用(原型 C 块)。
+ * 三接口并行:详情失败回落到列表行数据(同一投影,只少刷新不缺字段);
+ * usage-stats 与 storage-usage 各自持有数据与失败态——单接口失败只降级所在分区,不拖垮整个抽屉。
+ */
+const drawerVisible = ref(false);
+const drawerTenant = ref<TenantVO | null>(null);
+const usage = ref<UsageStatsVO | null>(null);
+const usageFailed = ref(false);
+const storage = ref<StorageUsageVO | null>(null);
+const storageFailed = ref(false);
+
+function openDetail(row: TenantVO): void {
+  drawerTenant.value = row;
+  usage.value = null;
+  usageFailed.value = false;
+  storage.value = null;
+  storageFailed.value = false;
+  drawerVisible.value = true;
+  getTenantDetail(row.tenantId)
+    .then((detail) => (drawerTenant.value = detail))
+    .catch(() => (drawerTenant.value = row));
+  getTenantUsageStats(row.tenantId)
+    .then((v) => (usage.value = v))
+    .catch(() => (usageFailed.value = true));
+  getTenantStorageUsage(row.tenantId)
+    .then((v) => (storage.value = v))
+    .catch(() => (storageFailed.value = true));
+}
+
+/** 存储使用率百分比:limitMb 为 null(不限)不渲染进度条与百分比,契约 §5.5 */
+const storagePercent = computed<number | null>(() => {
+  if (!storage.value || storage.value.limitMb == null || storage.value.limitMb <= 0) return null;
+  return Math.min(
+    100,
+    Math.round((storage.value.usedBytes / (storage.value.limitMb * 1024 * 1024)) * 100),
+  );
+});
+
+/** 剩余配额文案:limitMb 不限时返回空串(不渲染);负数(超额)钳到 0 */
+const storageRemainGbText = computed<string>(() => {
+  if (!storage.value || storage.value.limitMb == null) return '';
+  const remainBytes = storage.value.limitMb * 1024 * 1024 - storage.value.usedBytes;
+  return bytesToGbText(Math.max(0, remainBytes));
+});
+
+/** MB→GB 展示文案:整数 GB 不带小数,否则保留 1 位;null=不限 */
+function mbToGbText(mb: number | null): string {
+  if (mb == null) return '不限';
+  const gb = mb / 1024;
+  return Number.isInteger(gb) ? `${gb} GB` : `${gb.toFixed(1)} GB`;
+}
+
+/** 字节→GB 展示文案:≥10 GB 取整,否则保留 1 位 */
+function bytesToGbText(bytes: number): string {
+  const gb = bytes / 1024 ** 3;
+  return gb >= 10 ? `${Math.round(gb)} GB` : `${gb.toFixed(1)} GB`;
+}
+
+/** 使用率百分比文案:0.925 → 93%(契约两位小数,展示取整百分比) */
+function ratePercent(rate: number): string {
+  return `${Math.round(rate * 100)}%`;
 }
 </script>
 
@@ -338,16 +472,18 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         <ElTableColumn
           prop="tenantCode"
           label="租户标识"
-          min-width="120"
+          min-width="110"
         />
         <ElTableColumn
           prop="name"
           label="租户名称"
-          min-width="160"
+          min-width="150"
+          show-overflow-tooltip
         />
         <ElTableColumn
           label="联系人"
-          min-width="110"
+          width="96"
+          show-overflow-tooltip
         >
           <template #default="{ row }">
             {{ row.contactUser ?? '—' }}
@@ -355,7 +491,8 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         </ElTableColumn>
         <ElTableColumn
           label="联系电话"
-          min-width="130"
+          min-width="120"
+          show-overflow-tooltip
         >
           <template #default="{ row }">
             {{ row.contactPhone ?? '—' }}
@@ -363,15 +500,16 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         </ElTableColumn>
         <ElTableColumn
           label="到期时间"
-          min-width="160"
+          min-width="108"
         >
+          <!-- 列表只看日期:时分秒进详情抽屉看(dateTime 全量口径),列宽让给功能开通 -->
           <template #default="{ row }">
-            {{ row.expireTime ? dateTime(row.expireTime) : '不限' }}
+            {{ date(row.expireTime) }}
           </template>
         </ElTableColumn>
         <ElTableColumn
           label="账号上限"
-          width="100"
+          width="84"
           align="right"
         >
           <template #default="{ row }">
@@ -379,8 +517,34 @@ async function toggleStatus(row: TenantVO): Promise<void> {
           </template>
         </ElTableColumn>
         <ElTableColumn
+          label="存储配额"
+          width="92"
+          align="right"
+        >
+          <template #default="{ row }">
+            {{ mbToGbText(row.storageLimitMb) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn
+          label="功能开通"
+          width="160"
+        >
+          <template #default="{ row }">
+            <div class="feature-tags">
+              <span
+                v-for="item in FEATURE_META"
+                :key="item.key"
+                class="feature-tag"
+                :class="row[item.key] === 1 ? 'on' : 'off'"
+              >
+                {{ FEATURE_SHORT[item.key] }}
+              </span>
+            </div>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn
           label="状态"
-          width="96"
+          width="72"
           align="center"
         >
           <template #default="{ row }">
@@ -394,11 +558,19 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         </ElTableColumn>
         <ElTableColumn
           label="操作"
-          width="150"
+          width="180"
           align="center"
           fixed="right"
         >
           <template #default="{ row }">
+            <ElButton
+              v-permission="'platform:tenant:list'"
+              link
+              type="primary"
+              @click="openDetail(row as TenantVO)"
+            >
+              详情
+            </ElButton>
             <ElButton
               v-permission="'platform:tenant:update'"
               link
@@ -410,7 +582,7 @@ async function toggleStatus(row: TenantVO): Promise<void> {
             <ElButton
               v-permission="'platform:tenant:update'"
               link
-              type="primary"
+              :type="row.status === 0 ? 'danger' : 'success'"
               @click="toggleStatus(row as TenantVO)"
             >
               {{ row.status === 0 ? '停用' : '启用' }}
@@ -435,7 +607,7 @@ async function toggleStatus(row: TenantVO): Promise<void> {
     <ElDialog
       v-model="formVisible"
       :title="editingId === null ? '开通租户' : '修改租户'"
-      width="640px"
+      width="min(760px, 94vw)"
     >
       <div
         v-if="editingId === null"
@@ -447,186 +619,201 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         />
         <span>除备注外均为必填项;管理员初始口令开通后请线下告知租户</span>
       </div>
+
       <ElForm
         ref="formRef"
         :model="form"
         :rules="rules"
         label-position="top"
       >
-        <div class="form-panel">
-          <div class="panel-head">
-            <span class="panel-ico">
-              <AppIcon
-                name="box"
-                :size="13"
-              />
-            </span>
-            <span class="panel-title">租户信息</span>
-            <span class="panel-hint">标识开通后不可修改</span>
-          </div>
-          <div class="form-grid">
-            <ElFormItem
-              label="租户标识"
-              prop="tenantCode"
-            >
-              <ElInput
-                v-model="form.tenantCode"
-                :disabled="editingId !== null"
-                placeholder="2-64 位小写,字母、数字或 _ . -"
-              />
-            </ElFormItem>
-            <ElFormItem
-              label="租户名称"
-              prop="name"
-            >
-              <ElInput
-                v-model="form.name"
-                placeholder="列表与授权页展示的名称"
-              />
-            </ElFormItem>
-          </div>
+        <!-- 分区标题轻量化:无边框面板盒,字段两列舒展;功能开通改一行点亮芯片,单击切换 -->
+        <div class="sec-head">
+          <i class="bar" />
+          <b>基本信息</b>
+          <span>标识开通后不可修改</span>
+        </div>
+        <div class="form-grid">
+          <ElFormItem
+            label="租户标识"
+            prop="tenantCode"
+          >
+            <ElInput
+              v-model="form.tenantCode"
+              :disabled="editingId !== null"
+              placeholder="2-64 位小写,字母、数字或 _ . -"
+            />
+          </ElFormItem>
+          <ElFormItem
+            label="租户名称"
+            prop="name"
+          >
+            <ElInput
+              v-model="form.name"
+              placeholder="列表与授权页展示的名称"
+            />
+          </ElFormItem>
         </div>
 
         <div
           v-if="editingId === null"
-          class="form-panel"
+          class="sec-head"
         >
-          <div class="panel-head">
-            <span class="panel-ico">
-              <AppIcon
-                name="shield"
-                :size="13"
-              />
-            </span>
-            <span class="panel-title">管理员账号</span>
-            <span class="panel-hint">初始口令请线下转交租户</span>
-          </div>
-          <div class="form-grid">
-            <ElFormItem
-              label="登录名"
-              prop="adminUsername"
+          <i class="bar" />
+          <b>管理员账号</b>
+          <span>初始口令请线下转交租户</span>
+        </div>
+        <div
+          v-if="editingId === null"
+          class="form-grid"
+        >
+          <ElFormItem
+            label="登录名"
+            prop="adminUsername"
+          >
+            <ElInput
+              v-model="form.adminUsername"
+              placeholder="3-30 位,全站唯一"
+            />
+          </ElFormItem>
+          <ElFormItem
+            label="初始密码"
+            prop="adminPassword"
+          >
+            <PasswordHintInput
+              v-model="form.adminPassword"
+              class="mono-pwd"
             >
-              <ElInput
-                v-model="form.adminUsername"
-                placeholder="3-30 位,全站唯一"
-              />
-            </ElFormItem>
-            <ElFormItem
-              label="初始密码"
-              prop="adminPassword"
-            >
-              <PasswordHintInput
-                v-model="form.adminPassword"
-                class="mono-pwd"
-              >
-                <template #suffix>
-                  <button
-                    class="pwd-action"
-                    type="button"
-                    title="重新生成"
-                    @click="form.adminPassword = generatePassword()"
-                  >
-                    <AppIcon
-                      name="refresh"
-                      :size="15"
-                    />
-                  </button>
-                  <button
-                    class="pwd-action"
-                    :class="{ 'is-done': copied }"
-                    type="button"
-                    :title="copied ? '已复制' : '复制密码'"
-                    @click="copyAdminPassword"
-                  >
-                    <AppIcon
-                      :name="copied ? 'check' : 'copy'"
-                      :size="15"
-                    />
-                  </button>
-                </template>
-              </PasswordHintInput>
-            </ElFormItem>
-          </div>
+              <template #suffix>
+                <button
+                  class="pwd-action"
+                  type="button"
+                  title="重新生成"
+                  @click="form.adminPassword = generatePassword()"
+                >
+                  <AppIcon
+                    name="refresh"
+                    :size="15"
+                  />
+                </button>
+                <button
+                  class="pwd-action"
+                  :class="{ 'is-done': copied }"
+                  type="button"
+                  :title="copied ? '已复制' : '复制密码'"
+                  @click="copyAdminPassword"
+                >
+                  <AppIcon
+                    :name="copied ? 'check' : 'copy'"
+                    :size="15"
+                  />
+                </button>
+              </template>
+            </PasswordHintInput>
+          </ElFormItem>
         </div>
 
-        <div class="form-panel">
-          <div class="panel-head">
-            <span class="panel-ico">
-              <AppIcon
-                name="phone"
-                :size="13"
-              />
-            </span>
-            <span class="panel-title">联系方式</span>
-          </div>
-          <div class="form-grid">
-            <ElFormItem
-              label="联系人"
-              prop="contactUser"
-            >
-              <ElInput
-                v-model="form.contactUser"
-                placeholder="租户方对接人姓名"
-              />
-            </ElFormItem>
-            <ElFormItem
-              label="联系电话"
-              prop="contactPhone"
-            >
-              <ElInput
-                v-model="form.contactPhone"
-                maxlength="11"
-                show-word-limit
-                placeholder="11 位手机号"
-                @input="sanitizeContactPhone"
-              />
-            </ElFormItem>
-          </div>
+        <div class="sec-head">
+          <i class="bar" />
+          <b>联系方式</b>
+        </div>
+        <div class="form-grid">
+          <ElFormItem
+            label="联系人"
+            prop="contactUser"
+          >
+            <ElInput
+              v-model="form.contactUser"
+              placeholder="租户方对接人姓名"
+            />
+          </ElFormItem>
+          <ElFormItem
+            label="联系电话"
+            prop="contactPhone"
+          >
+            <ElInput
+              v-model="form.contactPhone"
+              maxlength="11"
+              show-word-limit
+              placeholder="11 位手机号"
+              @input="sanitizeContactPhone"
+            />
+          </ElFormItem>
         </div>
 
-        <div class="form-panel">
-          <div class="panel-head">
-            <span class="panel-ico">
-              <AppIcon
-                name="clock"
-                :size="13"
-              />
-            </span>
-            <span class="panel-title">使用限制</span>
-            <span class="panel-hint">
-              {{ editingId === null ? '开通后可在修改中随时调整' : '留空即恢复不限' }}
-            </span>
-          </div>
-          <div class="form-grid">
-            <ElFormItem
-              label="到期时间"
-              prop="expireTime"
-            >
-              <!-- value-format 给的是 ISO 本地时间串,后端 LocalDateTime 直接绑定;修改态清空即提交 null=不限期 -->
-              <ElDatePicker
-                v-model="form.expireTime"
-                type="datetime"
-                value-format="YYYY-MM-DDTHH:mm:ss"
-                :disabled-date="editingId === null ? isPastDay : undefined"
-                :placeholder="editingId === null ? '请选择到期时间' : '留空不限'"
-                class="full"
-              />
-            </ElFormItem>
-            <ElFormItem
-              label="账号上限"
-              prop="accountLimit"
-            >
-              <!-- min=1 是有意的:后端只认 null 为不限,0 会被当成"一个账号都不许建";修改态留空仍是不限 -->
-              <ElInputNumber
-                v-model="form.accountLimit"
-                :min="1"
-                :precision="0"
-                controls-position="right"
-                :placeholder="editingId === null ? '请输入上限数量' : '留空不限'"
-                class="full"
-              />
-            </ElFormItem>
-          </div>
+        <div class="sec-head">
+          <i class="bar" />
+          <b>使用限制</b>
+          <span>{{ editingId === null ? '账号数与存储配额留空即不限,开通后可随时调整' : '留空即恢复不限' }}</span>
+        </div>
+        <div class="form-grid cols-3">
+          <ElFormItem
+            label="到期时间"
+            prop="expireTime"
+          >
+            <!-- value-format 给的是 ISO 本地时间串,后端 LocalDateTime 直接绑定;修改态清空即提交 null=不限期 -->
+            <ElDatePicker
+              v-model="form.expireTime"
+              type="datetime"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              :disabled-date="editingId === null ? isPastDay : undefined"
+              :placeholder="editingId === null ? '请选择到期时间' : '留空不限'"
+              class="full"
+            />
+          </ElFormItem>
+          <ElFormItem
+            label="开通用户数"
+            prop="accountLimit"
+          >
+            <!-- 开通用户数=后端 account_limit(原型文案);min=1 是有意的:后端只认 null 为不限,0 会被当成"一个账号都不许建" -->
+            <ElInputNumber
+              v-model="form.accountLimit"
+              :min="1"
+              :precision="0"
+              controls-position="right"
+              :placeholder="editingId === null ? '请输入账户数量' : '留空不限'"
+              class="full"
+            />
+          </ElFormItem>
+          <ElFormItem
+            label="存储配额(GB)"
+            prop="storageGb"
+          >
+            <!-- GB 输入口径:提交 ×1024 换算 MB(契约 5.3 冻结换算,防止双端口径 1024 倍错位);留空不限,超限后上传被拒 -->
+            <ElInputNumber
+              v-model="form.storageGb"
+              :min="1"
+              :precision="0"
+              controls-position="right"
+              :placeholder="editingId === null ? '请输入配额大小' : '留空不限'"
+              class="full"
+            />
+          </ElFormItem>
+        </div>
+
+        <div class="sec-head">
+          <i class="bar" />
+          <b>功能开通</b>
+          <span>点亮即开通;未点亮的端用户无法登录,默认全部关闭</span>
+        </div>
+        <div class="chip-row">
+          <!-- 点亮式芯片:选中=主题实底+对勾,单击切换;hint 悬停可见(细节口径与抽屉五开关同源 FEATURE_META) -->
+          <ElButton
+            v-for="item in FEATURE_META"
+            :key="item.key"
+            class="feature-chip"
+            :type="form.features[item.key] ? 'primary' : 'info'"
+            :plain="!form.features[item.key]"
+            round
+            :title="item.hint"
+            @click="toggleFeature(item.key, !form.features[item.key])"
+          >
+            <AppIcon
+              v-if="form.features[item.key]"
+              name="check"
+              :size="13"
+            />
+            {{ item.label }}
+          </ElButton>
         </div>
 
         <ElFormItem
@@ -657,12 +844,519 @@ async function toggleStatus(row: TenantVO): Promise<void> {
         </ElButton>
       </template>
     </ElDialog>
+
+    <!-- 详情抽屉(原型 C 块):四区各自独立加载,单接口失败只降级所在分区 -->
+    <ElDrawer
+      v-model="drawerVisible"
+      size="560px"
+    >
+      <template #header>
+        <div class="drawer-head">
+          <h3>{{ drawerTenant?.name ?? '租户详情' }}</h3>
+          <span
+            class="status-pill"
+            :class="drawerTenant?.status === 0 ? 'success' : 'info'"
+          >
+            {{ drawerTenant?.status === 0 ? '正常' : '停用' }}
+          </span>
+          <span class="drawer-sub">tenant_id {{ drawerTenant?.tenantId }} · {{ drawerTenant?.tenantCode }}</span>
+        </div>
+      </template>
+
+      <div
+        v-if="drawerTenant"
+        class="drawer-body"
+      >
+        <!-- 区一:基础信息(列表行数据兜底,不单独发请求) -->
+        <div class="d-sec">
+          <h4>基础信息</h4>
+          <dl class="desc-grid">
+            <dt>联系人</dt>
+            <dd>{{ drawerTenant.contactUser ?? '—' }}</dd>
+            <dt>联系电话</dt>
+            <dd>{{ drawerTenant.contactPhone ?? '—' }}</dd>
+            <dt>开通时间</dt>
+            <dd>{{ dateTime(drawerTenant.createTime) }}</dd>
+            <dt>到期时间</dt>
+            <dd>{{ drawerTenant.expireTime ? dateTime(drawerTenant.expireTime) : '不限' }}</dd>
+            <dt>开通用户数</dt>
+            <dd>{{ drawerTenant.accountLimit ?? '不限' }}</dd>
+            <dt>存储配额</dt>
+            <dd>{{ mbToGbText(drawerTenant.storageLimitMb) }}</dd>
+            <dt>备注</dt>
+            <dd>{{ drawerTenant.remark ?? '—' }}</dd>
+          </dl>
+        </div>
+
+        <!-- 区二:功能开通(行数据已带五开关) -->
+        <div class="d-sec">
+          <h4>功能开通</h4>
+          <div class="feature-col">
+            <div
+              v-for="item in FEATURE_META"
+              :key="item.key"
+              class="feature-row"
+            >
+              <div class="f-txt">
+                <b>{{ item.label }}</b>
+              </div>
+              <span
+                class="feature-tag big"
+                :class="drawerTenant[item.key] === 1 ? 'on' : 'off'"
+              >
+                {{ drawerTenant[item.key] === 1 ? '已开通' : '未开通' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 区三:系统使用(usage-stats):用户五卡+分端使用率表;门户行占位(契约 BR-8) -->
+        <div class="d-sec">
+          <h4>系统使用</h4>
+          <div
+            v-if="usageFailed"
+            class="sec-fallback"
+          >
+            使用统计加载失败,请稍后重试
+          </div>
+          <template v-else-if="usage">
+            <div class="user-grid">
+              <div class="stat">
+                <b>{{ usage.users.total }}</b><span>总用户</span>
+              </div>
+              <div class="stat">
+                <b>{{ usage.users.enabled }}</b><span>启用</span>
+              </div>
+              <div class="stat">
+                <b>{{ usage.users.disabled }}</b><span>禁用</span>
+              </div>
+              <div class="stat">
+                <b>{{ usage.users.used }}</b><span>已使用</span>
+              </div>
+              <div class="stat hl">
+                <b>{{ usage.users.online }}</b><span>在线</span>
+              </div>
+            </div>
+            <table class="mini-table">
+              <thead>
+                <tr>
+                  <th>端</th>
+                  <th>登录用户</th>
+                  <th>总用户</th>
+                  <th>使用率</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>管理系统</td>
+                  <td>{{ usage.scenes.admin.loggedIn }}</td>
+                  <td>{{ usage.users.total }}</td>
+                  <td>
+                    <div class="rate-wrap">
+                      <div class="rate-bar">
+                        <i :style="{ width: ratePercent(usage.scenes.admin.rate) }" />
+                      </div>
+                      {{ ratePercent(usage.scenes.admin.rate) }}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>流程系统</td>
+                  <td>{{ usage.scenes.workflow.loggedIn }}</td>
+                  <td>{{ usage.users.total }}</td>
+                  <td>
+                    <div class="rate-wrap">
+                      <div class="rate-bar">
+                        <i :style="{ width: ratePercent(usage.scenes.workflow.rate) }" />
+                      </div>
+                      {{ ratePercent(usage.scenes.workflow.rate) }}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>移动端</td>
+                  <td>{{ usage.scenes.mobile.loggedIn }}</td>
+                  <td>{{ usage.users.total }}</td>
+                  <td>
+                    <div class="rate-wrap">
+                      <div class="rate-bar">
+                        <i :style="{ width: ratePercent(usage.scenes.mobile.rate) }" />
+                      </div>
+                      {{ ratePercent(usage.scenes.mobile.rate) }}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>数据大屏</td>
+                  <td>{{ usage.scenes.dashboard.loggedIn }}</td>
+                  <td>{{ usage.users.total }}</td>
+                  <td>
+                    <div class="rate-wrap">
+                      <div class="rate-bar">
+                        <i :style="{ width: ratePercent(usage.scenes.dashboard.rate) }" />
+                      </div>
+                      {{ ratePercent(usage.scenes.dashboard.rate) }}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>企业门户</td>
+                  <td
+                    colspan="3"
+                    class="portal-note"
+                  >
+                    未开通,访问人数与 IP 统计随门户上线后展示
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+          <div
+            v-else
+            class="sec-loading"
+          >
+            加载中…
+          </div>
+        </div>
+
+        <!-- 区四:存储使用(storage-usage):limitMb 不限时不渲染进度与百分比(契约 §5.5) -->
+        <div class="d-sec">
+          <h4>存储使用</h4>
+          <div
+            v-if="storageFailed"
+            class="sec-fallback"
+          >
+            存储统计加载失败,请稍后重试
+          </div>
+          <template v-else-if="storage">
+            <div class="usage-top">
+              <span class="num">
+                {{ bytesToGbText(storage.usedBytes) }}
+                <small>/ {{ storage.limitMb == null ? '不限' : mbToGbText(storage.limitMb) }}</small>
+              </span>
+              <span
+                v-if="storagePercent !== null"
+                class="pct"
+              >{{ storagePercent }}%</span>
+            </div>
+            <div
+              v-if="storagePercent !== null"
+              class="rate-bar big"
+            >
+              <i :style="{ width: storagePercent + '%' }" />
+            </div>
+            <div class="usage-sub">
+              共 {{ storage.fileCount }} 个文件<template v-if="storage.limitMb != null"> · 剩余 {{ storageRemainGbText }}</template>(配额可在「修改」中调整;存储不区分分类明细)
+            </div>
+          </template>
+          <div
+            v-else
+            class="sec-loading"
+          >
+            加载中…
+          </div>
+        </div>
+      </div>
+    </ElDrawer>
   </div>
 </template>
 
 <style scoped>
 .full {
   width: 100%;
+}
+
+/* 弹窗分区标题:竖条+标题+灰色说明,替代边框面板盒,视觉更轻、字段行距更舒展 */
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0 12px;
+}
+
+.sec-head .bar {
+  width: 3px;
+  height: 14px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--app-primary, #409eff);
+}
+
+.sec-head b {
+  font-size: 14px;
+  color: var(--app-ink, #303133);
+}
+
+.sec-head span {
+  font-size: 12px;
+  color: var(--app-muted, #909399);
+}
+
+/* 使用限制一行三列(到期时间/账号数/存储配额):760px 弹窗下三格并排,免纵向堆三行 */
+.form-grid.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 640px) {
+  .form-grid.cols-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 功能开通芯片行:点亮=主题实底+对勾,灰=未开通;圆角胶囊比开关行省高且状态一目了然 */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 4px;
+}
+
+.chip-row .feature-chip {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.chip-row .feature-chip .app-icon {
+  margin-right: 5px;
+}
+
+/* 功能开通 tag(列表列与抽屉共用形态):on=已开通(绿系),off=未开通(灰系);列表侧一行三个、两行展示(3+2),间距舒展不挤 */
+.feature-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.feature-tag {
+  font-size: 12px;
+  line-height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.feature-tag.on {
+  color: var(--app-success, #67c23a);
+  background: rgba(var(--app-success-rgb, 103, 194, 58), 0.12);
+  border-color: rgba(var(--app-success-rgb, 103, 194, 58), 0.4);
+}
+
+.feature-tag.off {
+  color: var(--app-muted, #909399);
+  background: var(--app-soft-2, #f4f4f5);
+  border-color: var(--app-line, #dcdfe6);
+}
+
+.feature-tag.big {
+  padding: 2px 12px;
+}
+
+/* 弹窗「功能开通」面板行:文案左、开关右,与原型 B 块同构 */
+.feature-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.f-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.f-txt b {
+  font-size: 13px;
+  color: var(--app-ink, #303133);
+}
+
+.f-txt span {
+  font-size: 12px;
+  color: var(--app-muted, #909399);
+}
+
+/* 抽屉四区:与原型 C 块同构 */
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.drawer-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.drawer-sub {
+  color: var(--app-muted, #909399);
+  font-size: 12px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.d-sec {
+  margin-bottom: 22px;
+}
+
+.d-sec h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--app-muted, #606266);
+}
+
+.desc-grid {
+  display: grid;
+  grid-template-columns: 84px 1fr 84px 1fr;
+  gap: 8px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.desc-grid dt {
+  color: var(--app-muted, #909399);
+}
+
+.desc-grid dd {
+  margin: 0;
+  color: var(--app-ink, #303133);
+  word-break: break-all;
+}
+
+.user-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat {
+  background: var(--app-soft, #f7f9fc);
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stat b {
+  display: block;
+  font-size: 18px;
+  color: var(--app-ink, #303133);
+}
+
+.stat span {
+  font-size: 12px;
+  color: var(--app-muted, #909399);
+}
+
+.stat.hl {
+  background: rgba(var(--app-primary-rgb), 0.08);
+}
+
+.stat.hl b {
+  color: var(--app-primary, #409eff);
+}
+
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.mini-table th,
+.mini-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--app-line, #ebeef5);
+}
+
+.mini-table th {
+  color: var(--app-muted, #909399);
+  font-weight: 500;
+}
+
+.rate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rate-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--app-line, #ebeef5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.rate-bar i {
+  display: block;
+  height: 100%;
+  background: var(--app-primary, #409eff);
+  border-radius: 3px;
+}
+
+.rate-bar.big {
+  height: 10px;
+  border-radius: 5px;
+}
+
+.usage-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.usage-top .num {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--app-ink, #303133);
+}
+
+.usage-top .num small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--app-muted, #909399);
+  margin-left: 4px;
+}
+
+.usage-top .pct {
+  font-size: 13px;
+  color: var(--app-primary, #409eff);
+  font-weight: 600;
+}
+
+.usage-sub {
+  font-size: 12px;
+  color: var(--app-muted, #909399);
+  margin-top: 10px;
+}
+
+.sec-fallback {
+  font-size: 12px;
+  color: var(--app-muted, #909399);
+  background: var(--app-soft, #f7f9fc);
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.sec-loading {
+  font-size: 12px;
+  color: var(--app-muted, #909399);
+  padding: 6px 0;
+}
+
+.portal-note {
+  color: var(--app-muted, #909399);
 }
 
 /* 弹窗面板/横幅/口令动作等公共样式在 styles/index.css 的「弹窗表单套件」一节,全局单点维护 */
