@@ -43,5 +43,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
+        <!-- 阿里云号码认证服务(短信验证码 SendSmsVerifyCode);第三方 SDK 依赖只准住本模块(ArchUnit 执法) -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>alibabacloud-dypnsapi20170525</artifactId>
+        </dependency>
     </dependencies>
 </project>

@@ -56,6 +56,8 @@
         <jsch.version>0.2.21</jsch.version>
         <!-- AWS SDK v2: S3 协议兼容存储(MinIO/云 OSS)走同一套协议栈,BOM 单点锁版本 -->
         <awssdk-bom.version>2.25.60</awssdk-bom.version>
+        <!-- 阿里云号码认证服务:短信验证码 SendSmsVerifyCode,SDK 只准住 snail-function-external -->
+        <aliyun-dypnsapi.version>2.0.0</aliyun-dypnsapi.version>
         <!-- 内嵌 SFTP 服务器:仅流程测试用,验证 storage 流程不再依赖外部 SFTP -->
         <sshd.version>2.12.1</sshd.version>
 
@@ -229,6 +231,13 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
+            </dependency>
+
+            <!-- 阿里云号码认证服务:短信验证码发送 SendSmsVerifyCode,与老 snail 联调链路同款 -->
+            <dependency>
+                <groupId>com.aliyun</groupId>
+                <artifactId>alibabacloud-dypnsapi20170525</artifactId>
+                <version>${aliyun-dypnsapi.version}</version>
             </dependency>
 
             <!-- IO 工具版本单点：Flowable 与 fastexcel 共用，取二者上界 -->
