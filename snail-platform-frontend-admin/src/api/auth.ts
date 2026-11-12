@@ -31,6 +31,15 @@ export interface RoleBrief {
   roleName: string;
 }
 
+/** 租户五系统开通态(/me 实时值,不进 JWT/登录快照):顶栏系统切换按此过滤入口,旧后端不下发时视为全量开通 */
+export interface TenantFeatures {
+  adminEnabled: boolean;
+  workflowEnabled: boolean;
+  mobileEnabled: boolean;
+  dashboardEnabled: boolean;
+  portalEnabled: boolean;
+}
+
 /** 当前登录人富快照:身份 + 组织/角色/租户名称 + 生效权限码。 */
 export interface LoginUser {
   userId: number;
@@ -43,6 +52,7 @@ export interface LoginUser {
   roles: RoleBrief[];
   permissions: string[];
   passwordChangeRequired: boolean;
+  tenantFeatures: TenantFeatures | null;
 }
 
 export function fetchCaptcha(): Promise<Captcha> {

@@ -90,10 +90,14 @@ async function signOut(): Promise<void> {
 const SCREEN_URL = import.meta.env.VITE_SCREEN_URL ?? 'http://localhost:8001/';
 const FLOW_URL = import.meta.env.VITE_FLOW_URL ?? 'http://localhost:8002/';
 
-const systems = [
-  { key: 'screen', name: '数据大屏', desc: '三维态势可视化', icon: 'chart', url: SCREEN_URL },
-  { key: 'flow', name: '流程平台', desc: '流程控制台', icon: 'flow', url: FLOW_URL },
-];
+/** 顶栏系统切换入口:按租户五系统开通态过滤,未开通的系统不出现;旧后端无开关字段时全量展示。 */
+const systems = computed(() => {
+  const features = auth.user?.tenantFeatures;
+  return [
+    { key: 'screen', name: '数据大屏', desc: '三维态势可视化', icon: 'chart', url: SCREEN_URL, enabled: features?.dashboardEnabled },
+    { key: 'flow', name: '流程平台', desc: '流程控制台', icon: 'flow', url: FLOW_URL, enabled: features?.workflowEnabled },
+  ].filter((item) => item.enabled !== false);
+});
 
 function openStandalone(url: string): void {
   window.open(`${url}${url.includes('?') ? '&' : '?'}ssotoken=${encodeURIComponent(auth.token)}`, '_blank', 'noopener');
@@ -101,7 +105,7 @@ function openStandalone(url: string): void {
 
 /** 顶栏系统切换入口,与流程端布局一致。 */
 function handleSystemCommand(command: string | number | object): void {
-  const target = systems.find((item) => item.key === command);
+  const target = systems.value.find((item) => item.key === command);
   if (target) openStandalone(target.url);
 }
 
@@ -379,6 +383,7 @@ onBeforeUnmount(() => {
             </div>
           </ElPopover>
           <ElDropdown
+            v-if="systems.length"
             trigger="click"
             popper-class="system-switch-popper"
             @command="handleSystemCommand"
@@ -414,6 +419,7 @@ onBeforeUnmount(() => {
             </template>
           </ElDropdown>
           <span
+            v-if="systems.length"
             class="header-divider"
             aria-hidden="true"
           ></span>

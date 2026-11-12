@@ -20,10 +20,14 @@ const router = useRouter();
 const ADMIN_URL = import.meta.env.VITE_ADMIN_URL ?? 'http://localhost:8000/';
 const FLOW_URL = import.meta.env.VITE_FLOW_URL ?? 'http://localhost:8002/';
 
-const systems = [
-  { key: 'admin', name: '管理端', desc: '多租户运营控制台', url: ADMIN_URL },
-  { key: 'flow', name: '流程平台', desc: '流程控制台', url: FLOW_URL },
-] as const;
+/** 顶栏系统切换入口:按租户五系统开通态过滤,未开通的系统不出现;旧后端无开关字段时全量展示。 */
+const systems = computed(() => {
+  const features = me.value?.tenantFeatures;
+  return [
+    { key: 'admin', name: '管理端', desc: '多租户运营控制台', url: ADMIN_URL, enabled: features?.adminEnabled },
+    { key: 'flow', name: '流程平台', desc: '流程控制台', url: FLOW_URL, enabled: features?.workflowEnabled },
+  ].filter((item) => item.enabled !== false);
+});
 
 const env = import.meta.env.PROD ? 'PROD' : 'DEV';
 
@@ -204,7 +208,10 @@ onBeforeUnmount(() => {
           {{ env }}
         </span>
 
-        <div class="ck-slot">
+        <div
+          v-if="systems.length"
+          class="ck-slot"
+        >
           <button
             type="button"
             class="ck-icon-btn"

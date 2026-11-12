@@ -95,6 +95,12 @@ function onSwitchSystem(command: string | number | object): void {
   openCrossApp(command as SystemKey, auth.token);
 }
 
+/** 顶栏系统切换入口显隐:租户开通态下发且管理端/数据大屏均未开通时,切换按钮整体隐藏。 */
+const showSystemSwitch = computed(() =>
+  auth.loginUser?.tenantFeatures?.adminEnabled !== false
+  || auth.loginUser?.tenantFeatures?.dashboardEnabled !== false,
+);
+
 const ICONS: Record<string, string> = {
   dashboard: 'layout-dashboard',
   modeler: 'workflow',
@@ -283,6 +289,7 @@ async function handleLogout(): Promise<void> {
         </ElPopover>
         <ThemePicker />
         <el-dropdown
+          v-if="showSystemSwitch"
           trigger="click"
           popper-class="system-switch-popper"
           @command="onSwitchSystem"
@@ -297,14 +304,21 @@ async function handleLogout(): Promise<void> {
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="admin">
+              <!-- 按租户开通态过滤:未开通的系统不给入口;旧后端无开关字段时全量展示 -->
+              <el-dropdown-item
+                v-if="auth.loginUser?.tenantFeatures?.adminEnabled !== false"
+                command="admin"
+              >
                 <span class="system-item">
                   <AppIcon name="shield" />
                   <span class="system-item-name">管理端</span>
                   <span class="system-item-desc">多租户运营控制台</span>
                 </span>
               </el-dropdown-item>
-              <el-dropdown-item command="screen">
+              <el-dropdown-item
+                v-if="auth.loginUser?.tenantFeatures?.dashboardEnabled !== false"
+                command="screen"
+              >
                 <span class="system-item">
                   <AppIcon name="activity" />
                   <span class="system-item-name">数据大屏</span>
@@ -315,6 +329,7 @@ async function handleLogout(): Promise<void> {
           </template>
         </el-dropdown>
         <span
+          v-if="showSystemSwitch"
           class="header-divider"
           aria-hidden="true"
         ></span>
