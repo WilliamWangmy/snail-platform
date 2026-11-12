@@ -8,7 +8,8 @@ import com.snail.platform.framework.core.exception.BizException;
  * 准入(租户停用/到期、账号停用)是运营状态,重试无意义,一律不计数。
  * 上游:AuthService、CaptchaService;下游:仍然按 BizException 被 GlobalExceptionHandler 翻成响应。
  * 分类既决定计数桶,也决定对外文案:凭证与验证码原样回各自文案(验证码在定位用户之前,不泄露账号存在性),
- * 准入类由登录链统一改写成"账号或密码错误"防枚举;错误码始终是 400。
+ * 准入类由登录链统一改写成"账号或密码错误"防枚举;Scene(端未开通)是凭证验真后才可达的例外,文案透传;
+ * 错误码始终是 400。
  */
 final class LoginRejects {
 
@@ -33,6 +34,17 @@ final class LoginRejects {
     static class Access extends BizException {
         Access(String message) {
             super(400, message);
+        }
+    }
+
+    /**
+     * scene 未开通的准入拒绝:Access 的透传子类——scene 闸在密码/短信码验真之后,
+     * 到达此处的调用方必已持有正确凭证,「租户未开通{端名}」文案可对外透传,无枚举/探测风险;
+     * 准入分类不变:不计任何失败数。
+     */
+    static class Scene extends Access {
+        Scene(String message) {
+            super(message);
         }
     }
 }

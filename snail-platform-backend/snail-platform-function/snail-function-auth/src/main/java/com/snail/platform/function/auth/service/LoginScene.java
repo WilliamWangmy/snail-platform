@@ -9,7 +9,9 @@ import java.util.Set;
  * oauth 链本期不加 scene,缺省按 admin 校验(ASM-3),移动端/门户接入 oauth 时再透传。
  * 上游:LoginRequest/SmsLoginRequest/SmsPickRequest 的 @Pattern 白名单;下游:AuthService 的 scene 闸与登录日志。
  * 口径:非法 scene 在参数校验层就拒(400「非法的登录端」,不涉账号、不进登录日志);
- *      合法但未开通走 LoginRejects.Access,对外统一"账号或密码错误"防枚举(D-02),细粒度原因只进 sys_login_log.msg。
+ *      合法但未开通走 LoginRejects.Scene——scene 闸在凭证验真之后(密码链在密码比对后,
+ *      短信/OAuth 链在码验真后),「租户未开通{端名}权限,请联系平台管理员」文案可对外透传
+ *      (2026-11-12 拍板改口径,原 D-02 统一改写已废),同时照旧落 sys_login_log.msg。
  */
 public final class LoginScene {
 

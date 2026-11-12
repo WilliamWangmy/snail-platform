@@ -37,8 +37,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * 职责:登录拒绝文案分类的离线回归——验证码失败必须回自己的文案,凭证/准入类仍统一回"账号或密码错误"。
- * scene 闸用例(租户管理增强):未开通端对外统一文案防枚举(D-02),细粒度原因「租户未开通{端名}」
- * 与登录端坐标只进登录日志;已开通端放行到密码比对,不产生差异化文案。
+ * scene 闸用例(租户管理增强,2026-11-12 改口径):scene 闸挪到密码比对之后,口令验真才报
+ * 「租户未开通{端名}权限,请联系平台管理员」(文案透传,不计失败数);口令错仍统一文案防探测。
  * 不启 Spring 上下文、不连 MySQL/Valkey:所有出口都是 Mockito 桩,验证码失败用与 CaptchaService
  * 同类型的 LoginRejects.Captcha 直接构造(包内可见,故本测试与 service 同包)。
  * 上游:AuthService.login 的 catch(BizException) 分流;下游:无外设断言。
@@ -128,25 +128,42 @@ class LoginRejectMessageTest {
         verify(failGuard, never()).increaseCredentialFail(any(), any());
     }
 
-    /** scene 闸(未开通端):对外统一"账号或密码错误"防端开通状态探测(D-02/NFR-3),不计失败数;
-     *  细粒度原因「租户未开通流程系统」与 scene=workflow 只进登录日志(AC-2 日志侧断言) */
+    /** scene 闸(未开通端):scene 闸在密码比对之后,口令验真才报「租户未开通{端名}权限,请联系平台管理员」
+     *  (2026-11-12 拍板改口径,文案透传),不计失败数;同文案照落登录日志(AC-2 日志侧断言) */
     @Test
-    void closedSceneRejectsUnifiedButLogsRealReason() {
-        when(userMapper.selectOne(any())).thenReturn(userWithStatus(0));
+    void closedSceneTellsTenantToContactPlatformAdmin() {
+        SysUser user = userWithStatus(0);
+        when(userMapper.selectOne(any())).thenReturn(user);
         SysTenant tenant = activeTenant();
         tenant.setWorkflowEnabled(0);
         when(tenantMapper.selectById(1L)).thenReturn(tenant);
 
         BizException error = assertThrows(BizException.class,
-                () -> authService.login(request("workflow"), http()));
+                () -> authService.login(requestWithPassword("workflow", "right-password"), http()));
 
-        assertEquals("账号或密码错误", error.getMessage());
+        assertEquals("租户未开通流程系统权限,请联系平台管理员", error.getMessage());
         verify(failGuard, never()).increaseCredentialFail(any(), any());
         ArgumentCaptor<SysLoginLog> logCaptor = ArgumentCaptor.forClass(SysLoginLog.class);
         verify(loginLogMapper).insert(logCaptor.capture());
-        assertEquals("租户未开通流程系统", logCaptor.getValue().getMsg());
+        assertEquals("租户未开通流程系统权限,请联系平台管理员", logCaptor.getValue().getMsg());
         assertEquals("workflow", logCaptor.getValue().getScene());
         assertEquals(0, logCaptor.getValue().getStatus());
+    }
+
+    /** scene 闸(未开通端+口令错):口令比对在 scene 闸之前,口令错仍统一文案防账号探测 */
+    @Test
+    void wrongPasswordStillUnifiedEvenWhenSceneClosed() {
+        SysUser user = userWithStatus(0);
+        when(userMapper.selectOne(any())).thenReturn(user);
+        SysTenant tenant = activeTenant();
+        tenant.setWorkflowEnabled(0);
+        when(tenantMapper.selectById(1L)).thenReturn(tenant);
+
+        BizException error = assertThrows(BizException.class,
+                () -> authService.login(requestWithPassword("workflow", "wrong-password"), http()));
+
+        assertEquals("账号或密码错误", error.getMessage());
+        verify(failGuard).increaseCredentialFail(any(), any());
     }
 
     /** scene 闸(已开通端):放行到密码比对,口令错仍统一文案并计凭证失败——开通与未开通对外无差异文案 */
@@ -169,17 +186,19 @@ class LoginRejectMessageTest {
     /** scene 缺省归一:不带 scene 的旧调用方按 admin(管理系统)闸校验,开关未开同样被拒(契约 §5.1) */
     @Test
     void defaultSceneIsAdminAndGated() {
-        when(userMapper.selectOne(any())).thenReturn(userWithStatus(0));
+        SysUser user = userWithStatus(0);
+        when(userMapper.selectOne(any())).thenReturn(user);
         SysTenant tenant = activeTenant();
         tenant.setAdminEnabled(0);
         when(tenantMapper.selectById(1L)).thenReturn(tenant);
 
-        BizException error = assertThrows(BizException.class, () -> authService.login(request(), http()));
+        BizException error = assertThrows(BizException.class,
+                () -> authService.login(requestWithPassword(null, "right-password"), http()));
 
-        assertEquals("账号或密码错误", error.getMessage());
+        assertEquals("租户未开通管理系统权限,请联系平台管理员", error.getMessage());
         ArgumentCaptor<SysLoginLog> logCaptor = ArgumentCaptor.forClass(SysLoginLog.class);
         verify(loginLogMapper).insert(logCaptor.capture());
-        assertEquals("租户未开通管理系统", logCaptor.getValue().getMsg());
+        assertEquals("租户未开通管理系统权限,请联系平台管理员", logCaptor.getValue().getMsg());
         assertEquals("admin", logCaptor.getValue().getScene());
     }
 
@@ -189,6 +208,10 @@ class LoginRejectMessageTest {
 
     private static LoginRequest request(String scene) {
         return new LoginRequest("admin", "wrong-password", "captcha-key", "ABCD", scene);
+    }
+
+    private static LoginRequest requestWithPassword(String scene, String password) {
+        return new LoginRequest("admin", password, "captcha-key", "ABCD", scene);
     }
 
     private static SysUser userWithStatus(Integer status) {
@@ -206,7 +229,7 @@ class LoginRejectMessageTest {
         tenant.setTenantId(1L);
         tenant.setStatus(0);
         // 五开关显式全开:本测试只验证密码/文案/计数链路,默认租户与种子口径一致(全 1),
-        // 不设值(null)会被 scene 闸按"未开通"拦在密码比对之前,凭证计数分支就走不到了
+        // 不设值(null)会被 scene 闸按"未开通"拦下(scene 闸在密码比对之后,凭证计数分支就走不到了)
         tenant.setAdminEnabled(1);
         tenant.setWorkflowEnabled(1);
         tenant.setMobileEnabled(1);

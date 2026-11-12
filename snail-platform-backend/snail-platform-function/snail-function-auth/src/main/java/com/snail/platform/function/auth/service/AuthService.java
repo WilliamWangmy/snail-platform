@@ -42,6 +42,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
  * (基础设施故障走 500,不落登录日志,由应用日志排障)。
  * 上游:AuthController;下游:sys_user/sys_tenant 读、sys_login_log 写、JWT 签发。
  * 防账号枚举:用户不存在、口令错误与定位后的准入类拒绝统一回"账号或密码错误";
+ * 例外:scene 未开通的闸在凭证验真之后(Scene),「租户未开通{端名}权限,请联系平台管理员」文案透传;
  * 验证码在定位用户之前核销,失败不携带账号存在性,原样回自己的细粒度文案(请输入/已过期/错误/次数过多)。
  * 计数口径:失败按类型分流(LoginRejects)——只有凭证失败累加 IP+登录名锁定,
  * 验证码失败由 CaptchaService 按 IP 自计,租户/账号停用属运营状态不计数;
@@ -252,13 +254,13 @@ public class AuthService {
             if (Objects.equals(user.getStatus(), 1)) {
                 throw new LoginRejects.Access("账号已停用");
             }
-            // scene 闸:租户未开通该端即准入拒绝——加在状态检查后、密码比对前(D-02):
-            // 对外由 catch 统一改写"账号或密码错误"防枚举,细粒度原因「租户未开通{端名}」只进登录日志
-            requireSceneEnabled(tenant, scene);
             // 口令比对放在状态检查之后:前置步骤都不需要哈希,停用账号在这一步之前就被拒
             if (!BCrypt.checkpw(request.password(), user.getPassword())) {
                 throw new LoginRejects.Credential("账号或密码错误");
             }
+            // scene 闸:租户未开通该端即准入拒绝——加在密码比对之后(2026-11-12 拍板改口径):
+            // 探测端开通状态必须先持有正确口令,细粒度文案「租户未开通{端名}权限」才可安全透传
+            requireSceneEnabled(tenant, scene);
 
             failGuard.clearCredentialFails(ip, username);
             String token = jwtTokenService.issue(
@@ -284,6 +286,11 @@ public class AuthService {
             // 验证码在定位用户之前就核销,失败文案(请输入/已过期/错误/次数过多)不携带账号存在性,
             // 原样回给前端不破坏防枚举;失败数由 CaptchaService 按 IP 自计,不进账号锁定桶
             if (e instanceof LoginRejects.Captcha) {
+                throw e;
+            }
+            // scene 未开通:密码比对通过才可达(Scene 只在闸后抛出),文案透传给登录方;
+            // 准入分类不变,不计失败数
+            if (e instanceof LoginRejects.Scene) {
                 throw e;
             }
             throw new LoginRejects.Access("账号或密码错误");
@@ -350,19 +357,23 @@ public class AuthService {
                 SysTenant tenant = requireAccessible(user, scene);
                 return issueSmsToken(user, tenant, ip, phone, http, scene, "");
             }
-            // 多命中:候选按 user_id 升序(hits 已排序);停用/到期/未开通该端的候选静默剔除,全部被剔按统一口径拒
-            List<SysUser> candidates = hits.stream()
-                    .filter(user -> {
-                        try {
-                            requireAccessible(user, scene);
-                            return true;
-                        } catch (BizException rejected) {
-                            return false;
-                        }
-                    })
-                    .toList();
+            // 多命中:候选按 user_id 升序(hits 已排序);停用/到期/账号停用的候选静默剔除,
+            // scene 未开通留档最后一次拒绝——全部被剔且原因里有端未开通时报「租户未开通{端名}」
+            // (短信码已验真,细粒度文案可透传,与密码链同口径);其余原因全部被剔仍按统一口径拒
+            LoginRejects.Scene sceneDenied = null;
+            List<SysUser> candidates = new ArrayList<>();
+            for (SysUser candidate : hits) {
+                try {
+                    requireAccessible(candidate, scene);
+                    candidates.add(candidate);
+                } catch (LoginRejects.Scene denied) {
+                    sceneDenied = denied;
+                } catch (BizException rejected) {
+                    // 运营状态类(停用/到期)静默剔除,不区分原因
+                }
+            }
             if (candidates.isEmpty()) {
-                throw new LoginRejects.Access("账号或密码错误");
+                throw sceneDenied != null ? sceneDenied : new LoginRejects.Access("账号或密码错误");
             }
             String pickKey = pickService.issue(candidates.stream().map(SysUser::getUserId).toList());
             return new LoginAccountsVO(pickKey, accountsOf(candidates));
@@ -373,6 +384,10 @@ public class AuthService {
             writeLoginLog(http, tenantId, phone, userId, 0, e.getMessage(), LOGIN_TYPE_SMS, scene);
             if (e instanceof LoginRejects.Credential) {
                 failGuard.increaseCredentialFail(ip, phone);
+                throw e;
+            }
+            // scene 未开通:短信码验真后才可达,文案透传(与密码链同口径)
+            if (e instanceof LoginRejects.Scene) {
                 throw e;
             }
             throw new LoginRejects.Access("账号或密码错误");
@@ -407,8 +422,11 @@ public class AuthService {
             writeLoginLog(http, tenantId, chosen != null ? chosen.getPhone() : "unknown",
                     chosen != null ? chosen.getUserId() : null, 0, e.getMessage(), LOGIN_TYPE_SMS,
                     LoginScene.normalize(request.scene()));
-            // 只把准入类(租户/账号停用)统一成凭证文案防枚举;pickKey 失效等流程提示原样回,
-            // 否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
+            // 只把准入类(租户/账号停用)统一成凭证文案防枚举;scene 未开通(pickKey 已证明凭证验真)
+            // 与 pickKey 失效等流程提示原样回,否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
+            if (e instanceof LoginRejects.Scene) {
+                throw e;
+            }
             throw e instanceof LoginRejects.Access
                     ? new LoginRejects.Access("账号或密码错误") : e;
         }
@@ -416,8 +434,8 @@ public class AuthService {
 
     /**
      * 租户/用户状态闸 + scene 开通闸:租户行缺失与显式停用同口径报"租户已停用",到期另报;
-     * 停用账号报"账号已停用";scene 对应端未开通报「租户未开通{端名}」——细粒度原因只进登录日志,
-     * 对外由调用方统一文案(D-02 防枚举)。
+     * 停用账号报"账号已停用";scene 对应端未开通报「租户未开通{端名}权限,请联系平台管理员」——
+     * 调用方均在短信码/OAuth 凭证验真之后才走到这里,该文案可对外透传(D-02 改口径);
      * 通过则返回租户行(签发 VO 要租户名)。
      */
     private SysTenant requireAccessible(SysUser user, String scene) {
@@ -439,7 +457,7 @@ public class AuthService {
      * scene 闸:按 LoginScene 常量集把 scene 映射到 sys_tenant 对应开关列——
      * admin→admin_enabled、workflow→workflow_enabled、app/miniapp→mobile_enabled(D-06 单开关双 scene)、
      * dashboard→dashboard_enabled、portal→portal_enabled。
-     * 未开通抛 LoginRejects.Access(准入类:不计失败数、对外统一文案);
+     * 未开通抛 LoginRejects.Scene(准入类子类:不计失败数;调用方在凭证验真后调用,文案可透传);
      * 开关实时读 sys_tenant 不走缓存(NFR-4:开关变更对新登录立即生效)。
      * oauth 链本期缺省 admin(ASM-3),调用方直接传 LoginScene.ADMIN。
      */
@@ -454,7 +472,7 @@ public class AuthService {
             default -> throw BizException.badRequest("非法的登录端");
         };
         if (!enabled) {
-            throw new LoginRejects.Access("租户未开通" + LoginScene.label(scene));
+            throw new LoginRejects.Scene("租户未开通" + LoginScene.label(scene) + "权限,请联系平台管理员");
         }
     }
 
@@ -642,6 +660,10 @@ public class AuthService {
                 }
                 throw credential;
             }
+            // scene 未开通:OAuth 凭证验真后才可达,文案透传(与密码/短信链同口径)
+            if (e instanceof LoginRejects.Scene) {
+                throw e;
+            }
             if (e instanceof LoginRejects.Access) {
                 throw new LoginRejects.Access("账号或密码错误");
             }
@@ -674,8 +696,11 @@ public class AuthService {
             Long tenantId = chosen != null ? chosen.getTenantId() : 0L;
             writeLoginLog(http, tenantId, candidate.openId(), chosen != null ? chosen.getUserId() : null,
                     0, e.getMessage(), candidate.source(), LoginScene.ADMIN);
-            // 只把准入类(租户/账号停用)统一成凭证文案防枚举;pickKey 失效等流程提示原样回,
-            // 否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
+            // 只把准入类(租户/账号停用)统一成凭证文案防枚举;scene 未开通(pickKey 已证明凭证验真)
+            // 与 pickKey 失效等流程提示原样回,否则"选择已过期,请重新登录"会被误报成"账号或密码错误"
+            if (e instanceof LoginRejects.Scene) {
+                throw e;
+            }
             throw e instanceof LoginRejects.Access
                     ? new LoginRejects.Access("账号或密码错误") : e;
         }
