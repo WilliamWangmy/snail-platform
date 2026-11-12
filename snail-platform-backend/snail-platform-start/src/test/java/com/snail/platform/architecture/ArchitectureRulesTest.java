@@ -120,14 +120,17 @@ class ArchitectureRulesTest {
             Set.of("insert", "update", "updateById", "delete", "deleteById", "deleteByMap", "insertOrUpdate", "upsert");
 
     /**
-     * last() 白名单:该方法把原文拼进 SQL 末尾,属注入面——只准已登记的 5 处使用,
+     * last() 白名单:该方法把原文拼进 SQL 末尾,属注入面——只准已登记的使用,
      * 且参数必须是编译期常量("FOR UPDATE"/"LIMIT " + 静态常量);新增使用先来这儿登记再写代码。
+     * 日志清除(OperLog/LoginLog/ExternalCallLog 三个 clean)用 "LIMIT " + CLEAN_BATCH 分批删大表,
+     * 与导出的 LIMIT 口径同源:常量在各自 Service 内单点定义。
      */
     private static final Set<String> LAST_ALLOWED = Set.of(
             "com.snail.platform.function.storage.service.FileQuotaService",
             "com.snail.platform.function.system.log.service.LoginLogService",
             "com.snail.platform.function.system.log.service.OperLogService",
-            "com.snail.platform.function.system.user.service.UserService");
+            "com.snail.platform.function.system.user.service.UserService",
+            "com.snail.platform.function.external.service.ExternalCallLogService");
 
     /** slf4j Logger 的输出口径方法名:落 password 字段的日志都从这些口出去 */
     private static final Set<String> LOGGER_METHODS =

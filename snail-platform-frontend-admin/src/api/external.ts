@@ -1,10 +1,10 @@
-import { get } from './http';
+import { get, post } from './http';
 import type { PageParams, PageResult } from './types';
 
 /**
  * 第三方调用流水行:列表即全行,后端无详情端点(与登录日志同口径)。
  * request/response 是落库前已脱敏+截断的快照,前端原样透出不二次加工;
- * 流水是只增不改的账本,页面只读,无删除/导出动作。
+ * 流水是只增不改的账本,页面无单条删除/导出动作,历史清理走按保留期的清除端点。
  */
 export interface ExternalCallLogVO {
   callId: number;
@@ -50,4 +50,12 @@ export interface ExternalCallQuery extends PageParams {
 /** 第三方调用流水分页,后端 ExternalCallController 镜像,平台面只读。 */
 export function pageExternalCalls(query: ExternalCallQuery): Promise<PageResult<ExternalCallLogVO>> {
   return get<PageResult<ExternalCallLogVO>>('/platform/external/call-log', query);
+}
+
+/**
+ * 清除保留期之外的历史调用流水(1m 一个月前/6m 半年前/1y 一年前),返回实际删除行数;
+ * 平台面整表按期删、不可逆,页面有二次确认兜底。
+ */
+export function cleanExternalCallLogs(before: '1m' | '6m' | '1y'): Promise<number> {
+  return post<number>('/platform/external/call-log/clean', { before });
 }

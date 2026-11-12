@@ -103,9 +103,9 @@ com.snail.platform.function.external
 │   ├── ExternalMasker.java         地址打码单点：邮箱/手机号按位保留
 │   └── SmtpMailClient.java         SMTP 厂商适配器，实现 MailPort
 ├── controller/
-│   └── ExternalCallController.java GET /platform/external/call-log（只读单端点）
+│   └── ExternalCallController.java GET /platform/external/call-log + POST /call-log/clean
 ├── service/
-│   └── ExternalCallLogService.java 流水分页查询，写路径零介入
+│   └── ExternalCallLogService.java 流水分页查询与按保留期清除历史，落账写路径零介入
 ├── entity/
 │   └── SysExternalCallLog.java     流水 PO（不继承审计基类，见存储一节）
 ├── mapper/
@@ -420,7 +420,8 @@ SELECT vendor, action, caller, status, response, cost_ms
    两表口径独立，做联合看板时必须映射，勿直接 UNION。
 4. **响应摘要可能是 `null` 或形似错误**。模板方法用 `String.valueOf(call.get())` 记响应，返回 `null` 的
    调用记字符串 `"null"`；这是摘要不是结构化结果，程序化消费请以各端口返回值为准。
-5. **流水表无清理机制**。目前只增不改，无保留期与归档策略；短信接入后写入量上升，清理策略是 M2 的前置拍板项。
+5. **历史清理只有手动三档清除**。`POST /platform/external/call-log/clean` 按 1m/6m/1y 保留期删历史流水
+   （`platform:external:clean` 权限，分批 1000 行独立提交），无自动归档与定时清理；做自动保留期策略是独立拍板项。
 6. **trace_id 依赖 MDC，无链路体系时为 NULL**。当前项目未全链路接 trace，该列只在有 MDC 值的请求线程里有值。
 7. **IP 定位端口的降级是静默的**。消费方拿 `Optional.empty()` 写“未知”，网关侧仍留一行失败流水
    ——排查“归属地怎么全是未知”时先看流水而不是业务表。
