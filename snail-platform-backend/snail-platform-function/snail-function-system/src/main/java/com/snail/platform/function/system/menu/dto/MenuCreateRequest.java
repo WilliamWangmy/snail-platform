@@ -30,10 +30,10 @@ public record MenuCreateRequest(
         @Max(value = 3, message = "菜单类型取值 1-3")
         Integer menuType,
 
-        @Schema(description = "展示端:1 站内 2 数据大屏 3 外链", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "展示端:1 管理端 2 数据大屏 3 外链 4 流程端 5 移动端", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "请选择展示端")
-        @Min(value = 1, message = "展示端取值 1-3")
-        @Max(value = 3, message = "展示端取值 1-3")
+        @Min(value = 1, message = "展示端取值 1-5")
+        @Max(value = 5, message = "展示端取值 1-5")
         Integer target,
 
         @Schema(description = "归属面:1 平台 2 租户", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -42,7 +42,7 @@ public record MenuCreateRequest(
         @Max(value = 2, message = "归属面取值 1-2")
         Integer scope,
 
-        @Schema(description = "路由/地址:站内与数据大屏为前端路由,外链为完整 URL")
+        @Schema(description = "路由/地址:各端站内菜单为对应端前端路由,外链为完整 URL")
         @Size(max = 500, message = "路由/地址过长")
         String path,
 

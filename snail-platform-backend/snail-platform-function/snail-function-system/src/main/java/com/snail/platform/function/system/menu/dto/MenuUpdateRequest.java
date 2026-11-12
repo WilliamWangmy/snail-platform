@@ -20,7 +20,7 @@ public record MenuUpdateRequest(
         @Size(max = 50, message = "菜单名称过长")
         String menuName,
 
-        @Schema(description = "路由/地址:站内与数据大屏为前端路由,外链为完整 URL;不传即清空")
+        @Schema(description = "路由/地址:各端站内菜单为对应端前端路由,外链为完整 URL;不传即清空")
         @Size(max = 500, message = "路由/地址过长")
         String path,
 

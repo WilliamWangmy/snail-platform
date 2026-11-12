@@ -24,7 +24,7 @@ public record RoleMenuNodeVO(
         @Schema(description = "类型:1 目录 2 菜单 3 按钮")
         Integer menuType,
 
-        @Schema(description = "展示端:1 站内 2 数据大屏 3 外链")
+        @Schema(description = "展示端:1 管理端 2 数据大屏 3 外链 4 流程端 5 移动端")
         Integer target,
 
         @Schema(description = "归属面:1 平台 2 租户")

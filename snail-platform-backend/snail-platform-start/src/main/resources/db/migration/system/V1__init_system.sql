@@ -14,7 +14,8 @@
 -- 业务表:审计四件套 + 逻辑删除;日志表只增,不配逻辑删除,时间毫秒
 -- 唯一键口径:被逻辑删除记录的键值不释放、不可复用
 -- 菜单口径:sys_menu 为全局目录,平台维护一份,租户只经 sys_role_menu 授权,不持有副本
--- target:1 站内(admin 菜单树) 2 数据大屏(dashboard 菜单树,admin 只配置) 3 外链(admin 菜单树,新标签)
+-- target:1 管理端(admin 菜单树) 2 数据大屏(dashboard 菜单树,admin 只配置) 3 外链(admin 菜单树,新标签)
+--       4 流程端(workflow 菜单树) 5 移动端(app/小程序);各端各自成树,不互相嵌套
 -- 权限码三段式 <面>:<模块>:<动作>;面随 scope 走:1 平台用 platform:,2 租户用 system:
 -- 字典租户各自维护:无平台内置、无并集、无默认种子
 -- 目录与外链 perm_code 为 NULL;MySQL 唯一索引允许多个 NULL
@@ -111,9 +112,9 @@ CREATE TABLE sys_menu (
     parent_id   BIGINT       NOT NULL DEFAULT 0 COMMENT '父菜单ID,根节点记 0',
     menu_name   VARCHAR(50)  NOT NULL COMMENT '菜单名称,界面展示用',
     menu_type   TINYINT      NOT NULL DEFAULT 2 COMMENT '类型:1 目录 2 菜单 3 按钮;建后不可改',
-    target      TINYINT      NOT NULL DEFAULT 1 COMMENT '展示端:1 站内(admin 菜单树) 2 数据大屏(dashboard 菜单树,admin 仅配置不展示) 3 外链(admin 菜单树,新标签打开完整 URL);建后不可改',
+    target      TINYINT      NOT NULL DEFAULT 1 COMMENT '展示端:1 管理端(admin 菜单树) 2 数据大屏(dashboard 菜单树,admin 仅配置不展示) 3 外链(admin 菜单树,新标签打开完整 URL) 4 流程端(workflow 菜单树) 5 移动端(app/小程序);各端各自成树不互相嵌套;建后不可改',
     scope       TINYINT      NOT NULL DEFAULT 2 COMMENT '归属面:1 平台 2 租户;平台面仅平台管理员可见可授;建后不可改',
-    path        VARCHAR(500) DEFAULT NULL COMMENT '路由/地址:站内为 admin 路由,数据大屏为 dashboard 路由,外链为完整 URL',
+    path        VARCHAR(500) DEFAULT NULL COMMENT '路由/地址:站内为对应端前端路由(admin/workflow/app),数据大屏为 dashboard 路由,外链为完整 URL',
     component   VARCHAR(255) DEFAULT NULL COMMENT '前端组件路径,站内与数据大屏菜单必填',
     perm_code   VARCHAR(100) DEFAULT NULL COMMENT '权限码:目录与外链为空,其余菜单/按钮必填;全局唯一含已删记录,建后不可改',
     icon        VARCHAR(100) DEFAULT NULL COMMENT '图标名,目录与菜单使用',
@@ -309,7 +310,7 @@ CREATE TABLE sys_user_identity (
 -- =========================================================
 -- 内置种子:默认租户 + admin 账号 + 全局菜单目录 + 平台面授权
 -- 新租户开通不靠迁移脚本:由平台管理功能在运行时按本模板复制,且不写 sys_menu、不复制目录
--- 目录内节点全部 is_system=1;现有页面均为站内菜单,target 走默认 1
+-- 目录内节点全部 is_system=1;现有页面除流程端(target=4)外均为管理端菜单,target 走默认 1
 -- 授权按 A 语义:租户面(scope=2)隐式全量,不落库;只显式授平台面(scope=1)节点
 -- =========================================================
 
@@ -385,8 +386,8 @@ VALUES
 (2201, 220, '发送公告',     3, 1, NULL,               NULL,                     'platform:notify:send',       NULL,             1, 1, NOW());
 
 -- ---------- 流程菜单(只赋权不展示) ----------
--- 流程中心由独立 workflow 前端承载,管理端导航不展示(visible=1);visible 只影响导航渲染
--- (SidebarMenu 过滤 visible=0),菜单管理与角色授权树照常出现,可正常勾选赋权
+-- 展示端 target=4 流程端:workflow 前端自己的菜单树,与管理端互不嵌套;管理端导航不展示(visible=1)
+-- visible 只影响导航渲染(SidebarMenu 过滤 visible=0),菜单管理与角色授权树照常出现,可正常勾选赋权
 -- 流程定义页与建模页同码(system:workflow-model:list),不单独设菜单——perm_code 全局唯一,授建模即含定义页
 -- workflow 端首页大屏(/dashboard)不设权限码,登录即可见,不入目录
 -- 权限码三段式随面走,与 workflow 控制器 @PreAuthorize 逐一对应
@@ -394,18 +395,18 @@ INSERT INTO sys_menu
 (menu_id, parent_id, menu_name, menu_type, target, scope, path, component, perm_code, icon, sort, visible, is_system, create_time)
 VALUES
 -- 租户面(scope=2):租户管理员按角色授权,租户面按 A 语义隐式全量,不落 sys_role_menu
-(3,    0,   '流程中心',   1, 1, 2, '/workflow', NULL,                          NULL,                            'Share',    3, 1, 1, NOW()),
-(300,  3,   '流程建模',   2, 1, 2, '/modeler',  'workflow/modeler/index',      'system:workflow-model:list',    'SetUp',    1, 1, 1, NOW()),
-(3001, 300, '新建模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:create',  NULL,       1, 0, 1, NOW()),
-(3002, 300, '修改模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:update',  NULL,       2, 0, 1, NOW()),
-(3003, 300, '删除模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:delete',  NULL,       3, 0, 1, NOW()),
-(3004, 300, '发布模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:publish', NULL,       4, 0, 1, NOW()),
-(310,  3,   '流程实例',   2, 1, 2, '/instance', 'workflow/instance/index',     'system:workflow-instance:list', 'Tickets',  2, 1, 1, NOW()),
-(3101, 310, '发起流程',   3, 1, 2, NULL,        NULL,                          'system:workflow-instance:start',   NULL,    1, 0, 1, NOW()),
-(3102, 310, '撤销流程',   3, 1, 2, NULL,        NULL,                          'system:workflow-instance:withdraw',NULL,    2, 0, 1, NOW()),
-(320,  3,   '任务中心',   2, 1, 2, '/task',     'workflow/task/index',         'system:workflow-task:list',     'Checked',  3, 1, 1, NOW()),
-(3201, 320, '查看已办',   3, 1, 2, NULL,        NULL,                          'system:workflow-task:done',     NULL,       1, 0, 1, NOW()),
-(3202, 320, '办理任务',   3, 1, 2, NULL,        NULL,                          'system:workflow-task:handle',   NULL,       2, 0, 1, NOW()),
+(3,    0,   '流程中心',   1, 4, 2, '/workflow', NULL,                          NULL,                            'Share',    3, 1, 1, NOW()),
+(300,  3,   '流程建模',   2, 4, 2, '/modeler',  'workflow/modeler/index',      'system:workflow-model:list',    'SetUp',    1, 1, 1, NOW()),
+(3001, 300, '新建模型',   3, 4, 2, NULL,        NULL,                          'system:workflow-model:create',  NULL,       1, 0, 1, NOW()),
+(3002, 300, '修改模型',   3, 4, 2, NULL,        NULL,                          'system:workflow-model:update',  NULL,       2, 0, 1, NOW()),
+(3003, 300, '删除模型',   3, 4, 2, NULL,        NULL,                          'system:workflow-model:delete',  NULL,       3, 0, 1, NOW()),
+(3004, 300, '发布模型',   3, 4, 2, NULL,        NULL,                          'system:workflow-model:publish', NULL,       4, 0, 1, NOW()),
+(310,  3,   '流程实例',   2, 4, 2, '/instance', 'workflow/instance/index',     'system:workflow-instance:list', 'Tickets',  2, 1, 1, NOW()),
+(3101, 310, '发起流程',   3, 4, 2, NULL,        NULL,                          'system:workflow-instance:start',   NULL,    1, 0, 1, NOW()),
+(3102, 310, '撤销流程',   3, 4, 2, NULL,        NULL,                          'system:workflow-instance:withdraw',NULL,    2, 0, 1, NOW()),
+(320,  3,   '任务中心',   2, 4, 2, '/task',     'workflow/task/index',         'system:workflow-task:list',     'Checked',  3, 1, 1, NOW()),
+(3201, 320, '查看已办',   3, 4, 2, NULL,        NULL,                          'system:workflow-task:done',     NULL,       1, 0, 1, NOW()),
+(3202, 320, '办理任务',   3, 4, 2, NULL,        NULL,                          'system:workflow-task:handle',   NULL,       2, 0, 1, NOW()),
 -- 平台面(scope=1):文末 admin 授权谓词按 m.scope=1 一刀切,本段自动被覆盖,无需单独补授
 (240,  2,   '流程模板',   2, 1, 1, '/platform/workflow-template', 'platform/workflow-template/index', 'platform:workflow-template:list',   'Files', 4, 1, 1, NOW()),
 (2401, 240, '新增模板',   3, 1, 1, NULL, NULL, 'platform:workflow-template:create', NULL, 1, 0, 1, NOW()),

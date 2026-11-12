@@ -49,8 +49,20 @@ public class RoleMenuService {
     /** 类型:按钮 */
     private static final int TYPE_BUTTON = 3;
 
+    /** 展示端:管理端 */
+    private static final int TARGET_ADMIN = 1;
+
     /** 展示端:数据大屏 */
     private static final int TARGET_DASHBOARD = 2;
+
+    /** 展示端:外链 */
+    private static final int TARGET_EXTERNAL = 3;
+
+    /** 展示端:流程端 */
+    private static final int TARGET_WORKFLOW = 4;
+
+    /** 展示端:移动端(app/小程序) */
+    private static final int TARGET_MOBILE = 5;
 
     /** 归属面:平台 */
     private static final int SCOPE_PLATFORM = 1;
@@ -84,7 +96,7 @@ public class RoleMenuService {
     }
 
     /**
-     * 当前用户菜单树:target=1 站内(含外链),target=2 数据大屏。
+     * 当前用户菜单树:target=1 管理端(含外链),2 数据大屏,4 流程端,5 移动端,各端各取各树。
      * 口径:内置 admin 隐式持有租户面全部菜单,其余人只看显式授权;按钮不入口径;
      * 父目录未授权但子菜单已授权时,目录作为容器补入;空目录与停用链整枝剪掉。
      */
@@ -271,11 +283,13 @@ public class RoleMenuService {
         return role;
     }
 
-    /** 站内端要站内(1)与外链(3),数据大屏端只要大屏(2) */
+    /** 展示端路由口径:管理端(1)含外链(3),数据大屏(2)/流程端(4)/移动端(5)各自独占一棵树 */
     private static boolean planeMatches(int menuTarget, int requestedTarget) {
-        return requestedTarget == TARGET_DASHBOARD
-                ? menuTarget == TARGET_DASHBOARD
-                : menuTarget != TARGET_DASHBOARD;
+        return switch (requestedTarget) {
+            case TARGET_ADMIN -> menuTarget == TARGET_ADMIN || menuTarget == TARGET_EXTERNAL;
+            case TARGET_DASHBOARD, TARGET_WORKFLOW, TARGET_MOBILE -> menuTarget == requestedTarget;
+            default -> false;
+        };
     }
 
     /** 自底向上剪枝:空目录不成导航;页面与外链即使无子也保留 */

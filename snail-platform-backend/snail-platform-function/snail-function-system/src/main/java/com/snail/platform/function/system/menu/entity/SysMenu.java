@@ -29,7 +29,7 @@ public class SysMenu extends AuditedEntity {
     /** 类型:1 目录 2 菜单 3 按钮 */
     private Integer menuType;
 
-    /** 展示端:1 站内 2 数据大屏 3 外链 */
+    /** 展示端:1 管理端 2 数据大屏 3 外链 4 流程端 5 移动端 */
     private Integer target;
 
     /** 归属面:1 平台 2 租户 */

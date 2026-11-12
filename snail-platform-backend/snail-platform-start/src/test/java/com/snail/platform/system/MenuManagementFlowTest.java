@@ -74,7 +74,7 @@ class MenuManagementFlowTest {
         assertRejected(postJson("/system/menu", adminToken, parentScopeBody("越面页面" + suffix, adminDir)),
                 "归属面");
         assertRejected(postJson("/system/menu", adminToken, crossPlaneBody("越面大屏" + suffix, dashDir)),
-                "不能相互嵌套");
+                "展示端必须与父菜单一致");
         assertRejected(postJson("/system/menu", adminToken, "{"
                         + "\"parentId\":" + page + ",\"menuName\":\"坏按钮\",\"menuType\":3,\"target\":1,"
                         + "\"scope\":2,\"permCode\":\"platform:t:view\"}"),

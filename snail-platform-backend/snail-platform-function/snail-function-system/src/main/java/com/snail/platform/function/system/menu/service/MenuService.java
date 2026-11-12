@@ -40,7 +40,7 @@ public class MenuService {
     /** 类型:按钮 */
     private static final int TYPE_BUTTON = 3;
 
-    /** 展示端:站内 */
+    /** 展示端:管理端 */
     private static final int TARGET_ADMIN = 1;
 
     /** 展示端:数据大屏 */
@@ -48,6 +48,12 @@ public class MenuService {
 
     /** 展示端:外链 */
     private static final int TARGET_EXTERNAL = 3;
+
+    /** 展示端:流程端 */
+    private static final int TARGET_WORKFLOW = 4;
+
+    /** 展示端:移动端(app/小程序) */
+    private static final int TARGET_MOBILE = 5;
 
     /** 归属面:平台 */
     private static final int SCOPE_PLATFORM = 1;
@@ -214,9 +220,9 @@ public class MenuService {
         return menu;
     }
 
-    /** 父节点约束:根只能是目录;按钮与外链不能挂下级;导航节点子承父面;大屏与站内两棵树不互相嵌套。
+    /** 父节点约束:根只能是目录;按钮与外链不能挂下级;导航节点子承父面;各展示端各成树不互相嵌套。
      *  按钮例外——它不入导航树,只决定"哪个动作要哪个码",所以允许挂在其服务的页面下:
-     *  站内页面上的跨面动作(如平台授权、跨租户查看)本就该长在同一个位置,授权树按节点自身的面判权。 */
+     *  页面上的跨面动作(如平台授权、跨租户查看)本就该长在同一个位置,授权树按节点自身的面判权。 */
     private void validateParent(SysMenu parent, int menuType, int target, int scope) {
         if (parent == null) {
             if (menuType != TYPE_DIR) {
@@ -233,8 +239,8 @@ public class MenuService {
         if (menuType != TYPE_BUTTON && !Objects.equals(parent.getScope(), scope)) {
             throw BizException.badRequest("子菜单归属面必须与父菜单一致");
         }
-        if (isDashboard(parent.getTarget()) != isDashboard(target)) {
-            throw BizException.badRequest("数据大屏菜单与站内菜单不能相互嵌套");
+        if (!Objects.equals(parent.getTarget(), target)) {
+            throw BizException.badRequest("子菜单展示端必须与父菜单一致");
         }
     }
 
@@ -280,8 +286,8 @@ public class MenuService {
             if (hasText(path) || hasText(component)) {
                 throw BizException.badRequest("按钮不能配置路由与组件");
             }
-            if (target != TARGET_ADMIN) {
-                throw BizException.badRequest("按钮只能属于站内菜单");
+            if (target == TARGET_DASHBOARD || target == TARGET_EXTERNAL) {
+                throw BizException.badRequest("按钮只能挂在管理端/流程端/移动端页面下");
             }
             if (visible != 0) {
                 throw BizException.badRequest("按钮固定为显示状态");
@@ -296,10 +302,6 @@ public class MenuService {
                 throw BizException.badRequest("权限码前缀必须与归属面一致");
             }
         }
-    }
-
-    private static boolean isDashboard(int target) {
-        return target == TARGET_DASHBOARD;
     }
 
     private static boolean hasText(String value) {

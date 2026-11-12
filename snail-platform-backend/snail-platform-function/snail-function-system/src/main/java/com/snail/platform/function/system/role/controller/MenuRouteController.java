@@ -38,11 +38,11 @@ public class MenuRouteController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "当前用户菜单树(target=1 站内含外链,target=2 数据大屏)")
+    @Operation(summary = "当前用户菜单树(target=1 管理端含外链,2 数据大屏,4 流程端,5 移动端)")
     @GetMapping("/current")
     public R<List<MenuRouteVO>> current(
-            @RequestParam(defaultValue = "1") @Min(value = 1, message = "展示端取值 1/2")
-            @Max(value = 2, message = "展示端取值 1/2") int target) {
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "展示端取值 1-5")
+            @Max(value = 5, message = "展示端取值 1-5") int target) {
         // userId 只从登录主体取,不做请求参数:换一个人的 ID 就看到一个人的导航,这个口子不能留
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof SnailPrincipal principal)) {

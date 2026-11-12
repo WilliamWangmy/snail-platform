@@ -22,11 +22,13 @@ const MENU_TYPES = [
   { value: 2, label: '菜单' },
   { value: 3, label: '按钮' },
 ];
-/** 全量三值供表格/只读展示;数据大屏(2)为内置固定菜单,新增表单不提供该选项。 */
+/** 全量枚举供表格/只读展示;数据大屏(2)为内置固定菜单,新增表单不提供该选项。 */
 const TARGETS = [
   { value: 1, label: '管理端' },
   { value: 2, label: '数据大屏' },
   { value: 3, label: '外链' },
+  { value: 4, label: '流程端' },
+  { value: 5, label: '移动端' },
 ];
 const SCOPES = [
   { value: 1, label: '平台' },
@@ -119,15 +121,17 @@ const typeOptions = computed(() => {
 });
 
 /**
- * 展示端可选项:按钮恒站内(后端只收站内按钮,且必须带权限码);父在站内树里可选站内或外链;
- * 根层只给站内——数据大屏树是内置固定菜单不做新增入口(见 canHaveChild),
- * 外链不做根,它不能挂下级,而空目录会被导航剪掉。
+ * 展示端可选项(与 MenuService.validateParent/validateShape 同口径):
+ * 按钮跟随父节点的展示端(后端要求子承父端);父在管理端树里可选管理端或外链;
+ * 流程端/移动端各自成树,子节点只能承父端;根层只给 管理端/流程端/移动端——
+ * 数据大屏树是内置固定菜单不做新增入口(见 canHaveChild),外链不做根,它不能挂下级。
  */
 const targetOptions = computed(() => {
   const p = parent.value;
-  if (form.menuType === 3) return TARGETS.filter((item) => item.value === 1);
-  if (p) return TARGETS.filter((item) => item.value === 1 || item.value === 3);
-  return TARGETS.filter((item) => item.value === 1);
+  if (form.menuType === 3) return TARGETS.filter((item) => item.value === (p?.target ?? 1));
+  if (p?.target === 1) return TARGETS.filter((item) => item.value === 1 || item.value === 3);
+  if (p) return TARGETS.filter((item) => item.value === p.target);
+  return TARGETS.filter((item) => item.value === 1 || item.value === 4 || item.value === 5);
 });
 
 const scopeOptions = computed(() => {
@@ -181,7 +185,7 @@ const rules = computed<FormRules<MenuForm>>(() => ({
   remark: [{ max: 500, message: '备注过长', trigger: 'blur' }],
 }));
 
-/** 从行内"新增下级"进来时带上父:面直接继承;能进来的父只可能是站内节点(大屏与外链已收掉入口),展示端默认管理端。 */
+/** 从行内"新增下级"进来时带上父:面与展示端都承父(各端各成树);能进来的父只可能是管理端/流程端/移动端节点(大屏与外链已收掉入口)。 */
 function openCreate(root?: MenuNode): void {
   editingId.value = null;
   editingSystem.value = false;
@@ -190,7 +194,7 @@ function openCreate(root?: MenuNode): void {
   Object.assign(form, emptyForm);
   if (root) {
     form.scope = root.scope;
-    form.target = 1;
+    form.target = root.target;
     form.menuType = root.menuType === 1 ? 1 : 3;
   }
   formVisible.value = true;
