@@ -107,6 +107,8 @@ const menus = computed(() => {
   const root = router.options.routes.find((item) => item.path === '/');
   return (root?.children ?? [])
     .filter((child) => child.meta?.title && !child.meta?.fullBleed)
+    // 权限门控:meta.perm 对应 sys_menu 种子的 perm_code,未授权的菜单不出现在导航
+    .filter((child) => !child.meta?.perm || auth.has(String(child.meta.perm)))
     .map((child) => ({
       key: String(child.name ?? child.path),
       path: `/${String(child.path)}`,

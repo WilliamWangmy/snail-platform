@@ -1158,10 +1158,11 @@ CREATE TABLE sys_workflow_task_record (
     KEY idx_wtr_operator (tenant_id, operator_id, created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '审批留痕:平台视角的审批台账,只插入不更新不删除;不替代引擎 ACT_HI_*';
 
--- ---------- 菜单种子(2026-11-11 拍板移除) ----------
+-- ---------- 菜单种子(2026-11-11 拍板移除;2026-11-12 改为"只赋权不展示",并入 V1 全局菜单目录) ----------
 -- 原计划给 admin 管理端种「流程中心」(租户面 3/300-3004/310/3101/320/330/3301/3302)与
 -- 「流程模板」(平台面 240/2401-2403)两组菜单;实际管理端不做流程页面——流程中心由独立
 -- workflow 前端承载,模板目录页面也未排期,菜单挂出来只会落到 404 兜底页,故整段移除。
--- 权限码(workflow:model:*/workflow:task:* 等)仍由后端 @PreAuthorize 把守,与菜单解耦;
--- 若日后管理端补流程页面,按 V1 口径重新种菜单并在此补平台面 role_menu 授权。
--- 本文件因此不再新增任何 sys_menu/sys_role_menu 行。
+-- 2026-11-12 口径回摆:菜单与按钮入全局目录但不在管理端导航展示(visible=1),可在菜单管理与
+-- 角色授权树正常勾选赋权;workflow 端导航/按钮也按权限码门控。因 sys_menu 是 V1 建的全局目录,
+-- 这批节点直接种在 V1__init_system.sql 的「流程菜单(只赋权不展示)」段,平台面 4 节点由 V1 文末
+-- m.scope=1 一刀切授权自动覆盖。本文件仍不含任何 sys_menu/sys_role_menu 行。

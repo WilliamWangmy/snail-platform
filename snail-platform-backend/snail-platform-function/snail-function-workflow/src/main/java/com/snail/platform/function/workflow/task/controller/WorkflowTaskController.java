@@ -38,21 +38,21 @@ public class WorkflowTaskController {
         this.taskService = taskService;
     }
 
-    @PreAuthorize("hasAuthority('workflow:task:list')")
+    @PreAuthorize("hasAuthority('system:workflow-task:list')")
     @Operation(summary = "我的待办分页")
     @GetMapping("/todo")
     public R<PageResult<WorkflowTodoVO>> todo(@Valid WorkflowTaskQuery query) {
         return R.ok(taskService.pageTodo(query));
     }
 
-    @PreAuthorize("hasAuthority('workflow:task:done')")
+    @PreAuthorize("hasAuthority('system:workflow-task:done')")
     @Operation(summary = "我的已办分页")
     @GetMapping("/done")
     public R<PageResult<WorkflowDoneVO>> done(@Valid WorkflowTaskQuery query) {
         return R.ok(taskService.pageDone(query));
     }
 
-    @PreAuthorize("hasAuthority('workflow:task:handle')")
+    @PreAuthorize("hasAuthority('system:workflow-task:handle')")
     @Operation(summary = "签收任务")
     @PostMapping("/{taskId}/claim")
     public R<Void> claim(@PathVariable String taskId, @Valid @RequestBody WorkflowHandleRequest request) {
@@ -60,7 +60,7 @@ public class WorkflowTaskController {
         return R.ok(null);
     }
 
-    @PreAuthorize("hasAuthority('workflow:task:handle')")
+    @PreAuthorize("hasAuthority('system:workflow-task:handle')")
     @Operation(summary = "审批通过")
     @PostMapping("/{taskId}/approve")
     public R<Void> approve(@PathVariable String taskId, @Valid @RequestBody WorkflowHandleRequest request) {
@@ -68,7 +68,7 @@ public class WorkflowTaskController {
         return R.ok(null);
     }
 
-    @PreAuthorize("hasAuthority('workflow:task:handle')")
+    @PreAuthorize("hasAuthority('system:workflow-task:handle')")
     @Operation(summary = "审批驳回")
     @PostMapping("/{taskId}/reject")
     public R<Void> reject(@PathVariable String taskId, @Valid @RequestBody WorkflowHandleRequest request) {
@@ -76,7 +76,7 @@ public class WorkflowTaskController {
         return R.ok(null);
     }
 
-    @PreAuthorize("hasAuthority('workflow:task:handle')")
+    @PreAuthorize("hasAuthority('system:workflow-task:handle')")
     @Operation(summary = "转办")
     @PostMapping("/{taskId}/transfer")
     public R<Void> transfer(@PathVariable String taskId,

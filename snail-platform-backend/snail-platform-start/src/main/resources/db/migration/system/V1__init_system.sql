@@ -18,7 +18,7 @@
 -- 权限码三段式 <面>:<模块>:<动作>;面随 scope 走:1 平台用 platform:,2 租户用 system:
 -- 字典租户各自维护:无平台内置、无并集、无默认种子
 -- 目录与外链 perm_code 为 NULL;MySQL 唯一索引允许多个 NULL
--- 种子只装系统面:文件面/流程面/第三方面种子在 V2/V3/V4 各自文件末尾
+-- 种子只装系统面菜单 + 流程面菜单(只赋权不展示);文件面/第三方面种子在 V2/V4 各自文件末尾
 -- =========================================================
 
 CREATE TABLE sys_tenant (
@@ -194,7 +194,7 @@ CREATE TABLE sys_login_log (
     ip         VARCHAR(50)  DEFAULT NULL COMMENT '客户端IP',
     browser    VARCHAR(100) DEFAULT NULL COMMENT '浏览器',
     os         VARCHAR(100) DEFAULT NULL COMMENT '操作系统',
-    login_type VARCHAR(20)  NOT NULL DEFAULT 'password' COMMENT '登录方式编码:password/sms,后续 feishu/wecom/dingtalk',
+    login_type VARCHAR(20)  NOT NULL DEFAULT 'password' COMMENT '登录方式编码:password/sms/sso(单点跳转签到),后续 feishu/wecom/dingtalk',
     scene      VARCHAR(20)  NOT NULL DEFAULT 'admin' COMMENT '登录端:admin/workflow/app/miniapp/dashboard/portal;统计分端与租户开通闸的归属列',
     status     TINYINT      NOT NULL COMMENT '结果:1 成功 0 失败',
     msg        VARCHAR(255) DEFAULT NULL COMMENT '失败原因',
@@ -363,9 +363,12 @@ VALUES
 (140,  1,   '登录日志',     2, 2, '/system/loginlog', 'system/loginlog/index',  'system:loginlog:list',       'Key',            5, 1, NOW()),
 (1401, 140, '导出登录日志', 3, 2, NULL,               NULL,                     'system:loginlog:export',     NULL,             1, 1, NOW()),
 (1402, 140, '跨租户查看',   3, 1, NULL,               NULL,                     'platform:loginlog:all',      NULL,             2, 1, NOW()),
+-- 日志清除按钮:三档保留期 1m/6m/1y 由接口白名单正则锁死;物理删除不可恢复,动作本身经 @OperLog 落审计
+(1403, 140, '清除登录日志', 3, 2, NULL,               NULL,                     'system:loginlog:clean',      NULL,             3, 1, NOW()),
 (150,  1,   '操作日志',     2, 2, '/system/operlog',  'system/operlog/index',   'system:operlog:list',        'Document',       6, 1, NOW()),
 (1501, 150, '导出操作日志', 3, 2, NULL,               NULL,                     'system:operlog:export',      NULL,             1, 1, NOW()),
 (1502, 150, '跨租户查看',   3, 1, NULL,               NULL,                     'platform:operlog:all',       NULL,             2, 1, NOW()),
+(1503, 150, '清除操作日志', 3, 2, NULL,               NULL,                     'system:operlog:clean',       NULL,             3, 1, NOW()),
 (160,  1,   '通知中心',     2, 2, '/system/notify',   'system/notify/index',    'system:notify:list',         'Bell',           7, 1, NOW()),
 (170,  1,   '在线用户',     2, 2, '/system/online',   'system/online/index',    'system:online:list',         'User',           8, 1, NOW()),
 (1701, 170, '强制下线',     3, 2, NULL,               NULL,                     'system:online:kick',         NULL,             1, 1, NOW()),
@@ -381,9 +384,38 @@ VALUES
 (220,  2,   '公告管理',     2, 1, '/platform/notify', 'platform/notify/index',  'platform:notify:list',       'Message',        3, 1, NOW()),
 (2201, 220, '发送公告',     3, 1, NULL,               NULL,                     'platform:notify:send',       NULL,             1, 1, NOW());
 
+-- ---------- 流程菜单(只赋权不展示) ----------
+-- 流程中心由独立 workflow 前端承载,管理端导航不展示(visible=1);visible 只影响导航渲染
+-- (SidebarMenu 过滤 visible=0),菜单管理与角色授权树照常出现,可正常勾选赋权
+-- 流程定义页与建模页同码(system:workflow-model:list),不单独设菜单——perm_code 全局唯一,授建模即含定义页
+-- workflow 端首页大屏(/dashboard)不设权限码,登录即可见,不入目录
+-- 权限码三段式随面走,与 workflow 控制器 @PreAuthorize 逐一对应
+INSERT INTO sys_menu
+(menu_id, parent_id, menu_name, menu_type, target, scope, path, component, perm_code, icon, sort, visible, is_system, create_time)
+VALUES
+-- 租户面(scope=2):租户管理员按角色授权,租户面按 A 语义隐式全量,不落 sys_role_menu
+(3,    0,   '流程中心',   1, 1, 2, '/workflow', NULL,                          NULL,                            'Share',    3, 1, 1, NOW()),
+(300,  3,   '流程建模',   2, 1, 2, '/modeler',  'workflow/modeler/index',      'system:workflow-model:list',    'SetUp',    1, 1, 1, NOW()),
+(3001, 300, '新建模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:create',  NULL,       1, 0, 1, NOW()),
+(3002, 300, '修改模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:update',  NULL,       2, 0, 1, NOW()),
+(3003, 300, '删除模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:delete',  NULL,       3, 0, 1, NOW()),
+(3004, 300, '发布模型',   3, 1, 2, NULL,        NULL,                          'system:workflow-model:publish', NULL,       4, 0, 1, NOW()),
+(310,  3,   '流程实例',   2, 1, 2, '/instance', 'workflow/instance/index',     'system:workflow-instance:list', 'Tickets',  2, 1, 1, NOW()),
+(3101, 310, '发起流程',   3, 1, 2, NULL,        NULL,                          'system:workflow-instance:start',   NULL,    1, 0, 1, NOW()),
+(3102, 310, '撤销流程',   3, 1, 2, NULL,        NULL,                          'system:workflow-instance:withdraw',NULL,    2, 0, 1, NOW()),
+(320,  3,   '任务中心',   2, 1, 2, '/task',     'workflow/task/index',         'system:workflow-task:list',     'Checked',  3, 1, 1, NOW()),
+(3201, 320, '查看已办',   3, 1, 2, NULL,        NULL,                          'system:workflow-task:done',     NULL,       1, 0, 1, NOW()),
+(3202, 320, '办理任务',   3, 1, 2, NULL,        NULL,                          'system:workflow-task:handle',   NULL,       2, 0, 1, NOW()),
+-- 平台面(scope=1):文末 admin 授权谓词按 m.scope=1 一刀切,本段自动被覆盖,无需单独补授
+(240,  2,   '流程模板',   2, 1, 1, '/platform/workflow-template', 'platform/workflow-template/index', 'platform:workflow-template:list',   'Files', 4, 1, 1, NOW()),
+(2401, 240, '新增模板',   3, 1, 1, NULL, NULL, 'platform:workflow-template:create', NULL, 1, 0, 1, NOW()),
+(2402, 240, '修改模板',   3, 1, 1, NULL, NULL, 'platform:workflow-template:update', NULL, 2, 0, 1, NOW()),
+(2403, 240, '删除模板',   3, 1, 1, NULL, NULL, 'platform:workflow-template:delete', NULL, 3, 0, 1, NOW());
+
 -- ---------- 默认租户 admin 的平台面授权 ----------
--- A 语义下租户面隐式全量,这里只落 scope=1 的 13 个节点(2/200/2001/2002/210/2101/2102/2103/1105/1402/1502/220/2201)
--- 谓词按 m.scope=1 一刀切,后建的域种子(V2/V3/V4)新增平台节点时无需改本段,各自文末补授即可
+-- A 语义下租户面隐式全量,这里只落 scope=1 的 17 个节点
+-- (2/200/2001/2002/210/2101/2102/2103/220/2201/240/2401/2402/2403/1105/1402/1502)
+-- 谓词按 m.scope=1 一刀切,后建的域种子(V2/V4)新增平台节点时无需改本段,各自文末补授即可
 INSERT INTO sys_role_menu (role_id, menu_id)
 SELECT r.role_id, m.menu_id
 FROM sys_role r

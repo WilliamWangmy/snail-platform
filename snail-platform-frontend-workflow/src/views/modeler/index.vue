@@ -12,11 +12,19 @@ import {
 } from '@/api/workflow/model';
 import AppIcon from '@/components/AppIcon.vue';
 import { useTable } from '@/composables/useTable';
+import { useAuthStore } from '@/stores/auth';
 
 import DefinitionListDialog from './components/DefinitionListDialog.vue';
 import ModelCreateDialog from './components/ModelCreateDialog.vue';
 
 const router = useRouter();
+
+/** 按钮级权限:与 sys_menu 种子码一致,未授权即隐藏对应操作入口 */
+const auth = useAuthStore();
+const canCreate = computed(() => auth.has('system:workflow-model:create'));
+const canUpdate = computed(() => auth.has('system:workflow-model:update'));
+const canDelete = computed(() => auth.has('system:workflow-model:delete'));
+const canPublish = computed(() => auth.has('system:workflow-model:publish'));
 
 type ModelQuery = {
   modelKey?: string;
@@ -215,6 +223,7 @@ const asModel = (row: unknown): WorkflowModelVO => row as WorkflowModelVO;
         <AppIcon name="refresh" />刷新
       </el-button>
       <el-button
+        v-if="canCreate"
         type="primary"
         @click="createDialogRef?.open()"
       >
@@ -385,6 +394,7 @@ const asModel = (row: unknown): WorkflowModelVO => row as WorkflowModelVO;
           <template #default="{ row }">
             <div class="row-actions">
               <el-button
+                v-if="canUpdate"
                 link
                 size="small"
                 @click="openDesigner(asModel(row))"
@@ -400,6 +410,7 @@ const asModel = (row: unknown): WorkflowModelVO => row as WorkflowModelVO;
                 <AppIcon name="history" />版本
               </el-button>
               <el-dropdown
+                v-if="canPublish || canDelete"
                 trigger="click"
                 @command="(command: string) => handleRowCommand(command, asModel(row))"
               >
@@ -413,18 +424,19 @@ const asModel = (row: unknown): WorkflowModelVO => row as WorkflowModelVO;
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item
-                      v-if="statusMeta(asModel(row)).key === 'published'"
+                      v-if="canPublish && statusMeta(asModel(row)).key === 'published'"
                       command="disable"
                     >
                       <span class="menu-inline"><AppIcon name="pause" />停用流程</span>
                     </el-dropdown-item>
                     <el-dropdown-item
-                      v-if="statusMeta(asModel(row)).key === 'disabled'"
+                      v-if="canPublish && statusMeta(asModel(row)).key === 'disabled'"
                       command="enable"
                     >
                       <span class="menu-inline"><AppIcon name="play" />启用流程</span>
                     </el-dropdown-item>
                     <el-dropdown-item
+                      v-if="canDelete"
                       :divided="statusMeta(asModel(row)).key !== 'draft' && statusMeta(asModel(row)).key !== 'unpublished'"
                       command="delete"
                       class="menu-danger"

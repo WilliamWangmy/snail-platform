@@ -29,7 +29,7 @@ public class WorkflowDefinitionController {
         this.modelService = modelService;
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:list')")
+    @PreAuthorize("hasAuthority('system:workflow-model:list')")
     @Operation(summary = "已发布版本的 BPMN 原文(只读回显)")
     @GetMapping("/{definitionId}/xml")
     public R<WorkflowDefinitionXmlVO> xml(@PathVariable String definitionId) {

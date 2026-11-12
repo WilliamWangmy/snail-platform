@@ -55,6 +55,9 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const auth = useAuthStore();
+/** 按钮级权限:与 sys_menu 种子码一致(办理/已办独立权限),未授权即隐藏对应入口 */
+const canHandle = computed(() => auth.has('system:workflow-task:handle'));
+const canViewDone = computed(() => auth.has('system:workflow-task:done'));
 const PAGE_SIZE = 10;
 const FETCH_SIZE = 200;
 
@@ -752,7 +755,7 @@ async function confirmTransfer(): Promise<void> {
               <template #default="scope">
                 <div class="row-actions">
                   <el-button
-                    v-if="!scope.row.claimed"
+                    v-if="canHandle && !scope.row.claimed"
                     link
                     size="small"
                     @click="openClaim(scope.row)"
@@ -767,6 +770,7 @@ async function confirmTransfer(): Promise<void> {
                     <AppIcon name="arrow-right" />处理
                   </el-button>
                   <el-dropdown
+                    v-if="canHandle"
                     trigger="click"
                     @command="command => handleTodoCommand(String(command), scope.row)"
                   >
@@ -818,7 +822,10 @@ async function confirmTransfer(): Promise<void> {
         </div>
       </el-tab-pane>
 
-      <el-tab-pane name="done">
+      <el-tab-pane
+        v-if="canViewDone"
+        name="done"
+      >
         <template #label>
           已办 <span class="tab-count">{{ doneTotal }}</span>
         </template>
@@ -1291,7 +1298,7 @@ async function confirmTransfer(): Promise<void> {
       <div class="drawer-foot">
         <span class="foot-note">{{ drawerFootnote }}</span>
         <div
-          v-if="activeKind === 'todo'"
+          v-if="activeKind === 'todo' && canHandle"
           class="task-drawer-actions"
         >
           <el-button

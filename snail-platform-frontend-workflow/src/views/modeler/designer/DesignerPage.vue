@@ -77,6 +77,10 @@ const elementRevision = ref(0);
 const saving = ref(false);
 const publishing = ref(false);
 
+/** 按钮级权限:与 sys_menu 种子码一致,未授权即隐藏保存/发布入口 */
+const canUpdate = computed(() => auth.has('system:workflow-model:update'));
+const canPublish = computed(() => auth.has('system:workflow-model:publish'));
+
 const selectedId = ref<string | null>(null);
 const selectedType = ref<string | null>(null);
 // bpmn-js 服务与模型对象不能被 Vue 深层代理，否则事件重绘时触发 Proxy 不变量错误
@@ -439,6 +443,7 @@ function goBack(): void {
           </el-button>
         </el-tooltip>
         <el-tooltip
+          v-if="canUpdate"
           content="保存草稿"
           placement="bottom"
         >
@@ -451,6 +456,7 @@ function goBack(): void {
           </el-button>
         </el-tooltip>
         <el-tooltip
+          v-if="canPublish"
           content="发布流程"
           placement="bottom"
         >

@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 1) model_key 就是 BPMN 的 process id,建后不可改、租户内终身占用;
  *    草稿保存时把 XML 里的 process id 对齐到 model_key(bpmn-js 新建默认给 Process_1,不对齐发布必然歧义);
  * 2) 草稿与已发布版本分离:改草稿不动在途实例,发布才产生新版本;坏版本靠挂起处理,不做回滚部署;
- * 3) 发布是"部署代码",权限码独立( workflow:model:publish),且整体在一个事务里——
+ * 3) 发布是"部署代码",权限码独立( system:workflow-model:publish),且整体在一个事务里——
  *    引擎写入与指针回写共用 DataSource + 事务管理器(P0 实证),任一步失败都不留半态;
  * 4) 删除只删平台侧记录,但前提是该 key 下没有在途实例,否则等于把在跑的流程变成孤儿。
  * 上游:WorkflowModelController;下游:sys_workflow_model 读写、WorkflowEngineGateway、WorkflowTemplateService。

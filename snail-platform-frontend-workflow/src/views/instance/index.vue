@@ -14,6 +14,7 @@ import {
 } from '@/api/workflow/instance';
 import { pageModels, type WorkflowModelVO } from '@/api/workflow/model';
 import AppIcon from '@/components/AppIcon.vue';
+import { useAuthStore } from '@/stores/auth';
 
 type InstanceFilter = 'all' | 'running' | 'approved' | 'rejected' | 'withdrawn';
 
@@ -40,6 +41,11 @@ const instances = ref<WorkflowInstanceVO[]>([]);
 const totalCount = ref(0);
 const models = ref<WorkflowModelVO[]>([]);
 const loading = ref(false);
+
+/** 按钮级权限:与 sys_menu 种子码一致(发起/撤销独立按钮权限),未授权即隐藏入口 */
+const auth = useAuthStore();
+const canStart = computed(() => auth.has('system:workflow-instance:start'));
+const mayWithdraw = computed(() => auth.has('system:workflow-instance:withdraw'));
 
 const query = ref('');
 const activeFilter = ref<InstanceFilter>('all');
@@ -412,6 +418,7 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
         <AppIcon name="refresh" />刷新
       </el-button>
       <el-button
+        v-if="canStart"
         type="primary"
         @click="openStart"
       >
@@ -592,7 +599,7 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
                 <AppIcon name="eye" />查看
               </el-button>
               <el-button
-                v-if="asInstance(row).status === 'RUNNING'"
+                v-if="asInstance(row).status === 'RUNNING' && mayWithdraw"
                 link
                 size="small"
                 type="danger"
@@ -901,7 +908,7 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
         <span class="foot-note">{{ drawerFootnote }}</span>
         <div class="task-drawer-actions">
           <el-button
-            v-if="canWithdraw"
+            v-if="canWithdraw && mayWithdraw"
             type="danger"
             plain
             @click="openWithdraw(activeInstance)"

@@ -39,35 +39,35 @@ public class WorkflowInstanceController {
         this.instanceService = instanceService;
     }
 
-    @PreAuthorize("hasAuthority('workflow:instance:start')")
+    @PreAuthorize("hasAuthority('system:workflow-instance:start')")
     @Operation(summary = "发起流程")
     @PostMapping
     public R<StartResult> start(@Valid @RequestBody WorkflowStartRequest request) {
         return R.ok(instanceService.start(request));
     }
 
-    @PreAuthorize("hasAuthority('workflow:instance:list')")
+    @PreAuthorize("hasAuthority('system:workflow-instance:list')")
     @Operation(summary = "我发起的分页")
     @GetMapping("/started")
     public R<PageResult<WorkflowInstanceVO>> started(@Valid WorkflowInstanceQuery query) {
         return R.ok(instanceService.pageStarted(query));
     }
 
-    @PreAuthorize("hasAuthority('workflow:instance:list')")
+    @PreAuthorize("hasAuthority('system:workflow-instance:list')")
     @Operation(summary = "流程实例详情")
     @GetMapping("/{instanceId}")
     public R<WorkflowInstanceVO> detail(@PathVariable String instanceId) {
         return R.ok(instanceService.detail(instanceId));
     }
 
-    @PreAuthorize("hasAuthority('workflow:instance:list')")
+    @PreAuthorize("hasAuthority('system:workflow-instance:list')")
     @Operation(summary = "流程轨迹")
     @GetMapping("/{instanceId}/trace")
     public R<WorkflowTraceVO> trace(@PathVariable String instanceId) {
         return R.ok(instanceService.trace(instanceId));
     }
 
-    @PreAuthorize("hasAuthority('workflow:instance:withdraw')")
+    @PreAuthorize("hasAuthority('system:workflow-instance:withdraw')")
     @Operation(summary = "撤销在途流程")
     @PostMapping("/{instanceId}/withdraw")
     public R<Void> withdraw(@PathVariable String instanceId,

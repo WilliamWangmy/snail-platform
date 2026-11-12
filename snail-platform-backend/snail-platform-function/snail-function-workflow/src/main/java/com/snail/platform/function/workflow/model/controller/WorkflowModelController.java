@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 职责:流程模型入口(租户面)——模型 CRUD、设计器草稿读写、发布与停用/激活、版本列表。
- * 权限口径:list 只圈可见面,增删改各一码,发布与停用共用 workflow:model:publish——
+ * 权限口径:list 只圈可见面,增删改各一码,发布与停用共用 system:workflow-model:publish——
  * 发布等同部署代码,停用等同让流程发不起来,两者危险等级一致,与"改个名字"必须分档(方案 §5)。
  * 草稿保存不标 @OperLog:设计器自动保存是高频动作,进审计表只会把操作日志刷成噪音。
  * 上游:模型管理页与设计器;下游:WorkflowModelService。
@@ -45,21 +45,21 @@ public class WorkflowModelController {
         this.modelService = modelService;
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:list')")
+    @PreAuthorize("hasAuthority('system:workflow-model:list')")
     @Operation(summary = "模型分页")
     @GetMapping("/page")
     public R<PageResult<WorkflowModelVO>> page(@Valid WorkflowModelQuery query) {
         return R.ok(modelService.page(query));
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:list')")
+    @PreAuthorize("hasAuthority('system:workflow-model:list')")
     @Operation(summary = "模型详情(不含 XML)")
     @GetMapping("/{modelId}")
     public R<WorkflowModelVO> detail(@PathVariable Long modelId) {
         return R.ok(modelService.detail(modelId));
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:create')")
+    @PreAuthorize("hasAuthority('system:workflow-model:create')")
     @Operation(summary = "新增模型(可直接给草稿,或从平台模板落地)")
     @OperLog(module = "流程模型", businessType = BusinessType.INSERT)
     @PostMapping
@@ -67,7 +67,7 @@ public class WorkflowModelController {
         return R.ok(modelService.create(request));
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:update')")
+    @PreAuthorize("hasAuthority('system:workflow-model:update')")
     @Operation(summary = "修改模型展示信息(流程标识不可改)")
     @OperLog(module = "流程模型", businessType = BusinessType.UPDATE)
     @PutMapping("/{modelId}")
@@ -77,7 +77,7 @@ public class WorkflowModelController {
         return R.ok(null);
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:delete')")
+    @PreAuthorize("hasAuthority('system:workflow-model:delete')")
     @Operation(summary = "删除模型(该流程标识下有在途实例时拒绝)")
     @OperLog(module = "流程模型", businessType = BusinessType.DELETE)
     @DeleteMapping("/{modelId}")
@@ -86,14 +86,14 @@ public class WorkflowModelController {
         return R.ok(null);
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:list')")
+    @PreAuthorize("hasAuthority('system:workflow-model:list')")
     @Operation(summary = "取设计器草稿")
     @GetMapping("/{modelId}/draft")
     public R<WorkflowDraftVO> draft(@PathVariable Long modelId) {
         return R.ok(modelService.draft(modelId));
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:update')")
+    @PreAuthorize("hasAuthority('system:workflow-model:update')")
     @Operation(summary = "保存设计器草稿(整份覆盖)")
     @PutMapping("/{modelId}/draft")
     public R<Void> saveDraft(@PathVariable Long modelId,
@@ -102,7 +102,7 @@ public class WorkflowModelController {
         return R.ok(null);
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:publish')")
+    @PreAuthorize("hasAuthority('system:workflow-model:publish')")
     @Operation(summary = "发布模型(校验 + 部署 + 回写版本指针)")
     @OperLog(module = "流程模型", businessType = BusinessType.OTHER)
     @PostMapping("/{modelId}/publish")
@@ -110,14 +110,14 @@ public class WorkflowModelController {
         return R.ok(modelService.publish(modelId));
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:list')")
+    @PreAuthorize("hasAuthority('system:workflow-model:list')")
     @Operation(summary = "版本列表(当前指针标 deployed)")
     @GetMapping("/{modelId}/definitions")
     public R<List<WorkflowDefinitionVO>> definitions(@PathVariable Long modelId) {
         return R.ok(modelService.definitions(modelId));
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:publish')")
+    @PreAuthorize("hasAuthority('system:workflow-model:publish')")
     @Operation(summary = "停用流程(挂起当前定义,禁止新发起)")
     @OperLog(module = "流程模型", businessType = BusinessType.OTHER)
     @PostMapping("/{modelId}/suspend")
@@ -126,7 +126,7 @@ public class WorkflowModelController {
         return R.ok(null);
     }
 
-    @PreAuthorize("hasAuthority('workflow:model:publish')")
+    @PreAuthorize("hasAuthority('system:workflow-model:publish')")
     @Operation(summary = "启用流程(激活当前定义,恢复可发起)")
     @OperLog(module = "流程模型", businessType = BusinessType.OTHER)
     @PostMapping("/{modelId}/activate")
