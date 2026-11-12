@@ -58,22 +58,33 @@ function appendQuery(url: string, params?: object): string {
 /** 并发多个请求同时 401 时只提示与跳转一次 */
 let redirecting = false;
 
+/** 当前是否已停在登录页(登录页接口异常时不再重复提示与跳转)。 */
+function onLoginPage(): boolean {
+  const pages = getCurrentPages();
+  const current = pages[pages.length - 1];
+  return current?.route === 'pages/login/login';
+}
+
 function handle401(): void {
   clearToken();
-  if (!redirecting) {
-    redirecting = true;
-    uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' });
-    setTimeout(() => {
-      uni.reLaunch({ url: '/pages/login/login', complete: () => (redirecting = false) });
-    }, 600);
-  }
+  if (redirecting || onLoginPage()) return;
+  redirecting = true;
+  uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' });
+  setTimeout(() => {
+    uni.reLaunch({ url: '/pages/login/login', complete: () => (redirecting = false) });
+  }, 600);
 }
 
 function resolveEnvelope<T>(statusCode: number, body: unknown): T {
+  // 后端未认证统一吐 HTTP 401 + R 信封;信封缺失(网关 401 等)也必须回登录页
+  if (statusCode === 401) {
+    handle401();
+    throw new ApiError(401, '未认证或登录已过期');
+  }
   const envelope = body as { code?: number; message?: string; data?: T };
   if (envelope && typeof envelope.code === 'number') {
     if (envelope.code === 0) return envelope.data as T;
-    if (envelope.code === 401 && statusCode !== 401) handle401();
+    if (envelope.code === 401) handle401();
     throw new ApiError(envelope.code, envelope.message || '请求失败');
   }
   throw new ApiError(-1, '网络异常，请稍后重试');

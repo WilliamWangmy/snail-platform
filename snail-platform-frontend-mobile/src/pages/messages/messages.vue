@@ -82,6 +82,7 @@ import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app';
 import { useToast } from 'wot-design-uni';
 import { useThemeStore } from '@/stores/theme';
 import { useNotifyStore } from '@/stores/notify';
+import { useAuthStore } from '@/stores/auth';
 import {
   markAllRead,
   markRead,
@@ -92,6 +93,7 @@ import {
 
 type FilterKey = 'all' | 'unread' | 'read';
 
+const auth = useAuthStore();
 const theme = useThemeStore();
 const notify = useNotifyStore();
 const toast = useToast();
@@ -161,6 +163,10 @@ const groups = computed<Array<{ day: string; items: NotifyInboxItem[] }>>(() => 
 });
 
 onShow(() => {
+  if (!auth.isLoggedIn) {
+    uni.reLaunch({ url: '/pages/login/login' });
+    return;
+  }
   notify.refresh();
   if (items.value.length === 0) void reload();
 });
