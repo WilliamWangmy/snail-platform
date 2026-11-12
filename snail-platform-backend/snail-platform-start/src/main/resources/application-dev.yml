@@ -27,12 +27,12 @@ snail:
       # 开发态短信走 mock 通道:发送动作同走网关留痕(sys_external_call_log),手机号打码;
       # 码值默认不落日志,从 Valkey GET snail:auth:sms:{phone} 取;
       # 本机自测要直接看码可开 mock-echo-code,生产 profile 两个开关都不存在,天然关闭
-      mock: ${SNAIL_SMS_MOCK:false}
-      mock-echo-code: ${SNAIL_SMS_MOCK_ECHO_CODE:false}
+      mock: ${SNAIL_SMS_MOCK:true}
+      mock-echo-code: ${SNAIL_SMS_MOCK_ECHO_CODE:true}
     oauth:
       # 开发态厂商调用走 mock 通道:authorizeUrl 直接造成本地回调,不申请厂商应用即可端到端跑通;
       # 生产 profile 无此键,@ConditionalOnProperty 缺省走真实客户端
-      mock: ${SNAIL_OAUTH_MOCK:false}
+      mock: ${SNAIL_OAUTH_MOCK:true}
       # mock 身份的实名手机号:改成与本地库某用户 sys_user.phone 一致即可验证 JIT 绑定与多租户 pick
       mock-mobile: ${SNAIL_OAUTH_MOCK_MOBILE:13800000000}
   storage:
