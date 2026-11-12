@@ -768,33 +768,6 @@ onMounted(() => void refreshCaptcha());
               企业微信
             </button>
           </div>
-
-          <div class="scr-sso">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              style="flex:none"
-            ><circle
-              cx="12"
-              cy="12"
-              r="8.6"
-              stroke="currentColor"
-              stroke-width="1.7"
-            /><path
-              d="M12 8v5"
-              stroke="currentColor"
-              stroke-width="1.7"
-              stroke-linecap="round"
-            /><circle
-              cx="12"
-              cy="16"
-              r="1"
-              fill="currentColor"
-            /></svg>
-            <span>从管理端或流程平台跳转时将自动携带一次性 ssotoken 免登进入大屏，无需再次输入密码。</span>
-          </div>
         </template>
 
         <div class="scr-foot">
@@ -1326,20 +1299,6 @@ onMounted(() => void refreshCaptcha());
 
 .scr-method:hover { border-color: var(--teal); color: var(--text-1); background: var(--panel-soft); }
 .scr-method.active { border-color: var(--teal); color: var(--teal); background: rgba(30, 201, 165, 0.08); }
-
-.scr-sso {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 18px;
-  padding: 10px 12px;
-  border: 1px dashed rgba(232, 173, 85, 0.35);
-  border-radius: 10px;
-  background: rgba(232, 173, 85, 0.06);
-  color: rgba(232, 173, 85, 0.85);
-  font-size: 11px;
-  line-height: 1.6;
-}
 
 .scr-foot {
   display: flex;
