@@ -95,10 +95,10 @@ function onSwitchSystem(command: string | number | object): void {
   openCrossApp(command as SystemKey, auth.token);
 }
 
-/** 顶栏系统切换入口显隐:租户开通态下发且管理端/数据大屏均未开通时,切换按钮整体隐藏。 */
+/** 顶栏系统切换入口显隐:管理端/数据大屏任一开关明确为 true 才显示,数据缺失(null/拉取失败)一律隐藏。 */
 const showSystemSwitch = computed(() =>
-  auth.loginUser?.tenantFeatures?.adminEnabled !== false
-  || auth.loginUser?.tenantFeatures?.dashboardEnabled !== false,
+  auth.loginUser?.tenantFeatures?.adminEnabled === true
+  || auth.loginUser?.tenantFeatures?.dashboardEnabled === true,
 );
 
 const ICONS: Record<string, string> = {
@@ -304,9 +304,9 @@ async function handleLogout(): Promise<void> {
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <!-- 按租户开通态过滤:未开通的系统不给入口;旧后端无开关字段时全量展示 -->
+              <!-- 按租户开通态过滤:开关明确为 true 才给入口,数据缺失(null/拉取失败)一律隐藏,宁可少显示不越权 -->
               <el-dropdown-item
-                v-if="auth.loginUser?.tenantFeatures?.adminEnabled !== false"
+                v-if="auth.loginUser?.tenantFeatures?.adminEnabled === true"
                 command="admin"
               >
                 <span class="system-item">
@@ -316,7 +316,7 @@ async function handleLogout(): Promise<void> {
                 </span>
               </el-dropdown-item>
               <el-dropdown-item
-                v-if="auth.loginUser?.tenantFeatures?.dashboardEnabled !== false"
+                v-if="auth.loginUser?.tenantFeatures?.dashboardEnabled === true"
                 command="screen"
               >
                 <span class="system-item">

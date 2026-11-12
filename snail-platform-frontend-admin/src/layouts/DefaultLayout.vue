@@ -90,13 +90,13 @@ async function signOut(): Promise<void> {
 const SCREEN_URL = import.meta.env.VITE_SCREEN_URL ?? 'http://localhost:8001/';
 const FLOW_URL = import.meta.env.VITE_FLOW_URL ?? 'http://localhost:8002/';
 
-/** 顶栏系统切换入口:按租户五系统开通态过滤,未开通的系统不出现;旧后端无开关字段时全量展示。 */
+/** 顶栏系统切换入口:按租户五系统开通态过滤,开关明确为 true 才显示——数据缺失(null/拉取失败)一律隐藏,宁可少显示不越权。 */
 const systems = computed(() => {
   const features = auth.user?.tenantFeatures;
   return [
-    { key: 'screen', name: '数据大屏', desc: '三维态势可视化', icon: 'chart', url: SCREEN_URL, enabled: features?.dashboardEnabled },
-    { key: 'flow', name: '流程平台', desc: '流程控制台', icon: 'flow', url: FLOW_URL, enabled: features?.workflowEnabled },
-  ].filter((item) => item.enabled !== false);
+    { key: 'screen', name: '数据大屏', desc: '三维态势可视化', icon: 'chart', url: SCREEN_URL, enabled: features?.dashboardEnabled === true },
+    { key: 'flow', name: '流程平台', desc: '流程控制台', icon: 'flow', url: FLOW_URL, enabled: features?.workflowEnabled === true },
+  ].filter((item) => item.enabled);
 });
 
 function openStandalone(url: string): void {
