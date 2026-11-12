@@ -4,6 +4,7 @@ import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
+import com.snail.platform.function.system.log.dto.LogCleanRequest;
 import com.snail.platform.function.system.log.dto.OperLogDetailVO;
 import com.snail.platform.function.system.log.dto.OperLogListVO;
 import com.snail.platform.function.system.log.dto.OperLogQuery;
@@ -17,13 +18,15 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 职责:操作日志查询入口——分页、详情、导出;本模块只读不写,没有任何修改性端点。
+ * 职责:操作日志入口——分页、详情、导出与历史清除;查询三端只读,唯一写端点是按保留期清除历史。
  * 上游:日志管理页面;下游:OperLogService。租户钉死在 Service,这里连 tenantId 都只透传平台侧参数。
- * 打标口径:导出自身是操作(businessType=EXPORT);读端点不打标。
+ * 打标口径:导出与清除自身是操作(EXPORT/DELETE),必须留在审计里;读端点不打标。
  */
 @Tag(name = "操作日志")
 @Validated
@@ -58,5 +61,13 @@ public class OperLogController {
     @GetMapping("/export")
     public void export(HttpServletResponse response, @Valid OperLogQuery query) throws IOException {
         operLogService.export(response, query);
+    }
+
+    @PreAuthorize("hasAuthority('system:operlog:clean')")
+    @Operation(summary = "清除历史操作日志(1m/6m/1y 三档保留期,不可逆)")
+    @OperLog(module = "操作日志", businessType = BusinessType.DELETE)
+    @PostMapping("/clean")
+    public R<Long> clean(@Valid @RequestBody LogCleanRequest request) {
+        return R.ok(operLogService.clean(request));
     }
 }

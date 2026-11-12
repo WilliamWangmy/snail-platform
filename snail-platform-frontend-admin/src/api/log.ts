@@ -1,4 +1,4 @@
-import { download, get } from './http';
+import { download, get, post } from './http';
 import type { PageParams, PageResult } from './types';
 
 /** 列表行:param/result 不在这里,全文只在详情端点。 */
@@ -53,18 +53,21 @@ export interface LoginLogVO {
   ip: string | null;
   browser: string | null;
   os: string | null;
+  /** 登录端:admin/workflow/app/miniapp/dashboard/portal,历史行 admin */
+  scene: string;
   /** 1 成功 0 失败 */
   status: number;
   msg: string | null;
   loginTime: string;
 }
 
-/** 同上:tenantId 仅平台侧生效;username 与 ip 是模糊匹配。 */
+/** 同上:tenantId 仅平台侧生效;username 与 ip 是模糊匹配,scene 精确匹配。 */
 export interface LoginLogQuery extends PageParams {
   tenantId?: number | null;
   username?: string;
   ip?: string;
   status?: number | null;
+  scene?: string;
   beginTime?: string;
   endTime?: string;
 }
@@ -92,4 +95,24 @@ export function pageLoginLogs(query: LoginLogQuery): Promise<PageResult<LoginLog
 /** 导出登录日志,行数上限口径与操作日志一致。 */
 export function exportLoginLogs(query: LoginLogQuery): Promise<void> {
   return download('/system/log/login/export', query, '登录日志.xlsx');
+}
+
+/** 日志清除请求:三档保留期白名单;tenantId 仅持平台跨租户权限码者生效,留空即跨租户全量(页面有二次确认)。 */
+export interface LogCleanRequest {
+  /** 1m 一个月前 / 6m 半年前 / 1y 一年前,删除该时点之前的全部日志 */
+  before: '1m' | '6m' | '1y';
+  tenantId?: number | null;
+}
+
+/**
+ * 清除保留期之外的历史操作日志,返回实际删除行数;不可逆,后端按 1000 行一批分批删。
+ * 清除动作自身会被 @OperLog 记一条 DELETE 审计,谁清的、何时清的可回查。
+ */
+export function cleanOperLogs(body: LogCleanRequest): Promise<number> {
+  return post<number>('/system/log/oper/clean', body);
+}
+
+/** 清除历史登录日志,口径与操作日志清除一致。 */
+export function cleanLoginLogs(body: LogCleanRequest): Promise<number> {
+  return post<number>('/system/log/login/clean', body);
 }

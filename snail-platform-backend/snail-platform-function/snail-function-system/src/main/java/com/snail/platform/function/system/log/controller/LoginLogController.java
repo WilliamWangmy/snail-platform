@@ -4,6 +4,7 @@ import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
 import com.snail.platform.framework.log.OperLog;
+import com.snail.platform.function.system.log.dto.LogCleanRequest;
 import com.snail.platform.function.system.log.dto.LoginLogQuery;
 import com.snail.platform.function.system.log.dto.LoginLogVO;
 import com.snail.platform.function.system.log.service.LoginLogService;
@@ -15,11 +16,13 @@ import java.io.IOException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 职责:登录日志查询入口——分页与导出;日志行由 auth 登录链写入,这里只读。
+ * 职责:登录日志入口——分页、导出与历史清除;日志行由 auth 登录链写入,查询侧只读,唯一写端点按保留期清历史。
  * 上游:日志管理页面;下游:LoginLogService。tenantId 参数只对平台侧生效,钉死逻辑在 Service。
  */
 @Tag(name = "登录日志")
@@ -48,5 +51,13 @@ public class LoginLogController {
     @GetMapping("/export")
     public void export(HttpServletResponse response, @Valid LoginLogQuery query) throws IOException {
         loginLogService.export(response, query);
+    }
+
+    @PreAuthorize("hasAuthority('system:loginlog:clean')")
+    @Operation(summary = "清除历史登录日志(1m/6m/1y 三档保留期,不可逆)")
+    @OperLog(module = "登录日志", businessType = BusinessType.DELETE)
+    @PostMapping("/clean")
+    public R<Long> clean(@Valid @RequestBody LogCleanRequest request) {
+        return R.ok(loginLogService.clean(request));
     }
 }

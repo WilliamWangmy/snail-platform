@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 /**
- * 职责:sys_login_log 数据访问。只增;查询侧显式写 tenant_id 条件(本表在拦截器豁免清单)。
+ * 职责:sys_login_log 数据访问。写入只有认证链留痕(增)与 log 子域按保留期清历史(删),无更新路径;查询侧显式写 tenant_id 条件(本表在拦截器豁免清单)。
  * 上游:MybatisPlusConfig 的 @MapperScan;下游:认证链留痕与 log 子域查询、租户详情统计的分端回填。
  */
 public interface SysLoginLogMapper extends BaseMapper<SysLoginLog> {

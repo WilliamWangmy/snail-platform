@@ -177,7 +177,9 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
 - **脱敏**在切面侧：`SensitiveDataMasker` 按 key 名单把密码等字段的值替换成 `******` 再落库，
   所以日志详情页看到的 `param`/`result` 已是脱敏后的文本。
 - **异步线程没有租户上下文**，`tenant_id`、`trace_id`、操作人、组织必须在请求线程取好随记录带入。
-- 两张日志表**只增不删**，不继承 `AuditedEntity`——给日志配逻辑删除字段就是给篡改留门。
+- 两张日志表**只增不改**，不继承 `AuditedEntity`——给日志配逻辑删除字段就是给篡改留门。
+  唯一的删除动作是按保留期清历史（`system:operlog:clean` / `system:loginlog:clean`，1m/6m/1y 三档，
+  分批 1000 行独立提交），清除本身经 `@OperLog` 落一条 DELETE 审计。
 - 登录日志的写路径在 `snail-function-auth` 的登录链（`AuthService.writeLoginLog`），留痕写失败不阻断登录响应；
   本模块的 `LoginLogService` 是纯读侧。
 - 查询侧显式钉租户边界：无 `platform:operlog:all` / `platform:loginlog:all` 者锁本租户（请求里的 `tenantId` 参数一概不认），
