@@ -30,11 +30,11 @@ export const FLOW_THEMES: FlowThemeMeta[] = [
     preview: { bg: '#eef4f3', line: '#dee3e3', sidebar: '#071820', primary: '#0da284', card: '#ffffff' },
   },
   {
-    id: 'dark', name: '夜航青', desc: '深色 · 默认', mode: 'dark', cb: false,
+    id: 'dark', name: '夜航青', desc: '深色', mode: 'dark', cb: false,
     preview: { bg: '#050f14', line: '#1d363f', sidebar: '#071820', primary: '#1ec9a5', card: '#0b202a' },
   },
   {
-    id: 'mist-light', name: '雾松青', desc: '浅色 · 管理端', mode: 'light', cb: false,
+    id: 'mist-light', name: '雾松青', desc: '浅色 · 默认', mode: 'light', cb: false,
     preview: { bg: '#f3f7f7', line: '#e5eeed', sidebar: '#0a302c', primary: '#0f9f82', card: '#ffffff' },
   },
   {
@@ -52,6 +52,23 @@ export const FLOW_THEMES: FlowThemeMeta[] = [
 ];
 
 const STORAGE_KEY = 'snail-flow-theme';
+/** 管理端（snail-platform-frontend-admin）的主题键;同源部署时共用 localStorage,两端主题保持一致。 */
+const ADMIN_STORAGE_KEY = 'snail_admin_theme_v1';
+
+/** 流程端主题 id → 管理端主题 id(两套 id 命名不同,色板一一对应)。 */
+const FLOW_TO_ADMIN: Record<FlowTheme, string> = {
+  light: 'flow-light',
+  dark: 'flow-dark',
+  'mist-light': 'light',
+  'obsidian-dark': 'dark',
+  'cb-light': 'cb-light',
+  'cb-dark': 'cb-dark',
+};
+
+/** 管理端主题 id → 流程端主题 id,上表反转。 */
+const ADMIN_TO_FLOW: Record<string, FlowTheme> = Object.fromEntries(
+  Object.entries(FLOW_TO_ADMIN).map(([flowId, adminId]) => [adminId, flowId as FlowTheme]),
+) as Record<string, FlowTheme>;
 
 function isFlowTheme(value: unknown): value is FlowTheme {
   return typeof value === 'string' && FLOW_THEMES.some((item) => item.id === value);
@@ -65,10 +82,17 @@ export function currentTheme(): FlowTheme {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (isFlowTheme(stored)) return stored;
+    /* 管理端已选过主题:按映射回读,单点到流程时与管理端观感一致。 */
+    const adminStored = localStorage.getItem(ADMIN_STORAGE_KEY);
+    if (adminStored) {
+      const mapped = ADMIN_TO_FLOW[adminStored];
+      if (mapped && isFlowTheme(mapped)) return mapped;
+    }
   } catch {
     /* ignore */
   }
-  return 'dark';
+  /* 缺省与管理端默认(雾松青)对齐,两端首访观感一致。 */
+  return 'mist-light';
 }
 
 /** 模式类驱动明暗（html.dark/html.light），data-flow-theme 驱动四套扩展配色。 */
@@ -80,6 +104,8 @@ export function applyTheme(theme: FlowTheme): void {
   root.dataset.flowTheme = meta.id;
   try {
     localStorage.setItem(STORAGE_KEY, meta.id);
+    /* 双键同步:管理端同源打开时读到同一偏好。 */
+    localStorage.setItem(ADMIN_STORAGE_KEY, FLOW_TO_ADMIN[theme]);
   } catch {
     /* ignore */
   }

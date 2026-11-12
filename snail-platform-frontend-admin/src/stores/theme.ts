@@ -84,13 +84,48 @@ export const THEMES: ThemeTokens[] = [
 ];
 
 const THEME_KEY = 'snail_admin_theme_v1';
+/** 流程端（snail-platform-frontend-workflow）的主题键;同源部署时两端共用 localStorage,双向同步保持一致。 */
+const FLOW_THEME_KEY = 'snail-flow-theme';
+
+/** 管理端主题 id → 流程端主题 id(两套 id 命名不同,色板一一对应)。 */
+const ADMIN_TO_FLOW: Record<string, string> = {
+  light: 'mist-light',
+  dark: 'obsidian-dark',
+  'cb-light': 'cb-light',
+  'cb-dark': 'cb-dark',
+  'flow-light': 'light',
+  'flow-dark': 'dark',
+};
+
+/** 流程端主题 id → 管理端主题 id,上表反转。 */
+const FLOW_TO_ADMIN: Record<string, string> = Object.fromEntries(
+  Object.entries(ADMIN_TO_FLOW).map(([adminId, flowId]) => [flowId, adminId]),
+);
 
 function readStoredTheme(): string {
   try {
     const stored = localStorage.getItem(THEME_KEY);
-    return stored && THEMES.some((item) => item.id === stored) ? stored : 'light';
+    if (stored && THEMES.some((item) => item.id === stored)) return stored;
+    /* 老用户只在流程端选过主题:按映射回读,保证两端首选项一致。 */
+    const flowStored = localStorage.getItem(FLOW_THEME_KEY);
+    if (flowStored) {
+      const mapped = FLOW_TO_ADMIN[flowStored];
+      if (mapped && THEMES.some((item) => item.id === mapped)) return mapped;
+    }
   } catch {
-    return 'light';
+    /* ignore */
+  }
+  return 'light';
+}
+
+/** 主题偏好持久化:同时写两端各自的键,先到哪端设置都能带过去(同源时生效)。 */
+function persistTheme(id: string): void {
+  try {
+    localStorage.setItem(THEME_KEY, id);
+    const flowId = ADMIN_TO_FLOW[id];
+    if (flowId) localStorage.setItem(FLOW_THEME_KEY, flowId);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -205,6 +240,8 @@ function applyTokens(theme: ThemeTokens): void {
 /** 主题状态:模块加载即按已存偏好着色,不等应用挂载,避免首屏闪默认色。 */
 const initialId = readStoredTheme();
 applyTokens(THEMES.find((item) => item.id === initialId) ?? THEMES[0]!);
+/* 启动即归一两端存储:老用户只存过单端键时,另一端同源打开即拿到相同主题。 */
+persistTheme(initialId);
 
 export const useThemeStore = defineStore('theme', () => {
   const currentId = ref(initialId);
@@ -213,11 +250,7 @@ export const useThemeStore = defineStore('theme', () => {
   function select(id: string): void {
     if (!THEMES.some((item) => item.id === id)) return;
     currentId.value = id;
-    try {
-      localStorage.setItem(THEME_KEY, id);
-    } catch {
-      /* ignore */
-    }
+    persistTheme(id);
     applyTokens(current.value);
   }
 
