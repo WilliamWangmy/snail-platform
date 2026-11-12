@@ -20,11 +20,11 @@ import java.time.LocalDateTime;
 @Schema(description = "新建租户请求")
 public record TenantCreateRequest(
 
-        @Schema(description = "租户标识,全局唯一,建后不可改", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "租户标识,全局唯一,建后不可改;开通时据此派生 MinIO 桶名 snail-<code>-<tenantId>", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank(message = "请输入租户标识")
-        @Size(min = 2, max = 64, message = "租户标识长度 2-64")
-        @Pattern(regexp = "[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?",
-                message = "租户标识只允许小写字母、数字、点、下划线与连字符,首尾须为字母或数字")
+        @Size(min = 2, max = 10, message = "租户标识长度 2-10")
+        @Pattern(regexp = "[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?",
+                message = "租户标识只允许小写字母、数字、点与连字符,首尾须为字母或数字")
         String tenantCode,
 
         @Schema(description = "租户名称", requiredMode = Schema.RequiredMode.REQUIRED)

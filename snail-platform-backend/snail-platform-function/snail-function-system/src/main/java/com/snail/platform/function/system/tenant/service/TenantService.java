@@ -9,6 +9,8 @@ import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
 import com.snail.platform.framework.redis.SnailRedisKeys;
+import com.snail.platform.framework.storage.BucketProvisioner;
+import com.snail.platform.framework.storage.S3BucketNames;
 import com.snail.platform.function.system.log.mapper.SysLoginLogMapper;
 import com.snail.platform.function.system.org.entity.SysOrg;
 import com.snail.platform.function.system.org.mapper.SysOrgMapper;
@@ -35,6 +37,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -52,6 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class TenantService {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantService.class);
 
     /** scene 契约字面量(统计层设计 §5.1 冻结,前后端字典对齐):app/miniapp 同属移动端产品位(D-06) */
     private static final String SCENE_ADMIN = "admin";
@@ -87,10 +94,17 @@ public class TenantService {
     /** Valkey 存取:分端登录统计键的读与自愈回填面(统计层设计 §5.6) */
     private final StringRedisTemplate redisTemplate;
 
+    /**
+     * 桶开通口:仅 snail.storage.type=s3 时有 bean(type 空/sftp 无桶概念);
+     * 用 ObjectProvider 接——存储未启用 s3 是合法形态,开通流程对缺席静默降级。
+     */
+    private final ObjectProvider<BucketProvisioner> bucketProvisioner;
+
     public TenantService(SysTenantMapper tenantMapper, SysOrgMapper orgMapper, SysRoleMapper roleMapper,
                          SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
                          CacheEvictor cacheEvictor, OnlineSessionService onlineSessionService,
-                         SysLoginLogMapper loginLogMapper, StringRedisTemplate redisTemplate) {
+                         SysLoginLogMapper loginLogMapper, StringRedisTemplate redisTemplate,
+                         ObjectProvider<BucketProvisioner> bucketProvisioner) {
         this.tenantMapper = tenantMapper;
         this.orgMapper = orgMapper;
         this.roleMapper = roleMapper;
@@ -100,6 +114,7 @@ public class TenantService {
         this.onlineSessionService = onlineSessionService;
         this.loginLogMapper = loginLogMapper;
         this.redisTemplate = redisTemplate;
+        this.bucketProvisioner = bucketProvisioner;
     }
 
     /**
@@ -205,7 +220,29 @@ public class TenantService {
             userRoleMapper.insert(binding);
             return null;
         });
+        ensureTenantBucket(tenantCode, newTenantId);
         return new TenantCreatedVO(newTenantId);
+    }
+
+    /**
+     * 开通侧建桶:按租户标识派生桶名(S3BucketNames.forTenant,归一规则与唯一性兜底见彼处)。
+     * 口径:尽力而为——建桶失败只告警不回滚开通,存储抖动不该挡租户建档;
+     * 桶创建幂等,重开同名租户撞唯一键根本到不了这里,补建可由运维对同一桶名手动执行;
+     * s3 未启用(type 空/sftp)时开通口缺席,静默跳过——没有对象存储不代表租户开不了。
+     */
+    private void ensureTenantBucket(String tenantCode, long tenantId) {
+        BucketProvisioner provisioner = bucketProvisioner.getIfAvailable();
+        if (provisioner == null) {
+            return;
+        }
+        String bucket = S3BucketNames.forTenant(tenantCode, tenantId);
+        try {
+            provisioner.ensureBucket(bucket);
+            log.info("租户 {}({}) 存储桶 {} 就绪", tenantCode, tenantId, bucket);
+        } catch (Exception e) {
+            log.warn("租户 {}({}) 存储桶 {} 创建失败,租户开通继续,请检查对象存储后补建: {}",
+                    tenantCode, tenantId, bucket, e.getMessage());
+        }
     }
 
     /**

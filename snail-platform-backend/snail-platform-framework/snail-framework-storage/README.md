@@ -30,7 +30,9 @@
 
 - `StoragePort` 统一契约：`put/get/delete/exists`；
 - SFTP 适配器：JSch 会话、目录自建、主机指纹校验、超时、流随会话关闭；
-- S3 协议兼容适配器：AWS SDK v2 同步客户端、路径式/虚拟主机寻址、显式 ContentLength；
+- S3 协议兼容适配器：AWS SDK v2 同步客户端、路径式/虚拟主机寻址、显式 ContentLength、启动期自动建桶（可关）；
+- `BucketProvisioner` 桶开通口：按名称确保桶存在（不存在即创建），仅 type=s3 时装配，供租户开通等业务装配点调用；
+- `S3BucketNames`：业务标识到 S3 桶名的归一工具（点逐字保留、相邻点坍缩、下划线防御归一、业务 ID 兜底唯一、63 封顶）；
 - 启动期装配与配置完整性校验：类型合法、所选后端必填项齐全、半截配置拒绝启动；
 - `StoragePortRegistry`：当前写入端口与全部已配置后端的只读视图。
 
@@ -65,7 +67,11 @@ com.snail.platform.framework.storage
 ├── SnailStorageConfig.java       装配与启动期校验
 ├── SnailStorageProperties.java   snail.storage.* 配置
 ├── SftpStoragePort.java          SFTP 适配器
-└── S3StoragePort.java            S3 协议兼容适配器
+├── S3StoragePort.java            S3 协议兼容适配器
+├── BucketProvisioner.java        桶开通口(type=s3 才装配)
+├── S3BucketProvisioner.java      桶开通实现(headBucket→createBucket)
+├── S3BucketNames.java            业务标识→桶名归一
+└── S3Clients.java                S3Client 单点构造(端口与桶开通共用)
 
 src/test/java/...
 ├── SftpStoragePortTest.java      SFTP 适配器单测（内嵌服务器）
@@ -115,6 +121,10 @@ S3 完整性：endpoint、region、bucket、access-key、secret-key 全部必填
 - 客户端：AWS SDK v2 同步 `S3Client` + `UrlConnectionHttpClient`（依赖树最小）；
 - 寻址：`path-style=true`（默认）走 `endpoint/bucket/key`，MinIO 等自建只吃这一种；
   `false` 走 `bucket.endpoint/key`，阿里 OSS/腾讯 COS 的兼容端点用虚拟主机形态；
+- **启动期自动建桶**：`auto-create-bucket=true`（默认）时构造期 `headBucket` 探测，
+  404 即 `createBucket`（不携带 LocationConstraint，region 默认 us-east-1），其余错误原样上抛；
+  把"桶缺失"从第一笔上传的 404 提前到装配期暴露，与本模块"配置问题启动即失败"的口径一致；
+  云 OSS 若运行身份无建桶权限，显式关闭；
 - `put` 显式携带 `contentLength`（来自调用方元数据）与 `contentType`，同键覆盖；
 - `get` 返回 SDK 的 `ResponseInputStream`，调用方负责关闭；键不存在由 SDK 抛异常；
 - `delete`：S3 对不存在的键本就返回成功，天然幂等；
@@ -130,7 +140,10 @@ S3 完整性：endpoint、region、bucket、access-key、secret-key 全部必填
 | [`SnailStorageConfig`](src/main/java/com/snail/platform/framework/storage/SnailStorageConfig.java) | 装配与校验 | 非法类型/半截配置/active 缺失均拒绝启动 |
 | [`SnailStorageProperties`](src/main/java/com/snail/platform/framework/storage/SnailStorageProperties.java) | 配置绑定 | 含 SFTP、S3、上传约束三段 |
 | [`SftpStoragePort`](src/main/java/com/snail/platform/framework/storage/SftpStoragePort.java) | SFTP 实现 | 每操作独立建连；严格指纹默认开；流随会话关闭 |
-| [`S3StoragePort`](src/main/java/com/snail/platform/framework/storage/S3StoragePort.java) | S3 兼容实现 | 默认路径式寻址；`put` 显式长度；`exists` 仅 NoSuchKey 为 false |
+| [`S3StoragePort`](src/main/java/com/snail/platform/framework/storage/S3StoragePort.java) | S3 兼容实现 | 默认路径式寻址；`put` 显式长度；`exists` 仅 NoSuchKey 为 false；启动期自动建桶 |
+| [`BucketProvisioner`](src/main/java/com/snail/platform/framework/storage/BucketProvisioner.java) | 桶开通口 | 仅 type=s3 装配；失败原样上抛，成败语义由调用方拍板 |
+| [`S3BucketProvisioner`](src/main/java/com/snail/platform/framework/storage/S3BucketProvisioner.java) | 桶开通实现 | headBucket→404 即 createBucket；幂等；探测/建桶逻辑与读写端口共用 |
+| [`S3BucketNames`](src/main/java/com/snail/platform/framework/storage/S3BucketNames.java) | 桶名归一 | 点逐字保留;相邻点坍缩;下划线防御归一;业务 ID 兜底唯一;63 封顶 |
 
 ## 配置项
 
@@ -152,6 +165,7 @@ S3 完整性：endpoint、region、bucket、access-key、secret-key 全部必填
 | `snail.storage.s3.bucket` | 无 | 桶名 |
 | `snail.storage.s3.access-key` / `secret-key` | 无 | 凭证 |
 | `snail.storage.s3.path-style` | `true` | true 路径式；false 虚拟主机 |
+| `snail.storage.s3.auto-create-bucket` | `true` | 启动时桶不存在即自动创建；云 OSS 无建桶权限时显式关闭 |
 | `snail.storage.upload.max-size-mb` | `50` | 单文件上限（由 function-storage 消费） |
 | `snail.storage.upload.ext-whitelist` | 见 `application.yml` | 扩展名白名单（由 function-storage 消费） |
 
@@ -175,6 +189,12 @@ try (InputStream in = registry.of(file.getStorageType())
 
 // 删除（幂等）
 registry.of(file.getStorageType()).ifPresent(port -> port.delete(file.getObjectKey()));
+
+// 桶开通(如租户开通时按标识建桶):bean 仅 type=s3 存在,消费方用 ObjectProvider 按缺席降级
+public TenantService(ObjectProvider<BucketProvisioner> bucketProvisioner, ...) { ... }
+
+String bucket = S3BucketNames.forTenant(tenantCode, tenantId);   // snail-<code>-<id>
+bucketProvisioner.getIfAvailable().ensureBucket(bucket);
 ```
 
 ## 验证手段
@@ -191,6 +211,9 @@ registry.of(file.getStorageType()).ifPresent(port -> port.delete(file.getObjectK
 
 - **`exists` 的 S3 映射**：实现只把 `NoSuchKeyException` 映射为 false，其余 S3 异常上抛；
   部分兼容端点对 404 的异常类型可能不同，未在本仓逐一验证，依赖该行为前先用目标端点确认；
+- **自动建桶不带 LocationConstraint**：`createBucket` 裸桶名，region 默认 us-east-1 时 MinIO/云 OSS 均可接受；
+  标准 AWS 分区（非 us-east-1）要求携带 LocationConstraint，届时预建桶或关闭 `auto-create-bucket`；
+  另探测用 `headBucket`，个别兼容端点对桶不存在的 404 映射若非 404 状态码，探测错误会原样上抛（启动即失败，可据此排查）；
 - **SFTP 不做连接池**：每操作独立建连，吞吐不足时再上连接池（路线图项）；
 - **不重试、不做分片**：网络抖动与超大文件由消费方或后续迭代处理；
 - **`put` 同键覆盖**：后端不做"新建才写入"语义，需要防覆盖由业务侧键生成保证（UUID）；

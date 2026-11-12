@@ -4,7 +4,7 @@ snail:
   storage:
     # type 缺省(空)= 不装配写入端口,文件功能端点按"文件存储未配置"降级;
     # 开关打开后所选后端必填,配置缺失即启动失败
-    type: ${SNAIL_STORAGE_TYPE:}
+    type: ${SNAIL_STORAGE_TYPE:s3}
     sftp:
       host: ${SNAIL_SFTP_HOST:}
       port: ${SNAIL_SFTP_PORT:22}
@@ -19,13 +19,15 @@ snail:
       session-timeout-ms: ${SNAIL_SFTP_SESSION_TIMEOUT_MS:30000}
     s3:
       # 协议兼容端点与凭证不给开发默认值;type=s3 而这些值缺失,装配校验启动即失败
-      endpoint: ${SNAIL_S3_ENDPOINT:}
+      endpoint: ${SNAIL_S3_ENDPOINT:http://localhost:9000}
       region: ${SNAIL_S3_REGION:us-east-1}
-      bucket: ${SNAIL_S3_BUCKET:}
-      access-key: ${SNAIL_S3_AK:}
-      secret-key: ${SNAIL_S3_SK:}
+      bucket: ${SNAIL_S3_BUCKET:snail-platform}
+      access-key: ${SNAIL_S3_AK:admin}
+      secret-key: ${SNAIL_S3_SK:Admin@12345}
       # true 路径式 endpoint/bucket/key(MinIO 等自建必需);false 虚拟主机 bucket.endpoint/key(阿里 OSS/腾讯 COS 兼容端点用这个)
       path-style: true
+      # 启动时桶不存在即自动创建(MinIO 自建常用);云 OSS 若运行身份无建桶权限显式关闭
+      auto-create-bucket: ${SNAIL_S3_AUTO_CREATE_BUCKET:true}
     upload:
       max-size-mb: 50
       ext-whitelist: jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,md,zip,7z

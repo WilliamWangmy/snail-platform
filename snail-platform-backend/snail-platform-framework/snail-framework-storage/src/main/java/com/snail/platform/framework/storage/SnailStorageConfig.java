@@ -3,6 +3,7 @@ package com.snail.platform.framework.storage;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,6 +50,17 @@ public class SnailStorageConfig {
         return new StoragePortRegistry(activeType, ports);
     }
 
+    /**
+     * 桶开通口:仅活动写入后端是 s3 时装配(type 空/sftp 无桶概念,消费方按 bean 缺席降级);
+     * 复用 S3 端口的完整性校验——半截配置同样拒绝启动,不让桶开通口带病注册。
+     */
+    @Bean
+    @ConditionalOnProperty(name = "snail.storage.type", havingValue = SnailStorageProperties.TYPE_S3)
+    public BucketProvisioner bucketProvisioner(SnailStorageProperties properties) {
+        requireS3Complete(properties.getS3());
+        return new S3BucketProvisioner(properties.getS3());
+    }
+
     /** 配置是否出现:只要填了任一身份/连接键就要求配全,半截配置不允许静默消失 */
     private static boolean sftpPresent(SnailStorageProperties.Sftp sftp) {
         return hasText(sftp.getHost()) || hasText(sftp.getUsername())
@@ -82,12 +94,17 @@ public class SnailStorageConfig {
 
     /** 校验 S3 必填连接与凭证,构建端口 */
     private static StoragePort buildS3(SnailStorageProperties.S3 s3) {
+        requireS3Complete(s3);
+        return new S3StoragePort(s3);
+    }
+
+    /** S3 完整性校验:五项全必填,桶开通口与读写端口共用同一口径 */
+    private static void requireS3Complete(SnailStorageProperties.S3 s3) {
         requireText(s3.getEndpoint(), "snail.storage.s3.endpoint");
         requireText(s3.getRegion(), "snail.storage.s3.region");
         requireText(s3.getBucket(), "snail.storage.s3.bucket");
         requireText(s3.getAccessKey(), "snail.storage.s3.access-key");
         requireText(s3.getSecretKey(), "snail.storage.s3.secret-key");
-        return new S3StoragePort(s3);
     }
 
     /** 配置完整性校验:缺失即启动失败,报错点名缺失的配置键 */

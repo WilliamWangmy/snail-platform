@@ -95,6 +95,13 @@ public class SnailStorageProperties {
          * {false} 走 bucket.endpoint/key(阿里 OSS、腾讯 COS 的 S3 兼容端点用虚拟主机形态)。
          */
         private boolean pathStyle = true;
+
+        /**
+         * 启动时桶不存在是否自动创建:把"桶缺失"从第一笔上传的 404 提前到装配期暴露,
+         * 与本模块"配置问题启动即失败"的口径一致;MinIO 自建的常规姿势。
+         * 云 OSS 若运行身份无建桶权限,显式关闭。
+         */
+        private boolean autoCreateBucket = true;
     }
 
     /** 上传约束;multipart 上限在 spring.servlet.multipart 同步声明,这里只管业务侧校验 */

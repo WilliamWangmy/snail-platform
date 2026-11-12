@@ -1,13 +1,8 @@
 package com.snail.platform.framework.storage;
 
 import java.io.InputStream;
-import java.net.URI;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -20,6 +15,7 @@ import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
  * 上游:StoragePort;下游:AWS SDK v2 的同步 S3Client(url-connection HTTP 客户端,依赖树最小)。
  * 口径:寻址方式由 snail.storage.s3.path-style 决定,默认路径式(MinIO 不吃虚拟主机寻址),
  * 阿里 OSS/腾讯 COS 的兼容端点要显式关掉本开关改走虚拟主机寻址;
+ * auto-create-bucket=true(默认)时构造期 headBucket 探测,桶缺失即 createBucket,桶缺失提前到启动期暴露;
  * put 显式携带 ContentLength(已知,来自元数据);
  * get 返回 SDK 的 ResponseInputStream,调用方关闭;exists 走 headObject,仅 NoSuchKeyException 视为不存在,
  * 其余 S3 异常(含部分兼容端点对 404 的其它映射)原样上抛。
@@ -35,17 +31,19 @@ public class S3StoragePort implements StoragePort {
     /** 构造同步客户端;path-style 决定 MinIO 形态与云厂商虚拟主机形态 */
     public S3StoragePort(SnailStorageProperties.S3 config) {
         this.bucket = config.getBucket();
-        this.client = S3Client.builder()
-                .endpointOverride(URI.create(config.getEndpoint()))
-                .region(Region.of(config.getRegion()))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(config.getAccessKey(), config.getSecretKey())))
-                // 自建 MinIO 只吃路径式;云厂商兼容端点由 path-style=false 切到虚拟主机寻址
-                .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(config.isPathStyle())
-                        .build())
-                .httpClient(UrlConnectionHttpClient.builder().build())
-                .build();
+        this.client = S3Clients.create(config);
+        if (config.isAutoCreateBucket()) {
+            ensureBucket();
+        }
+    }
+
+    /**
+     * 启动期确保桶存在:headBucket 404 即 createBucket,其余错误原样上抛。
+     * 把"桶缺失"从第一笔上传的 404 提前到装配期暴露,与本模块"配置问题启动即失败"的口径一致;
+     * 幂等——桶已存在时 headBucket 成功直接返回。实现收口在 S3BucketProvisioner.ensure,开通侧共用。
+     */
+    private void ensureBucket() {
+        S3BucketProvisioner.ensure(client, bucket);
     }
 
     /** 写入对象:长度与类型显式声明,同键覆盖 */

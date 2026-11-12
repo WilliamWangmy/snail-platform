@@ -123,10 +123,10 @@ function toggleFeature(key: keyof TenantFeatureFlags, on: boolean): void {
 const rules = computed<FormRules<TenantForm>>(() => ({
   tenantCode: [
     { required: true, message: '请输入租户标识', trigger: 'blur' },
-    { min: 2, max: 64, message: '租户标识长度 2-64', trigger: 'blur' },
+    { min: 2, max: 10, message: '租户标识长度 2-10', trigger: 'blur' },
     {
-      pattern: /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/,
-      message: '租户标识只允许小写字母、数字、点、下划线与连字符,首尾须为字母或数字',
+      pattern: /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/,
+      message: '租户标识只允许小写字母、数字、点与连字符,首尾须为字母或数字',
       trigger: 'blur',
     },
   ],
@@ -671,7 +671,7 @@ function ratePercent(rate: number): string {
             <ElInput
               v-model="form.tenantCode"
               :disabled="editingId !== null"
-              placeholder="2-64 位小写,字母、数字或 _ . -"
+              placeholder="2-10 位小写,字母、数字或 . -"
             />
           </ElFormItem>
           <ElFormItem

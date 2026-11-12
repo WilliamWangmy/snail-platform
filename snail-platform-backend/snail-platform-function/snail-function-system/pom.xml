@@ -42,5 +42,9 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-framework-excel</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-storage</artifactId>
+        </dependency>
     </dependencies>
 </project>

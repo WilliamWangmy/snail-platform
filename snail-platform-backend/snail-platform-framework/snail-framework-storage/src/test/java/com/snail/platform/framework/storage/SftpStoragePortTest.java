@@ -1,6 +1,7 @@
 package com.snail.platform.framework.storage;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -146,14 +147,57 @@ class SftpStoragePortTest {
     }
 
     /**
-     * S3 寻址开关的默认值钉在这儿:建 S3Client 不联网,不值得为它单开一个类,
-     * 而"默认必须等于 MinIO 形态"是适配器自己的配置契约,漂成 false 会让自建存储静默连错。
+     * S3 寻址与建桶开关的默认值钉在这儿:建 S3Client 不联网,不值得为它单开一个类,
+     * 而"默认必须等于 MinIO 形态"是适配器自己的配置契约,漂了会让自建存储静默连错或桶缺失延迟到首笔上传才炸。
      */
     @Test
     void s3PropertiesDefaultToPathStyleAndCanOptOut() {
         SnailStorageProperties.S3 s3 = new SnailStorageProperties.S3();
         assertTrue(s3.isPathStyle(), "path-style 默认必须为真");
+        assertTrue(s3.isAutoCreateBucket(), "auto-create-bucket 默认必须为真");
         s3.setPathStyle(false);
+        s3.setAutoCreateBucket(false);
         assertFalse(s3.isPathStyle(), "显式关掉后应保持虚拟主机寻址");
+        assertFalse(s3.isAutoCreateBucket(), "显式关掉后不应再自动建桶");
+    }
+
+    /**
+     * 建桶探测发生在构造期:端点指向无人监听的本地端口,
+     * auto-create-bucket=true 时构造即在 headBucket 处联网失败(桶缺失在启动期暴露,不是首笔上传),
+     * 关掉后构造不发起任何请求。两个断言都不依赖真实 S3 服务。
+     */
+    @Test
+    void s3BucketProbeHappensAtConstructionAndCanBeDisabled() {
+        SnailStorageProperties.S3 enabled = unreachableS3();
+        enabled.setAutoCreateBucket(true);
+        assertThrows(RuntimeException.class, () -> new S3StoragePort(enabled),
+                "开启自动建桶时,构造期就应探测桶并与端点建连");
+
+        SnailStorageProperties.S3 disabled = unreachableS3();
+        disabled.setAutoCreateBucket(false);
+        assertDoesNotThrow(() -> new S3StoragePort(disabled),
+                "关闭自动建桶后,构造期不应发起任何网络请求");
+    }
+
+    /** 指向本机必然无人监听端口的 S3 配置,连接被拒是确定性行为,不依赖外部服务 */
+    private static SnailStorageProperties.S3 unreachableS3() {
+        SnailStorageProperties.S3 s3 = new SnailStorageProperties.S3();
+        s3.setEndpoint("http://127.0.0.1:1");
+        s3.setRegion("us-east-1");
+        s3.setBucket("snail-test");
+        s3.setAccessKey("ak");
+        s3.setSecretKey("sk");
+        return s3;
+    }
+
+    /**
+     * 桶开通口的失败语义钉在这儿:调用期联网失败原样上抛,成败语义(阻断/告警)由调用方拍板,
+     * 开通口自己不吞——端点无人监听即连接被拒,确定性离线可测。
+     */
+    @Test
+    void s3BucketProvisionerSurfacesFailureAtCallTime() {
+        S3BucketProvisioner provisioner = new S3BucketProvisioner(unreachableS3());
+        assertThrows(RuntimeException.class, () -> provisioner.ensureBucket("snail-probe-1"),
+                "端点不可达时 ensureBucket 应原样上抛而非静默返回");
     }
 }
