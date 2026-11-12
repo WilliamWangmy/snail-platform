@@ -36,6 +36,9 @@ public record LoginLogQuery(
         @Min(value = 0, message = "结果取值 0/1")
         @Max(value = 1, message = "结果取值 0/1") Integer status,
 
+        @Schema(description = "登录端:admin/workflow/app/miniapp/dashboard/portal,不传不限")
+        String scene,
+
         @Schema(description = "登录时间起,ISO 局部日期时间")
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime beginTime,
 

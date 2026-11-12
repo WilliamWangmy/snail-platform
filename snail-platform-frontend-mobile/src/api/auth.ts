@@ -7,7 +7,8 @@ export function fetchCaptcha(): Promise<Captcha> {
 }
 
 export function login(payload: LoginPayload): Promise<LoginResult> {
-  return post<LoginResult>('/system/auth/login', payload);
+  // 登录端坐标:后端缺省按 admin 记账,移动端必须显式自报,否则流水分端全错
+  return post<LoginResult>('/system/auth/login', { ...payload, scene: 'app' });
 }
 
 /** 服务端登出:令牌版本自增,当前用户全部设备立即失效。 */
@@ -58,12 +59,13 @@ export function sendSmsCaptcha(payload: SmsCaptchaPayload): Promise<void> {
  * 单账号直接返回 LoginResult;多账号返回 SmsAccountsResult(pickKey 非空),需再调 pick。
  */
 export function loginBySms(payload: SmsLoginPayload): Promise<LoginResult | SmsAccountsResult> {
-  return post<LoginResult | SmsAccountsResult>('/system/auth/login-sms', payload);
+  return post<LoginResult | SmsAccountsResult>('/system/auth/login-sms', { ...payload, scene: 'app' });
 }
 
 /** 选定租户账号换正式令牌:pickKey 一次一用,失败需从头重走短信登录。 */
 export function pickSmsAccount(payload: SmsPickPayload): Promise<LoginResult> {
-  return post<LoginResult>('/system/auth/login-sms/pick', payload);
+  // pick 是独立二次调用,scene 与 login-sms 保持一致(后端 v1.3 口径)
+  return post<LoginResult>('/system/auth/login-sms/pick', { ...payload, scene: 'app' });
 }
 
 /** login-sms 出参判别:响应含 pickKey 即多账号候选态。 */

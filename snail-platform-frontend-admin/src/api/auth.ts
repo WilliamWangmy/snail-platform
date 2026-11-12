@@ -50,7 +50,8 @@ export function fetchCaptcha(): Promise<Captcha> {
 }
 
 export function login(payload: LoginPayload): Promise<LoginResult> {
-  return post<LoginResult>('/system/auth/login', payload);
+  // 登录端坐标显式自报:后端缺省也是 admin,显式传不依赖缺省口径,分端统计不受后端契约变动影响
+  return post<LoginResult>('/system/auth/login', { ...payload, scene: 'admin' });
 }
 
 /* ------------------------- 短信验证码登录 ------------------------- */
@@ -96,12 +97,13 @@ export function sendSmsCaptcha(payload: SmsCaptchaPayload): Promise<void> {
  * 单账号直接返回 LoginResult;多账号返回 SmsAccountsResult(pickKey 非空),需再调 pick。
  */
 export function loginBySms(payload: SmsLoginPayload): Promise<LoginResult | SmsAccountsResult> {
-  return post<LoginResult | SmsAccountsResult>('/system/auth/login-sms', payload);
+  return post<LoginResult | SmsAccountsResult>('/system/auth/login-sms', { ...payload, scene: 'admin' });
 }
 
 /** 选定租户账号换正式令牌:pickKey 一次一用,失败需从头重走短信登录。 */
 export function pickSmsAccount(payload: SmsPickPayload): Promise<LoginResult> {
-  return post<LoginResult>('/system/auth/login-sms/pick', payload);
+  // pick 是独立二次调用,scene 与 login-sms 保持一致(后端 v1.3 口径)
+  return post<LoginResult>('/system/auth/login-sms/pick', { ...payload, scene: 'admin' });
 }
 
 /** login-sms 出参判别:响应含 pickKey 即多账号候选态。 */
