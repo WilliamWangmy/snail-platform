@@ -189,8 +189,12 @@ public class TenantService {
 
             SysUser admin = new SysUser();
             admin.setUsername(adminUsername);
-            admin.setNickname("租户管理员");
+            // 管理员昵称沿用租户联系人,联系电话同步落到账号上(短信登录/找回密码等场景要用);
+            // 联系人/电话是租户表单的选填字段,留空时账号侧同样留空,与"整份覆盖"口径一致
+            admin.setNickname(request.contactUser() != null && !request.contactUser().isBlank()
+                    ? request.contactUser().trim() : "租户管理员");
             admin.setPassword(BCrypt.hashpw(adminPassword));
+            admin.setPhone(request.contactPhone());
             admin.setOrgId(root.getOrgId());
             admin.setStatus(0);
             userMapper.insert(admin);

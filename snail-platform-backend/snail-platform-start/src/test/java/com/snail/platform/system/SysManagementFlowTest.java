@@ -62,6 +62,7 @@ class SysManagementFlowTest {
         String adminToken = login("admin", "admin123");
 
         Long demoTenantId = provisionTenant(suffix, adminToken);
+        assertProvisionedAdminCarriesPhone(suffix);
         TestPasswordFlagSupport.clearPendingFlags(jdbcTemplate);
         proveTenantRenamed(demoTenantId, suffix, adminToken);
         String demoToken = login("tadmin" + suffix, "Admin@123");
@@ -101,6 +102,13 @@ class SysManagementFlowTest {
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertTrue(response.contains("\"code\":0"), "开通租户失败: " + response);
         return Long.valueOf(extract(DATA_ID, response));
+    }
+
+    /** 开通时填写的联系电话要落到首任管理员账号上(短信登录/找回密码依赖该字段) */
+    private void assertProvisionedAdminCarriesPhone(String suffix) {
+        String phone = jdbcTemplate.queryForObject(
+                "SELECT phone FROM sys_user WHERE username = ?", String.class, "tadmin" + suffix);
+        assertEquals("13900000000", phone, "首任管理员手机号未随开通写入账号");
     }
 
     /** 模板复制的管理员可登录 = 根组织/内置角色/账号/绑定四步写入全部落到了新租户头上 */
