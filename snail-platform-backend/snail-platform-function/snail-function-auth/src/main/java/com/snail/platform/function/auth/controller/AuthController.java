@@ -13,6 +13,7 @@ import com.snail.platform.function.auth.dto.LoginUserVO;
 import com.snail.platform.function.auth.dto.SmsCaptchaRequest;
 import com.snail.platform.function.auth.dto.SmsLoginRequest;
 import com.snail.platform.function.auth.dto.SmsPickRequest;
+import com.snail.platform.function.auth.dto.SsoCheckInRequest;
 import com.snail.platform.function.auth.service.AuthService;
 import com.snail.platform.function.auth.service.CaptchaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -96,6 +97,14 @@ public class AuthController {
     @PostMapping("/logout")
     public R<Void> logout() {
         authService.logout(LoginUserContextHolder.userId());
+        return R.ok(null);
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "单点跳转签到(独立端以 ssotoken 落地后上报登录端,落 login_type=sso 日志)")
+    @PostMapping("/sso")
+    public R<Void> ssoCheckIn(@Valid @RequestBody SsoCheckInRequest request, HttpServletRequest http) {
+        authService.ssoCheckIn(request, http);
         return R.ok(null);
     }
 

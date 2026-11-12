@@ -6,6 +6,8 @@ import cn.hutool.extra.servlet.JakartaServletUtil;
 import cn.hutool.http.useragent.UserAgent;
 import cn.hutool.http.useragent.UserAgentUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.snail.platform.framework.core.context.LoginUser;
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.context.TenantContextHolder;
 import com.snail.platform.framework.core.exception.BizException;
 import com.snail.platform.framework.security.token.JwtTokenService;
@@ -23,6 +25,7 @@ import com.snail.platform.function.auth.dto.OAuthPickRequest;
 import com.snail.platform.function.auth.dto.SmsCaptchaRequest;
 import com.snail.platform.function.auth.dto.SmsLoginRequest;
 import com.snail.platform.function.auth.dto.SmsPickRequest;
+import com.snail.platform.function.auth.dto.SsoCheckInRequest;
 import com.snail.platform.function.external.api.ExternalCallException;
 import com.snail.platform.function.external.api.SmsPort;
 import com.snail.platform.function.external.api.SocialAuthPort;
@@ -75,6 +78,9 @@ public class AuthService {
 
     /** 短信登录方式编码,落登录日志 login_type 列 */
     private static final String LOGIN_TYPE_SMS = "sms";
+
+    /** 管理系统向 workflow/dashboard 等独立端免登跳转(ssotoken 共用会话)的落地签到 */
+    private static final String LOGIN_TYPE_SSO = "sso";
 
     /** 手机号形态闸:11 位大陆手机号,不匹配直接拒绝,不进查询不进限流计数 */
     private static final Pattern PHONE_PATTERN = Pattern.compile("^1\\d{10}$");
@@ -450,6 +456,35 @@ public class AuthService {
         if (!enabled) {
             throw new LoginRejects.Access("租户未开通" + LoginScene.label(scene));
         }
+    }
+
+    /**
+     * 单点跳转签到:admin→workflow/dashboard 等独立端共用一套会话(跳转只带 ssotoken),
+     * 落地端此前在登录日志里无痕——本端点让落地端在会话建立后上报 scene,补一条 login_type=sso 的登录日志。
+     * 令牌真伪已在过滤器链验真(LoginUserContextHolder 必有快照),这里只做两件事:
+     * 按 scene 闸复核租户开通态(实时读 sys_tenant,与登录链同口径;未开通先落失败日志再 403,
+     * 与落地端 /me 的 tenantFeatures 守卫互为纵深),经 writeLoginLog 单点落日志,
+     * 分端统计 SADD 由成功分支顺带收口(统计层设计 §5.6,"四链一处生效")。
+     */
+    public void ssoCheckIn(SsoCheckInRequest request, HttpServletRequest http) {
+        LoginUser user = LoginUserContextHolder.get();
+        String scene = request.scene();
+        SysTenant tenant = tenantMapper.selectById(user.tenantId());
+        try {
+            if (tenant == null || Objects.equals(tenant.getStatus(), 1)) {
+                throw new LoginRejects.Access("租户已停用");
+            }
+            if (tenant.getExpireTime() != null && tenant.getExpireTime().isBefore(LocalDateTime.now())) {
+                throw new LoginRejects.Access("租户已到期");
+            }
+            requireSceneEnabled(tenant, scene);
+        } catch (LoginRejects.Access e) {
+            writeLoginLog(http, user.tenantId(), user.username(), user.userId(), 0,
+                    e.getMessage(), LOGIN_TYPE_SSO, scene);
+            throw BizException.forbidden(e.getMessage());
+        }
+        writeLoginLog(http, user.tenantId(), user.username(), user.userId(), 1,
+                "单点登录", LOGIN_TYPE_SSO, scene);
     }
 
     /** 签发短信登录令牌并落成功日志;计数清零键是"来源+手机号",与失败计数同一把尺 */

@@ -124,6 +124,15 @@ export function fetchMe(): Promise<Me> {
   return get<Me>('/system/auth/me');
 }
 
+/**
+ * 单点跳转签到:管理端/流程端以 ssotoken 共用会话免登跳转,落地后上报本端坐标,
+ * 后端按 scene 复核租户开通态并补一条 login_type=sso 的登录日志(此前共用会话跳转在日志里无痕)。
+ * 签到失败不影响进入大屏——日志/统计链路故障不该反压业务,调用方静默兜底。
+ */
+export function ssoCheckIn(): Promise<void> {
+  return post<void>('/system/auth/sso', { scene: 'dashboard' });
+}
+
 /** login-sms 出参判别:响应含 pickKey 即多账号候选态。 */
 export function isSmsAccountsResult(
   result: LoginResult | SmsAccountsResult,

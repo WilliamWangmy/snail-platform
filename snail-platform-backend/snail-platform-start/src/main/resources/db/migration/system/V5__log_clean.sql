@@ -16,6 +16,13 @@ VALUES
 (1503, 150, '清除操作日志', 3, 2, NULL, NULL, 'system:operlog:clean', NULL, 3, 1, NOW()),
 (2221, 222, '清除调用流水', 3, 1, NULL, NULL, 'platform:external:clean', NULL, 1, 1, NOW());
 
+-- ---------- sys_login_log.login_type 注释扩位 ----------
+-- 单点跳转签到(login_type=sso)落地:admin 向 workflow/dashboard 等独立端共用会话免登,
+-- 落地端经 POST /system/auth/sso 上报 scene 补登录日志;仅改注释对齐口径,列定义不变
+ALTER TABLE sys_login_log
+    MODIFY COLUMN login_type VARCHAR(20) NOT NULL DEFAULT 'password'
+    COMMENT '登录方式编码:password/sms/sso(单点跳转签到),后续 feishu/wecom/dingtalk';
+
 -- ---------- 默认租户 admin 的平台面授权 ----------
 -- 与 V1/V2/V3/V4 同口径:INSERT IGNORE 保幂等(PK 是 role_id+menu_id);谓词按 m.scope=1 一刀切
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)

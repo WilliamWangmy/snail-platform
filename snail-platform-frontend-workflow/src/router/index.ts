@@ -11,6 +11,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { ElMessage } from 'element-plus';
 
 import { routes } from '@/router/routes';
+import { ssoCheckIn } from '@/api/auth';
 import { useAuthStore } from '@/stores/auth';
 
 const router = createRouter({
@@ -26,6 +27,8 @@ router.beforeEach(async (to) => {
   // 管理端免登录跳转：一次性 ssotoken 落地后去掉参数重走守卫（fetchMe 校验，失败按未认证处理）
   if (typeof to.query.ssotoken === 'string' && to.query.ssotoken) {
     auth.setToken(to.query.ssotoken);
+    // 落地即签到：后端补一条 sso 登录日志并记分端统计；失败静默，日志链路故障不挡进入
+    void ssoCheckIn().catch(() => {});
     const rest = { ...to.query };
     delete rest.ssotoken;
     return { path: to.path, query: rest, replace: true };

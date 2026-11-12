@@ -38,7 +38,7 @@ public class SysLoginLog {
     /** 操作系统 */
     private String os;
 
-    /** 登录方式编码:password/sms,后续 feishu/wecom/dingtalk */
+    /** 登录方式编码:password/sms/sso(管理系统向独立端免登跳转的落地签到),后续 feishu/wecom/dingtalk */
     private String loginType;
 
     /** 登录端:admin/workflow/app/miniapp/dashboard/portal;统计分端与租户开通闸的归属列,历史行吃默认值 admin */

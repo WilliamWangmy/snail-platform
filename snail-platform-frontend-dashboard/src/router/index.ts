@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { getToken, setToken } from '@/stores/auth';
+import { ssoCheckIn } from '@/api/auth';
 
 /**
  * 大屏路由:/login 登录页,/ 数据大屏本体(三维地图)。
@@ -28,6 +29,8 @@ router.beforeEach((to) => {
   // 管理端/流程平台免登录跳转:ssotoken 落地为本地会话后去参重走守卫,后续与 F5 恢复会话同路径
   if (typeof to.query.ssotoken === 'string' && to.query.ssotoken) {
     setToken(to.query.ssotoken);
+    // 落地即签到:后端补一条 sso 登录日志并记分端统计;失败静默,日志链路故障不挡进入
+    void ssoCheckIn().catch(() => {});
     const rest = { ...to.query };
     delete rest.ssotoken;
     return { path: to.path, query: rest, replace: true };

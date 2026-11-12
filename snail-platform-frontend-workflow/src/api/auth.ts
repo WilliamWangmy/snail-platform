@@ -88,3 +88,14 @@ export function loginByOauth(data: OAuthLoginRequest): Promise<LoginSuccessVO | 
 export function pickOauthAccount(data: SmsPickRequest): Promise<LoginSuccessVO> {
   return http<LoginSuccessVO>({ url: '/system/auth/oauth/pick', method: 'POST', data });
 }
+
+/* ------------------------- 单点跳转签到 ------------------------- */
+
+/**
+ * 单点跳转签到：管理端以 ssotoken 共用会话免登跳转，落地后上报本端坐标（scene=workflow），
+ * 后端按 scene 复核租户开通态并补一条 login_type=sso 的登录日志（此前共用会话跳转在日志里无痕）。
+ * 签到失败不影响进入——日志/统计链路故障不反压业务，调用方静默兜底。
+ */
+export function ssoCheckIn(): Promise<void> {
+  return http<void>({ url: '/system/auth/sso', method: 'POST', data: { scene: 'workflow' } });
+}
