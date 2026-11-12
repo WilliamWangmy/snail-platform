@@ -2,6 +2,7 @@ package com.snail.platform.function.external.client;
 
 import com.snail.platform.function.external.entity.SysExternalCallLog;
 import com.snail.platform.function.external.mapper.SysExternalCallLogMapper;
+import java.time.LocalDateTime;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -73,6 +74,11 @@ public class ExternalCallLedger implements DisposableBean {
     /** 流水落库;库抖动只 warn——流水已经比调用本身次要,不能因为记不上而让线程退出 */
     private void write(SysExternalCallLog row) {
         try {
+            // 调用时间由落账线程显式写(实体口径):行组装在调用线程,时间戳统一取落账前一刻,
+            // 与库列 DEFAULT NULL 对齐——不补写则整列恒 NULL,页面"调用时间"永远空
+            if (row.getCreateTime() == null) {
+                row.setCreateTime(LocalDateTime.now());
+            }
             callLogMapper.insert(row);
         } catch (Exception e) {
             log.warn("第三方调用 {} / {} 的流水落库失败: {}",
