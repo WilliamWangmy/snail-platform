@@ -4,6 +4,8 @@ target/
 # 前端
 node_modules/
 dist/
+# file-viewer 自托管资产里的上游 dist 是运行时依赖,不是构建产物
+!snail-platform-frontend-admin/public/file-viewer/vendor/ppt/dist/
 *.local
 *.tsbuildinfo
 
