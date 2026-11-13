@@ -28,6 +28,9 @@ const query = reactive<LoginLogQuery>({
   scene: '',
 });
 
+/** 查询条件较多,默认只露前两项,其余折叠,点"展开"才显示 */
+const filterExpanded = ref(false);
+
 /** 结果筛选的 UI 态:ElRadioButton 的 value 不收 null,空串代表"全部",提交前折成 null。 */
 const statusFilter = ref<number | ''>('');
 
@@ -258,7 +261,10 @@ async function cleanLogs(command: string | number | object): Promise<void> {
             @keyup.enter="search"
           />
         </ElFormItem>
-        <ElFormItem label="结果">
+        <ElFormItem
+          v-show="filterExpanded"
+          label="结果"
+        >
           <ElRadioGroup
             v-model="statusFilter"
             @change="search"
@@ -276,6 +282,7 @@ async function cleanLogs(command: string | number | object): Promise<void> {
         </ElFormItem>
         <ElFormItem
           v-if="isPlatform"
+          v-show="filterExpanded"
           label="租户"
         >
           <ElSelect
@@ -298,7 +305,10 @@ async function cleanLogs(command: string | number | object): Promise<void> {
             </ElOption>
           </ElSelect>
         </ElFormItem>
-        <ElFormItem label="登录端">
+        <ElFormItem
+          v-show="filterExpanded"
+          label="登录端"
+        >
           <ElSelect
             v-model="query.scene"
             clearable
@@ -314,7 +324,10 @@ async function cleanLogs(command: string | number | object): Promise<void> {
             />
           </ElSelect>
         </ElFormItem>
-        <ElFormItem label="登录时间">
+        <ElFormItem
+          v-show="filterExpanded"
+          label="登录时间"
+        >
           <ElDatePicker
             v-model="range"
             type="datetimerange"
@@ -333,6 +346,17 @@ async function cleanLogs(command: string | number | object): Promise<void> {
             @click="search"
           >
             查询
+          </ElButton>
+          <ElButton
+            link
+            type="primary"
+            @click="filterExpanded = !filterExpanded"
+          >
+            {{ filterExpanded ? '收起' : '展开' }}
+            <AppIcon
+              :name="filterExpanded ? 'arrow-up' : 'arrow-down'"
+              :size="12"
+            />
           </ElButton>
         </ElFormItem>
       </ElForm>

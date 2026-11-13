@@ -38,6 +38,9 @@ const query = reactive<UserQuery>({
   status: null,
 });
 
+/** 查询条件较多,默认只露前两项,其余折叠,点"展开"才显示 */
+const filterExpanded = ref(false);
+
 const { rows, total, loading, pageNum, pageSize, refresh, search } = usePageList<UserVO>((page) =>
   pageUsers({ ...query, ...page }),
 );
@@ -454,6 +457,7 @@ async function kickUser(row: UserVO): Promise<void> {
         </ElFormItem>
         <ElFormItem
           v-if="orgTree.length"
+          v-show="filterExpanded"
           label="所属组织"
         >
           <ElTreeSelect
@@ -467,7 +471,10 @@ async function kickUser(row: UserVO): Promise<void> {
             style="width: 200px"
           />
         </ElFormItem>
-        <ElFormItem label="状态">
+        <ElFormItem
+          v-show="filterExpanded"
+          label="状态"
+        >
           <ElSelect
             v-model="query.status"
             clearable
@@ -493,6 +500,17 @@ async function kickUser(row: UserVO): Promise<void> {
             @click="search"
           >
             查询
+          </ElButton>
+          <ElButton
+            link
+            type="primary"
+            @click="filterExpanded = !filterExpanded"
+          >
+            {{ filterExpanded ? '收起' : '展开' }}
+            <AppIcon
+              :name="filterExpanded ? 'arrow-up' : 'arrow-down'"
+              :size="12"
+            />
           </ElButton>
         </ElFormItem>
       </ElForm>
