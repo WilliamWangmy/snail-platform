@@ -207,45 +207,95 @@ async function submitSend(): Promise<void> {
     <ElDialog
       v-model="sendVisible"
       title="发送公告"
-      width="560px"
+      width="640px"
     >
+      <div class="form-banner">
+        <AppIcon
+          name="alert"
+          :size="14"
+        />
+        <span>公告将发送给目标租户的全部启用用户,发送后不可撤回</span>
+      </div>
       <ElForm
         ref="sendFormRef"
         :model="sendForm"
         :rules="sendRules"
-        label-width="90px"
+        label-position="top"
       >
-        <ElFormItem label="目标租户">
-          <ElSelect
-            v-model="sendForm.tenantId"
-            filterable
-            placeholder="选择启用中的租户"
-            style="width: 100%"
-          >
-            <ElOption
-              v-for="tenant in tenantOptions"
-              :key="tenant.tenantId"
-              :label="`${tenant.name} (${tenant.tenantCode})`"
-              :value="tenant.tenantId"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem label="标题">
-          <ElInput
-            v-model="sendForm.title"
-            maxlength="100"
-            show-word-limit
-          />
-        </ElFormItem>
-        <ElFormItem label="正文">
-          <ElInput
-            v-model="sendForm.content"
-            type="textarea"
-            :rows="6"
-            maxlength="5000"
-            show-word-limit
-          />
-        </ElFormItem>
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="send"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">发送目标</span>
+            <span class="panel-hint">仅启用中的租户可选</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="目标租户"
+              prop="tenantId"
+              class="span-2"
+            >
+              <ElSelect
+                v-model="sendForm.tenantId"
+                filterable
+                placeholder="选择启用中的租户"
+                class="full"
+              >
+                <ElOption
+                  v-for="tenant in tenantOptions"
+                  :key="tenant.tenantId"
+                  :label="`${tenant.name} (${tenant.tenantCode})`"
+                  :value="tenant.tenantId"
+                />
+              </ElSelect>
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="mail"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">公告内容</span>
+            <span class="panel-hint">标题至多 100 字,正文至多 5000 字</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="公告标题"
+              prop="title"
+              class="span-2"
+            >
+              <ElInput
+                v-model="sendForm.title"
+                maxlength="100"
+                show-word-limit
+                placeholder="用户收件箱里展示的标题"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="公告正文"
+              prop="content"
+              class="span-2"
+            >
+              <ElInput
+                v-model="sendForm.content"
+                type="textarea"
+                :rows="6"
+                maxlength="5000"
+                show-word-limit
+                placeholder="支持纯文本,发送后全员可见"
+              />
+            </ElFormItem>
+          </div>
+        </div>
       </ElForm>
       <template #footer>
         <ElButton @click="sendVisible = false">
@@ -262,3 +312,9 @@ async function submitSend(): Promise<void> {
     </ElDialog>
   </div>
 </template>
+
+<style scoped>
+.full {
+  width: 100%;
+}
+</style>
