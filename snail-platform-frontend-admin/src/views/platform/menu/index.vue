@@ -2,7 +2,7 @@
 /** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
 defineOptions({ name: 'PlatformMenu' });
 import { computed, onMounted, reactive, ref } from 'vue';
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type TableInstance } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
 import {
   createMenu,
@@ -12,6 +12,7 @@ import {
   type MenuNode,
 } from '@/api/menu';
 import { useAuthStore } from '@/stores/auth';
+import { ICON_OPTIONS, menuIcon } from '@/utils/icons';
 import RowActions, { type RowAction } from '@/components/RowActions.vue';
 
 const auth = useAuthStore();
@@ -42,6 +43,24 @@ function labelOf(list: { value: number; label: string }[], value: number): strin
 const loading = ref(false);
 const tree = ref<MenuNode[]>([]);
 const names = ref(new Map<number, string>());
+/** 节点深度(根=0),供名称列按层级区分字重。 */
+const depths = ref(new Map<number, number>());
+const tableRef = ref<TableInstance>();
+
+/** 树表默认收起,头部按钮一键切换全部层级;重取数据后回到收起态。 */
+const allExpanded = ref(false);
+
+function toggleAll(): void {
+  const next = !allExpanded.value;
+  allExpanded.value = next;
+  const walk = (nodes: MenuNode[]): void => {
+    for (const node of nodes) {
+      tableRef.value?.toggleRowExpansion(node, next);
+      if (node.children.length) walk(node.children);
+    }
+  };
+  walk(tree.value);
+}
 
 /** 菜单树一次取全(含按钮);父节点名称由同一次遍历铺平,供表单只读展示。 */
 async function load(): Promise<void> {
@@ -49,16 +68,20 @@ async function load(): Promise<void> {
   try {
     tree.value = await fetchMenuTree();
     const map = new Map<number, string>();
-    const walk = (nodes: MenuNode[]): void => {
+    const depthMap = new Map<number, number>();
+    const walk = (nodes: MenuNode[], depth: number): void => {
       for (const node of nodes) {
         map.set(node.menuId, node.menuName);
-        if (node.children.length) walk(node.children);
+        depthMap.set(node.menuId, depth);
+        if (node.children.length) walk(node.children, depth + 1);
       }
     };
-    walk(tree.value);
+    walk(tree.value, 0);
     names.value = map;
+    depths.value = depthMap;
   } finally {
     loading.value = false;
+    allExpanded.value = false;
   }
 }
 
@@ -329,21 +352,60 @@ function actionsOf(row: MenuNode): RowAction[] {
       <template #header>
         <div class="table-card-head">
           <h3>菜单结构 <span>共 {{ names.size }} 项</span></h3>
+          <ElButton
+            size="small"
+            @click="toggleAll"
+          >
+            <AppIcon
+              :name="allExpanded ? 'arrow-up' : 'arrow-down'"
+              :size="13"
+            />
+            {{ allExpanded ? '收起全部' : '展开全部' }}
+          </ElButton>
         </div>
       </template>
 
       <ElTable
+        ref="tableRef"
         v-loading="loading"
         :data="tree"
         row-key="menuId"
         :tree-props="{ children: 'children' }"
-        :default-expand-all="true"
+        :indent="22"
       >
         <ElTableColumn
-          prop="menuName"
           label="菜单名称"
-          min-width="150"
-        />
+          min-width="220"
+        >
+          <template #default="{ row }">
+            <div
+              class="name-cell"
+              :class="{ leaf: row.menuType === 3 }"
+            >
+              <span
+                class="name-ico"
+                :class="{ btn: row.menuType === 3 }"
+              >
+                <AppIcon
+                  :name="row.menuType === 3 ? 'zap' : menuIcon(row.icon)"
+                  :size="13"
+                />
+              </span>
+              <span
+                class="name-text"
+                :class="{ root: (depths.get(row.menuId) ?? 0) === 0 }"
+              >{{ row.menuName }}</span>
+              <ElTag
+                v-if="row.isSystem === 1"
+                size="small"
+                type="warning"
+                effect="plain"
+              >
+                内置
+              </ElTag>
+            </div>
+          </template>
+        </ElTableColumn>
         <ElTableColumn
           label="类型"
           width="72"
@@ -375,7 +437,11 @@ function actionsOf(row: MenuNode): RowAction[] {
           show-overflow-tooltip
         >
           <template #default="{ row }">
-            {{ row.path ?? '—' }}
+            <span
+              v-if="row.path"
+              class="mono-cell"
+            >{{ row.path }}</span>
+            <span v-else>—</span>
           </template>
         </ElTableColumn>
         <ElTableColumn
@@ -384,7 +450,11 @@ function actionsOf(row: MenuNode): RowAction[] {
           show-overflow-tooltip
         >
           <template #default="{ row }">
-            {{ row.component ?? '—' }}
+            <span
+              v-if="row.component"
+              class="mono-cell"
+            >{{ row.component }}</span>
+            <span v-else>—</span>
           </template>
         </ElTableColumn>
         <ElTableColumn
@@ -393,23 +463,17 @@ function actionsOf(row: MenuNode): RowAction[] {
           show-overflow-tooltip
         >
           <template #default="{ row }">
-            {{ row.permCode ?? '—' }}
-          </template>
-        </ElTableColumn>
-        <ElTableColumn
-          label="内置"
-          width="56"
-          align="center"
-        >
-          <template #default="{ row }">
-            <span v-if="row.isSystem === 1">是</span>
+            <span
+              v-if="row.permCode"
+              class="mono-cell"
+            >{{ row.permCode }}</span>
             <span v-else>—</span>
           </template>
         </ElTableColumn>
         <ElTableColumn
           prop="sort"
           label="排序"
-          width="56"
+          width="60"
           align="center"
         />
         <ElTableColumn
@@ -442,212 +506,294 @@ function actionsOf(row: MenuNode): RowAction[] {
     <ElDialog
       v-model="formVisible"
       :title="editingId === null ? '新增菜单' : '修改菜单'"
-      width="560px"
+      width="640px"
     >
+      <div
+        v-if="editingId === null"
+        class="form-banner"
+      >
+        <AppIcon
+          name="alert"
+          :size="14"
+        />
+        <span>类型、展示端、归属面与权限码创建后不可修改;可选项范围由上级节点决定</span>
+      </div>
       <ElForm
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="100px"
+        label-position="top"
       >
-        <ElFormItem label="上级">
-          <ElInput
-            :model-value="parentLabel"
-            disabled
-          />
-        </ElFormItem>
-        <ElFormItem
-          v-if="editingId === null"
-          label="类型"
-          prop="menuType"
-        >
-          <ElSelect
-            v-model="form.menuType"
-            class="full"
-          >
-            <ElOption
-              v-for="item in typeOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem
-          v-else
-          label="类型"
-        >
-          <ElInput
-            :model-value="labelOf(MENU_TYPES, immutable.menuType)"
-            disabled
-          />
-        </ElFormItem>
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="flow"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">归属与类型</span>
+            <span
+              v-if="editingId === null"
+              class="panel-hint"
+            >挂在不同上级,可选的类型与展示端不同</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem label="上级">
+              <ElInput
+                :model-value="parentLabel"
+                disabled
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="editingId === null"
+              label="类型"
+              prop="menuType"
+            >
+              <ElSelect
+                v-model="form.menuType"
+                class="full"
+              >
+                <ElOption
+                  v-for="item in typeOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem
+              v-else
+              label="类型"
+            >
+              <ElInput
+                :model-value="labelOf(MENU_TYPES, immutable.menuType)"
+                disabled
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="editingId === null"
+              label="展示端"
+              prop="target"
+            >
+              <ElSelect
+                v-model="form.target"
+                class="full"
+              >
+                <ElOption
+                  v-for="item in targetOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem
+              v-else
+              label="展示端"
+            >
+              <ElInput
+                :model-value="labelOf(TARGETS, immutable.target)"
+                disabled
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="editingId === null"
+              label="归属面"
+              prop="scope"
+            >
+              <ElSelect
+                v-model="form.scope"
+                class="full"
+              >
+                <ElOption
+                  v-for="item in scopeOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem
+              v-else
+              label="归属面"
+            >
+              <ElInput
+                :model-value="labelOf(SCOPES, immutable.scope)"
+                disabled
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="receipt"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">基本信息</span>
+            <span
+              v-if="editingId === null"
+              class="panel-hint"
+            >路由与组件仅菜单类型需要配置</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="菜单名称"
+              prop="menuName"
+            >
+              <ElInput
+                v-model="form.menuName"
+                placeholder="侧栏与面包屑展示的名称"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="!isButton"
+              label="图标"
+              prop="icon"
+            >
+              <ElSelect
+                v-model="form.icon"
+                clearable
+                filterable
+                placeholder="选择侧栏图标"
+                class="full"
+              >
+                <template #prefix>
+                  <AppIcon
+                    :name="menuIcon(form.icon)"
+                    :size="14"
+                  />
+                </template>
+                <ElOption
+                  v-for="item in ICON_OPTIONS"
+                  :key="item.ep"
+                  :label="item.ep"
+                  :value="item.ep"
+                >
+                  <div class="icon-option">
+                    <AppIcon
+                      :name="item.icon"
+                      :size="14"
+                    />
+                    <span>{{ item.ep }}</span>
+                  </div>
+                </ElOption>
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem
+              v-if="!isButton"
+              label="路由/地址"
+              prop="path"
+            >
+              <ElInput
+                v-model="form.path"
+                :placeholder="isExternal ? 'https:// 开头的完整地址' : '/system/user'"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="needComponent"
+              label="前端组件"
+              prop="component"
+            >
+              <ElInput
+                v-model="form.component"
+                placeholder="src/views 下的相对路径,如 system/user/index"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="needPermCode"
+              label="权限码"
+              prop="permCode"
+            >
+              <ElInput
+                v-model="form.permCode"
+                :disabled="editingId !== null"
+                :placeholder="editingId === null ? `${form.scope === 1 ? 'platform' : 'system'}:模块:动作` : '建后不可修改'"
+                class="mono-input"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-else-if="editingId !== null && immutable.permCode"
+              label="权限码"
+            >
+              <ElInput
+                :model-value="immutable.permCode"
+                disabled
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="sliders"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">展示设置</span>
+            <span class="panel-hint">数值越小越靠前</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="排序"
+              prop="sort"
+            >
+              <ElInputNumber
+                v-model="form.sort"
+                class="full"
+                :min="0"
+                :precision="0"
+                controls-position="right"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="!isButton"
+              label="侧栏显示"
+            >
+              <ElSwitch
+                v-model="form.visible"
+                :active-value="0"
+                :inactive-value="1"
+                inline-prompt
+                active-text="显示"
+                inactive-text="隐藏"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="editingId !== null"
+              label="状态"
+            >
+              <ElSwitch
+                v-model="form.status"
+                :active-value="0"
+                :inactive-value="1"
+                :disabled="editingSystem"
+                inline-prompt
+                active-text="正常"
+                inactive-text="停用"
+              />
+            </ElFormItem>
+          </div>
+        </div>
 
         <ElFormItem
-          v-if="editingId === null"
-          label="展示端"
-          prop="target"
-        >
-          <ElSelect
-            v-model="form.target"
-            class="full"
-          >
-            <ElOption
-              v-for="item in targetOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem
-          v-else
-          label="展示端"
-        >
-          <ElInput
-            :model-value="labelOf(TARGETS, immutable.target)"
-            disabled
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          v-if="editingId === null"
-          label="归属面"
-          prop="scope"
-        >
-          <ElSelect
-            v-model="form.scope"
-            class="full"
-          >
-            <ElOption
-              v-for="item in scopeOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem
-          v-else
-          label="归属面"
-        >
-          <ElInput
-            :model-value="labelOf(SCOPES, immutable.scope)"
-            disabled
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          label="菜单名称"
-          prop="menuName"
-        >
-          <ElInput v-model="form.menuName" />
-        </ElFormItem>
-
-        <ElFormItem
-          v-if="!isButton"
-          label="路由/地址"
-          prop="path"
-        >
-          <ElInput
-            v-model="form.path"
-            :placeholder="isExternal ? 'https:// 开头的完整地址' : '/system/user'"
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          v-if="needComponent"
-          label="前端组件"
-          prop="component"
-        >
-          <ElInput
-            v-model="form.component"
-            placeholder="src/views 下的相对路径,如 system/user/index"
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          v-if="needPermCode"
-          label="权限码"
-          prop="permCode"
-        >
-          <ElInput
-            v-model="form.permCode"
-            :disabled="editingId !== null"
-            :placeholder="editingId === null ? `${form.scope === 1 ? 'platform' : 'system'}:模块:动作` : '建后不可修改'"
-          />
-        </ElFormItem>
-        <ElFormItem
-          v-else-if="editingId !== null && immutable.permCode"
-          label="权限码"
-        >
-          <ElInput
-            :model-value="immutable.permCode"
-            disabled
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          v-if="!isButton"
-          label="图标"
-          prop="icon"
-        >
-          <ElInput
-            v-model="form.icon"
-            placeholder="Element Plus 图标名,如 User"
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          label="排序"
-          prop="sort"
-        >
-          <ElInputNumber
-            v-model="form.sort"
-            :min="0"
-            :precision="0"
-            controls-position="right"
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          v-if="!isButton"
-          label="侧栏显示"
-        >
-          <ElSwitch
-            v-model="form.visible"
-            :active-value="0"
-            :inactive-value="1"
-            inline-prompt
-            active-text="显示"
-            inactive-text="隐藏"
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          v-if="editingId !== null"
-          label="状态"
-        >
-          <ElSwitch
-            v-model="form.status"
-            :active-value="0"
-            :inactive-value="1"
-            :disabled="editingSystem"
-            inline-prompt
-            active-text="正常"
-            inactive-text="停用"
-          />
-        </ElFormItem>
-
-        <ElFormItem
-          label="备注"
+          label="备注(选填)"
           prop="remark"
+          class="remark-item"
         >
           <ElInput
             v-model="form.remark"
             type="textarea"
             :rows="2"
             maxlength="500"
+            show-word-limit
+            placeholder="选填,最多 500 字"
           />
         </ElFormItem>
       </ElForm>
@@ -670,5 +816,76 @@ function actionsOf(row: MenuNode): RowAction[] {
 <style scoped>
 .full {
   width: 100%;
+}
+
+/* 名称列:图标徽章 + 名称 + 内置徽标。
+   必须是 inline-flex 而非 flex:EP 树表的层级缩进是插在 .cell 里的 inline span,
+   块级 flex 会让缩进与展开箭头被挤到上一行,内容顶格,层级看起来失效。 */
+.name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 36px);
+  vertical-align: middle;
+}
+
+.name-ico {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(var(--app-primary-rgb), 0.1);
+  color: var(--app-primary);
+}
+
+.name-ico.btn {
+  background: var(--app-soft-2);
+  color: var(--app-muted);
+}
+
+.name-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--app-muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 根级(顶级目录)名称加重提亮,子级保持弱化,展开后层级一眼可辨 */
+.name-text.root {
+  color: var(--app-ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* 展开箭头:跟随主题色,悬停浮出 */
+.table-card :deep(.el-table__expand-icon) {
+  border-radius: 6px;
+  color: var(--app-muted);
+  transition:
+    color 0.16s,
+    background-color 0.16s,
+    transform 0.16s;
+}
+
+.table-card :deep(.el-table__expand-icon:hover) {
+  background: var(--app-soft-2);
+  color: var(--app-primary);
+}
+
+/* 路由/组件/权限码:等宽字体弱化展示,与名称列拉开层次 */
+.mono-cell {
+  color: var(--app-muted);
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+}
+
+.icon-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>
