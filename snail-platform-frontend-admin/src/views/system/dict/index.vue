@@ -275,6 +275,30 @@ async function removeData(row: DictDataVO): Promise<void> {
   await loadItems(row.dictId);
 }
 
+/**
+ * 字典项启停:没有独立 status 端点,走修改契约只翻 status,其余字段按行上现值原样带回。
+ * 停用必须过确认(业务侧下拉立即少一项);确认后就地翻牌,row 是 itemsMap 缓存里的同一引用,不重拉。
+ */
+async function toggleItemStatus(row: DictDataVO): Promise<void> {
+  const next = row.status === 0 ? 1 : 0;
+  if (next === 1) {
+    const goOn = await confirmAction(
+      `停用字典项 ${row.dictLabel}(${row.dictValue})?业务页面按该类型取的下拉会立即少这一项;已落库的历史值不受影响。`,
+      () => Promise.resolve(),
+      { title: '停用确认', confirmText: '停用' },
+    );
+    if (!goOn) return;
+  }
+  await updateDictData(row.dictDataId, {
+    dictLabel: row.dictLabel,
+    sort: row.sort,
+    status: next,
+    remark: row.remark,
+  });
+  row.status = next;
+  ElMessage.success(next === 0 ? '已启用' : '已停用');
+}
+
 onMounted(typeList.refresh);
 </script>
 
@@ -493,24 +517,29 @@ onMounted(typeList.refresh);
         class="item-grid"
       >
         <article
-          v-for="(item, index) in itemRows(activeTypeId)"
+          v-for="item in itemRows(activeTypeId)"
           :key="item.dictDataId"
           class="item-tile"
           :class="{ off: item.status !== 0 }"
         >
           <div class="tile-top">
-            <span class="tile-seq">{{ String(index + 1).padStart(2, '0') }}</span>
             <span
-              class="status-pill"
-              :class="item.status === 0 ? 'success' : 'info'"
+              class="tile-state"
+              :class="{ off: item.status !== 0 }"
             >
+              <i class="state-dot" />
               {{ item.status === 0 ? '正常' : '停用' }}
             </span>
+            <span class="tile-sort">排序 {{ item.sort }}</span>
           </div>
-          <div class="tile-label">
-            {{ item.dictLabel }}
+          <div class="tile-body">
+            <span class="tile-cap">标签</span>
+            <div class="tile-label">
+              {{ item.dictLabel }}
+            </div>
           </div>
           <div class="tile-value">
+            <span class="value-cap">值</span>
             <code>{{ item.dictValue }}</code>
             <button
               class="copy-btn"
@@ -524,34 +553,47 @@ onMounted(typeList.refresh);
               />
             </button>
           </div>
-          <div class="tile-foot">
-            <span class="tile-sort">排序 {{ item.sort }}</span>
-            <div class="tile-acts">
-              <button
-                v-if="auth.has('system:dict:update')"
-                class="mini-btn"
-                type="button"
-                title="修改字典项"
-                @click="openDataEdit(item)"
-              >
-                <AppIcon
-                  name="edit"
-                  :size="14"
-                />
-              </button>
-              <button
-                v-if="auth.has('system:dict:delete')"
-                class="mini-btn danger"
-                type="button"
-                title="删除字典项"
-                @click="removeData(item)"
-              >
-                <AppIcon
-                  name="trash"
-                  :size="14"
-                />
-              </button>
-            </div>
+          <div class="tile-acts">
+            <button
+              v-if="auth.has('system:dict:update')"
+              class="mini-btn"
+              type="button"
+              title="修改标签、排序与备注"
+              @click="openDataEdit(item)"
+            >
+              <AppIcon
+                name="edit"
+                :size="12"
+              />
+              修改
+            </button>
+            <button
+              v-if="auth.has('system:dict:update')"
+              class="mini-btn toggle"
+              :class="{ 'is-off': item.status !== 0 }"
+              type="button"
+              :title="item.status === 0 ? '停用后业务下拉不再出现' : '重新启用'"
+              @click="toggleItemStatus(item)"
+            >
+              <AppIcon
+                :name="item.status === 0 ? 'eye-off' : 'check'"
+                :size="12"
+              />
+              {{ item.status === 0 ? '停用' : '启用' }}
+            </button>
+            <button
+              v-if="auth.has('system:dict:delete')"
+              class="mini-btn danger"
+              type="button"
+              title="删除字典项"
+              @click="removeData(item)"
+            >
+              <AppIcon
+                name="trash"
+                :size="12"
+              />
+              删除
+            </button>
           </div>
         </article>
 
@@ -1207,15 +1249,51 @@ onMounted(typeList.refresh);
   justify-content: space-between;
 }
 
-.tile-seq {
+/* 状态呼吸点:绿点=正常,灰点=停用,比胶囊徽章更轻 */
+.tile-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-success);
+  font-size: 10.5px;
+}
+
+.state-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--app-success);
+  box-shadow: 0 0 0 3px rgba(var(--app-success-rgb), 0.14);
+}
+
+.tile-state.off {
+  color: var(--app-muted);
+}
+
+.tile-state.off .state-dot {
+  background: var(--app-muted);
+  box-shadow: 0 0 0 3px var(--app-soft-2);
+}
+
+.tile-sort {
   color: var(--app-muted);
   font-family: var(--app-font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+}
+
+/* 字段小标注:标明哪行是标签、哪条是值 */
+.tile-cap {
+  display: block;
+  margin-top: 11px;
+  color: var(--app-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
 }
 
 .tile-label {
-  margin-top: 10px;
+  margin-top: 2px;
   overflow: hidden;
   color: var(--app-ink);
   font-size: 15px;
@@ -1232,10 +1310,19 @@ onMounted(typeList.refresh);
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 9px;
-  padding: 6px 8px;
+  margin-top: 7px;
+  padding: 5px 6px 5px 5px;
   border-radius: 8px;
   background: var(--app-soft-2);
+}
+
+.value-cap {
+  flex: none;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(var(--app-primary-rgb), 0.12);
+  color: var(--app-primary);
+  font-size: 10px;
 }
 
 .tile-value code {
@@ -1271,54 +1358,65 @@ onMounted(typeList.refresh);
   color: var(--app-primary);
 }
 
-.tile-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: auto;
-  padding-top: 11px;
-}
-
-.tile-sort {
-  color: var(--app-muted);
-  font-size: 10.5px;
-}
-
+/* 操作行:独占卡片底部,虚线分隔;三个按钮等宽铺满,观感整齐 */
 .tile-acts {
   display: flex;
-  gap: 2px;
-  opacity: 0.4;
-  transition: opacity 0.18s;
-}
-
-.item-tile:hover .tile-acts {
-  opacity: 1;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed var(--app-line);
 }
 
 .mini-btn {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 5px;
+  height: 27px;
+  min-width: 0;
+  padding: 0 6px;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: var(--app-card);
   color: var(--app-muted);
   cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
   transition:
     color 0.16s,
+    border-color 0.16s,
     background-color 0.16s;
 }
 
 .mini-btn:hover {
-  background: rgba(var(--app-primary-rgb), 0.1);
+  border-color: rgba(var(--app-primary-rgb), 0.45);
+  background: rgba(var(--app-primary-rgb), 0.07);
   color: var(--app-primary);
 }
 
+/* 停用悬停给警示橙,启用悬停给正常绿:动作方向一眼可辨 */
+.mini-btn.toggle:not(.is-off):hover {
+  border-color: rgba(var(--app-warning-rgb), 0.45);
+  background: rgba(var(--app-warning-rgb), 0.08);
+  color: var(--app-warning);
+}
+
+.mini-btn.toggle.is-off:hover {
+  border-color: rgba(var(--app-success-rgb), 0.45);
+  background: rgba(var(--app-success-rgb), 0.07);
+  color: var(--app-success);
+}
+
 .mini-btn.danger:hover {
-  background: rgba(var(--app-danger-rgb), 0.1);
+  border-color: rgba(var(--app-danger-rgb), 0.45);
+  background: rgba(var(--app-danger-rgb), 0.07);
   color: var(--app-danger);
+}
+
+/* 停用卡片:值条降透明度,弱化但不藏信息 */
+.item-tile.off .tile-value {
+  opacity: 0.72;
 }
 
 .add-item-tile {
