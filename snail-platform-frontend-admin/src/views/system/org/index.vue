@@ -3,6 +3,7 @@
 defineOptions({ name: 'SystemOrg' });
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import AppIcon from '@/components/AppIcon.vue';
 import {
   createOrg,
   deleteOrg,
@@ -245,60 +246,95 @@ function actionsOf(row: OrgNode): RowAction[] {
     <ElDialog
       v-model="formVisible"
       :title="editingId === null ? '新增下级组织' : '修改组织'"
-      width="460px"
+      width="640px"
     >
+      <div
+        v-if="editingId === null"
+        class="form-banner"
+      >
+        <AppIcon
+          name="alert"
+          :size="14"
+        />
+        <span>新节点默认为正常状态;上级由发起入口决定,创建后如需更换请使用移动功能</span>
+      </div>
       <ElForm
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="88px"
+        label-position="top"
       >
-        <ElFormItem label="上级组织">
-          <ElInput
-            :model-value="parentLabel"
-            disabled
-          />
-        </ElFormItem>
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="columns"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">基本信息</span>
+            <span
+              v-if="editingId === null"
+              class="panel-hint"
+            >组织名称建议与实际部门保持一致</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem label="上级组织">
+              <ElInput
+                :model-value="parentLabel"
+                disabled
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="组织名称"
+              prop="name"
+            >
+              <ElInput
+                v-model="form.name"
+                placeholder="组织架构中展示的名称"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="排序"
+              prop="sort"
+            >
+              <ElInputNumber
+                v-model="form.sort"
+                class="full"
+                :min="0"
+                :precision="0"
+                controls-position="right"
+              />
+            </ElFormItem>
+            <!-- 状态只在修改时给:新节点后端一律置正常。0/1 沿用后端取值,0=正常 映射开关的激活态 -->
+            <ElFormItem
+              v-if="editingId !== null"
+              label="状态"
+            >
+              <ElSwitch
+                v-model="form.status"
+                :active-value="0"
+                :inactive-value="1"
+                inline-prompt
+                active-text="正常"
+                inactive-text="停用"
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
         <ElFormItem
-          label="组织名称"
-          prop="name"
-        >
-          <ElInput v-model="form.name" />
-        </ElFormItem>
-        <ElFormItem
-          label="排序"
-          prop="sort"
-        >
-          <ElInputNumber
-            v-model="form.sort"
-            :min="0"
-            :precision="0"
-            controls-position="right"
-          />
-        </ElFormItem>
-        <!-- 状态只在修改时给:新节点后端一律置正常。0/1 沿用后端取值,0=正常 映射开关的激活态 -->
-        <ElFormItem
-          v-if="editingId !== null"
-          label="状态"
-        >
-          <ElSwitch
-            v-model="form.status"
-            :active-value="0"
-            :inactive-value="1"
-            inline-prompt
-            active-text="正常"
-            inactive-text="停用"
-          />
-        </ElFormItem>
-        <ElFormItem
-          label="备注"
+          label="备注(选填)"
           prop="remark"
+          class="remark-item"
         >
           <ElInput
             v-model="form.remark"
             type="textarea"
             :rows="2"
             maxlength="500"
+            show-word-limit
+            placeholder="选填,最多 500 字"
           />
         </ElFormItem>
       </ElForm>
