@@ -403,79 +403,115 @@ function actionsOf(row: RoleVO): RowAction[] {
     <ElDialog
       v-model="formVisible"
       :title="editingId === null ? '新增角色' : '修改角色'"
-      width="480px"
+      width="640px"
     >
+      <div
+        v-if="editingId === null"
+        class="form-banner"
+      >
+        <AppIcon
+          name="alert"
+          :size="14"
+        />
+        <span>角色标识创建后不可修改;数据权限档位不得超过自身权限,过宽会被后端拒绝</span>
+      </div>
       <ElForm
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="88px"
+        label-position="top"
       >
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="shield"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">基本信息</span>
+            <span
+              v-if="editingId === null"
+              class="panel-hint"
+            >角色标识即权限点前缀,建议语义化命名</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem
+              label="角色名称"
+              prop="roleName"
+            >
+              <ElInput
+                v-model="form.roleName"
+                placeholder="列表与授权中展示的角色名"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="角色标识"
+              prop="roleCode"
+            >
+              <ElInput
+                v-model="form.roleCode"
+                :disabled="editingId !== null"
+                :placeholder="editingId === null ? '小写字母、数字、下划线' : '创建后不可修改'"
+              />
+            </ElFormItem>
+            <ElFormItem
+              label="数据权限"
+              prop="dataScope"
+            >
+              <ElSelect
+                v-model="form.dataScope"
+                class="full"
+              >
+                <ElOption
+                  v-for="item in DATA_SCOPES"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem
+              label="排序"
+              prop="sort"
+            >
+              <ElInputNumber
+                v-model="form.sort"
+                class="full"
+                :min="0"
+                :precision="0"
+                controls-position="right"
+              />
+            </ElFormItem>
+            <ElFormItem
+              v-if="editingId !== null"
+              label="状态"
+              class="span-2"
+            >
+              <ElSwitch
+                v-model="form.status"
+                :active-value="0"
+                :inactive-value="1"
+                inline-prompt
+                active-text="正常"
+                inactive-text="停用"
+              />
+            </ElFormItem>
+          </div>
+        </div>
+
         <ElFormItem
-          label="角色名称"
-          prop="roleName"
-        >
-          <ElInput v-model="form.roleName" />
-        </ElFormItem>
-        <ElFormItem
-          label="角色标识"
-          prop="roleCode"
-        >
-          <ElInput
-            v-model="form.roleCode"
-            :disabled="editingId !== null"
-            :placeholder="editingId === null ? '小写字母、数字、下划线' : '创建后不可修改'"
-          />
-        </ElFormItem>
-        <ElFormItem
-          label="数据权限"
-          prop="dataScope"
-        >
-          <ElSelect
-            v-model="form.dataScope"
-            class="full"
-          >
-            <ElOption
-              v-for="item in DATA_SCOPES"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem
-          label="排序"
-          prop="sort"
-        >
-          <ElInputNumber
-            v-model="form.sort"
-            :min="0"
-            :precision="0"
-            controls-position="right"
-          />
-        </ElFormItem>
-        <ElFormItem
-          v-if="editingId !== null"
-          label="状态"
-        >
-          <ElSwitch
-            v-model="form.status"
-            :active-value="0"
-            :inactive-value="1"
-            inline-prompt
-            active-text="正常"
-            inactive-text="停用"
-          />
-        </ElFormItem>
-        <ElFormItem
-          label="备注"
+          label="备注(选填)"
           prop="remark"
+          class="remark-item"
         >
           <ElInput
             v-model="form.remark"
             type="textarea"
             :rows="2"
             maxlength="500"
+            show-word-limit
+            placeholder="选填,最多 500 字"
           />
         </ElFormItem>
       </ElForm>
