@@ -1,4 +1,4 @@
-import { del, download, get, post } from './http';
+import { del, download, get, getBlob, post } from './http';
 import type { PageParams, PageResult } from './types';
 
 /** 文件信息,与后端 FileVO 同口径。 */
@@ -53,4 +53,9 @@ export function deleteFile(fileId: number): Promise<void> {
  */
 export function downloadFile(file: FileVO): Promise<void> {
   return download(`/system/file/${file.fileId}/raw`, {}, file.fileName);
+}
+
+/** 预览取原始字节:与下载同端点同权限(system:file:download),格式解析全在浏览器内完成。 */
+export function fetchFileBlob(fileId: number): Promise<Blob> {
+  return getBlob(`/system/file/${fileId}/raw`);
 }

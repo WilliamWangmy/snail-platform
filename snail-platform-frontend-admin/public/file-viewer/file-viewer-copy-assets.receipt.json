@@ -1,0 +1,3629 @@
+{
+  "schemaVersion": 1,
+  "packageName": "file-viewer-copy-assets",
+  "packageVersion": "3.3.3",
+  "copyGroups": [
+    "office-presentation",
+    "office-presentation-binary",
+    "office-word-openxml",
+    "pdf",
+    "spreadsheet-openxml"
+  ],
+  "installedAt": "2026-11-13T07:27:00.149Z",
+  "files": [
+    {
+      "path": "flyfish-viewer-manifest.json",
+      "size": 131,
+      "sha256": "aabdb0a9fbd2da8767b44f0f5e274aad38324551eddfdf027c268a0ab153f824",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation",
+        "office-presentation-binary",
+        "office-word-openxml",
+        "pdf",
+        "spreadsheet-openxml"
+      ]
+    },
+    {
+      "path": "vendor/docx/docx.worker.js",
+      "size": 668864,
+      "sha256": "95fe7219172162fbb16f337e80516c2e339089cd16596686cc35f56c726a6507",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-word-openxml"
+      ]
+    },
+    {
+      "path": "vendor/docx/jszip.min.js",
+      "size": 97781,
+      "sha256": "7f839b2d4688b845c105ebf5d2f9803075f91ea0fe72bdaac176c3a04dd3d2c1",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-word-openxml"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78-EUC-H.bcmap",
+      "size": 2404,
+      "sha256": "d92a261336dc18b8c03a46eb4d462382d33f4338fa195d303256b2031434c874",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78-EUC-V.bcmap",
+      "size": 173,
+      "sha256": "61670bebc4e4827b67230c054fd0d820d6e30c3584d02e386804e62bbedc032a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78-H.bcmap",
+      "size": 2379,
+      "sha256": "ece6415b853d61e1b2560165151407d35cf16e6556932b85a13ea75276b77402",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78-RKSJ-H.bcmap",
+      "size": 2398,
+      "sha256": "696b1f973c97623496703809eaaa5f9b40696c77540057413f4b826a08edfa7b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78-RKSJ-V.bcmap",
+      "size": 173,
+      "sha256": "53cb6d560ab377da48cf65d6dcacb0bdb31f13fab7066c580de38c12a73a7ff9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78-V.bcmap",
+      "size": 169,
+      "sha256": "289000f02fd34872b6975503217f33abae6bee676e7d28f640473a67c8db1712",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78ms-RKSJ-H.bcmap",
+      "size": 2651,
+      "sha256": "a2442595218f5f8bd8e1b42188e368587d876cfe0cc4cd87196f077c878f72e2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/78ms-RKSJ-V.bcmap",
+      "size": 290,
+      "sha256": "f8ddceba96bfd9d3740bd1789ee30d1f47c78371520a8084f71f7df58f19be0b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/83pv-RKSJ-H.bcmap",
+      "size": 905,
+      "sha256": "44040051ec818fe09b9703472bea72efd2759d5eeb5ff0d77c718d6bb5e6d1df",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/90ms-RKSJ-H.bcmap",
+      "size": 721,
+      "sha256": "c13e043e85ff715b75bb03801e8fd0fb8f3a75e4a48496faa6baaf92b5b48ba1",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/90ms-RKSJ-V.bcmap",
+      "size": 290,
+      "sha256": "499bb916ce1adbe4289b6e5811f4dc20eb238cdc2ffad20cf26ae56716885bab",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/90msp-RKSJ-H.bcmap",
+      "size": 715,
+      "sha256": "7b8b3b8bbf821702e9a4df9f3596ce292380c8c1b0925dedadbb4e4b2d80498b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/90msp-RKSJ-V.bcmap",
+      "size": 291,
+      "sha256": "6296c2b5c07dca8128e96d5296d621a3268803d4fa0e5812a21e52fe2802aacb",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/90pv-RKSJ-H.bcmap",
+      "size": 982,
+      "sha256": "fb5103f03d3a34547e18d316e52b6d9b26e485c662999222f84d2ba54c2e4fa8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/90pv-RKSJ-V.bcmap",
+      "size": 260,
+      "sha256": "7bcb5ad2ba55b9662ce379e16c2d9cc2b82d621a579807353741172e4af615c2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Add-H.bcmap",
+      "size": 2419,
+      "sha256": "a2ffab28b990998181bcca9b0e914bb2207820f100ae31d5c469444892e5ad8e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Add-RKSJ-H.bcmap",
+      "size": 2413,
+      "sha256": "b29f4b52e2465d0485856d5e69f1ba69927deb2848d8fd328c8035583b35bb7e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Add-RKSJ-V.bcmap",
+      "size": 287,
+      "sha256": "2aa2232c283a3f5d0997c2834a36cead0b79ce2657944cfeed08140c293460ff",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Add-V.bcmap",
+      "size": 282,
+      "sha256": "25125d3b1be64e86b2df5b3344170b45a42bcaa0b46e43a34314ef73c166e542",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-0.bcmap",
+      "size": 317,
+      "sha256": "8c65be9d51a9f269a547dc12460707aaf4031ab67ebe8a2900f4b4cc6b3e450e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-1.bcmap",
+      "size": 371,
+      "sha256": "73152bc1a59cc594b414ac6068be48e5512b96ae85920c40e32a99269fdb0c04",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-2.bcmap",
+      "size": 376,
+      "sha256": "a1b8d353bdef9584c820464e8f1c9e2013d64ebf433cba0aa831dddf515818c2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-3.bcmap",
+      "size": 401,
+      "sha256": "2ffc0c75c79fafde506163d3c08c390d183251009f3fbf6ae50d1167d14b9570",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-4.bcmap",
+      "size": 405,
+      "sha256": "98a1f470c878c6b9691a4d7aef776af8ac9b55f5587c9fafa00547f3bf655716",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-5.bcmap",
+      "size": 406,
+      "sha256": "ddd6e29955eb8cb545f2ebd09c628c3bbda5023256eda1b728f743c75fb77829",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-6.bcmap",
+      "size": 406,
+      "sha256": "317bb2db71e0e5b7b0c47b75de1da915c2e22f65f0c0861507f9ca7ba238f8a2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-CNS1-UCS2.bcmap",
+      "size": 41193,
+      "sha256": "e665837f2197c6bd08cd8955ad4d6932cee2398e2e328b25b00e6bfb3bd72af9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-GB1-0.bcmap",
+      "size": 217,
+      "sha256": "8b81cce8a11d510e505704953cfa4e4ab080c1a0cab991145a3512ee433946b9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-GB1-1.bcmap",
+      "size": 250,
+      "sha256": "0426983081788ec7202703e71f1efa4b860f75b936994236010b39d89251a81e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-GB1-2.bcmap",
+      "size": 465,
+      "sha256": "e67b37a83b160ab3831306a71a605893b24454ee81ac9b6123bf2d3984d268d5",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-GB1-3.bcmap",
+      "size": 470,
+      "sha256": "aa299afc3e12a28726147305f191be28c7498078c8b182ece7886ac79cd99078",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-GB1-4.bcmap",
+      "size": 601,
+      "sha256": "8fbd7d74c2ddb1350c1cecce54a73fde3f5453093d4bed445283ec0033d2097f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-GB1-5.bcmap",
+      "size": 625,
+      "sha256": "c22cb2fcff24112fa31dab2111bdc51957006576d31aad5a25e67793ac01428c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-GB1-UCS2.bcmap",
+      "size": 33974,
+      "sha256": "20507620260c0c935c35afc1e70e5888aa7125d5ec7ffc03cef1959feb2c1641",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-0.bcmap",
+      "size": 225,
+      "sha256": "464f08905236f5703b1f5cf8358767c8b18e6bcc808840d081f1de2c7ab38134",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-1.bcmap",
+      "size": 226,
+      "sha256": "4c823848722187d1ffe75ae3f5f9126ccd2d7895a05fad14c919fb119e037008",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-2.bcmap",
+      "size": 233,
+      "sha256": "7810fb808e367e70429e90a9478fe6a3fdc3e214f25c7582ce9c2da6a242315c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-3.bcmap",
+      "size": 242,
+      "sha256": "84deb1828711ad3d390c9899c38abce1bf619d65ff7bf1a326ec95acc45f08f8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-4.bcmap",
+      "size": 337,
+      "sha256": "3f8a4f974919c2b8bae5d10175ffa2673be140481e00840542c85d48ef184067",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-5.bcmap",
+      "size": 430,
+      "sha256": "1d3ce4ff28d977f8cf37a912ae4ec811f4175c3167b1ec0b2567feec3e79e1db",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-6.bcmap",
+      "size": 485,
+      "sha256": "5609797b9401b30be72ef9645da62a87829f058c3be4b5c623383119f584b1d9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Japan1-UCS2.bcmap",
+      "size": 40951,
+      "sha256": "66c5d0dc4964f4093e77b194023f3a0f689324028ec8330e1e1d0570bcba7c2f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Korea1-0.bcmap",
+      "size": 241,
+      "sha256": "dfb8c3874f0e5a8c3acf597d2c12d2b63e90bc5e4f0fce990ec4c56077d80b32",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Korea1-1.bcmap",
+      "size": 386,
+      "sha256": "62f277b7b1c441c007797ae707d5c37258d029ce4661a2b911e2e1ee35e6adc1",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Korea1-2.bcmap",
+      "size": 391,
+      "sha256": "1d77068af462f96d7ad28ad7e7d43eef6423c685b479d7dc25ff5df38db0380d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Adobe-Korea1-UCS2.bcmap",
+      "size": 23293,
+      "sha256": "857b723088be97255053562bfa41bd1075a7f7910d3bab59a0645c8bbc7060ff",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/B5-H.bcmap",
+      "size": 1086,
+      "sha256": "718ad0ffbef4c34f8f3f31292c462e519cd567a5511fc8b346c60010d64f4ef9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/B5-V.bcmap",
+      "size": 142,
+      "sha256": "b5c37383517477620ced927b6b4ffd4f4cc6230d8051b5b46a21d6768e07f7d8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/B5pc-H.bcmap",
+      "size": 1099,
+      "sha256": "bab6028aead1d6149400e904ab10cfd319082d826473ed4c582c8eeed920f17e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/B5pc-V.bcmap",
+      "size": 144,
+      "sha256": "41543142b9767f3b76133899fc8453282b01ad3c653acaeea42d78c5a7d08c63",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/CNS-EUC-H.bcmap",
+      "size": 1780,
+      "sha256": "e8f89cd61e6486b948205da46499d659ed0aed949b7095fd3c8e95ffe2b0e7a9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/CNS-EUC-V.bcmap",
+      "size": 1920,
+      "sha256": "cae422bec2ac6dbe86bf921cec942bacd2d0b733ffcca5f91b3ba14e917025a0",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/CNS1-H.bcmap",
+      "size": 706,
+      "sha256": "e8487971ab20cd16f3de3e8ac56ec994b72b658ad113f2818239dfd5108f501a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/CNS1-V.bcmap",
+      "size": 143,
+      "sha256": "42df8076aaa7574505e7304af83a3323ec032c4177d64b1309db8c043d594a8a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/CNS2-H.bcmap",
+      "size": 504,
+      "sha256": "bc6024d274d440f0625c69e25f37036ef6cb6689432ceaa160d3432a2a716ca7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/CNS2-V.bcmap",
+      "size": 93,
+      "sha256": "2e4f70a8afd23a121030fc2e5b5f3816e903b11e7ba8b8c09654b31c80399c38",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/ETen-B5-H.bcmap",
+      "size": 1125,
+      "sha256": "87ee6b3f5bfda5fe26fa35431264c7d73070d10dbbf398a75185d63ae322c18d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/ETen-B5-V.bcmap",
+      "size": 158,
+      "sha256": "47dc0d2c21e3bde317947aec1675ceabc1d5460a60bf9c24334b8c407a17172c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/ETenms-B5-H.bcmap",
+      "size": 101,
+      "sha256": "d5f5a73da4173b7da9a3a20e16f26f9cd5d12deb1553409919e0cec6fd37fdee",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/ETenms-B5-V.bcmap",
+      "size": 172,
+      "sha256": "18252fca90f472f479af1bddd60d6ab51c8e1b55dcf6845951426504934543e0",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/ETHK-B5-H.bcmap",
+      "size": 4426,
+      "sha256": "d2f10fa519336bc4efcc7b6deb9604b75429946b40d82e311cb3a97a1994c89a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/ETHK-B5-V.bcmap",
+      "size": 158,
+      "sha256": "1fea3fd0d9f0f679f80505800851ef2e4131d81127e18c006938ffa2f4c8b247",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/EUC-H.bcmap",
+      "size": 578,
+      "sha256": "f9939cd57fccdc65c5d9f4c205fd497ebdbd283643308da5663801a8c1d9c595",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/EUC-V.bcmap",
+      "size": 170,
+      "sha256": "1283a50a706507c4436da83ede9ad7a4440be25378f2e96f6c81a430081426a3",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Ext-H.bcmap",
+      "size": 2536,
+      "sha256": "4000ed4e61a1c668ef453bbd0603cfa383defa793abd46a57ed870d7f527350b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Ext-RKSJ-H.bcmap",
+      "size": 2542,
+      "sha256": "e0d2f0df337660e73813238dd4a725f11f0621b90f3273857db253d0e7694caa",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Ext-RKSJ-V.bcmap",
+      "size": 218,
+      "sha256": "f617a22b6d67febb187990952006c91a9f5a4db21155d268c656252d0c21985d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Ext-V.bcmap",
+      "size": 215,
+      "sha256": "c2087fb845a9e3acea0c2922cd40e6af67e11957bec74dcd597f1285edd490ce",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GB-EUC-H.bcmap",
+      "size": 549,
+      "sha256": "928bad06fd84a48f5ba7150d7716609119fb660f2aaa73eccad81ddab9b9d203",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GB-EUC-V.bcmap",
+      "size": 179,
+      "sha256": "a9ad88ac2479da529b16dc48abc5952332e27bc355335f91df5729a587533324",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GB-H.bcmap",
+      "size": 528,
+      "sha256": "1018c777a8910b5bb46d7d54a4aee9d51ca5cff8addb2b41c969d9101cb3fd1c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GB-V.bcmap",
+      "size": 175,
+      "sha256": "0b96789143c0bbf9f1641ae7165b3456dccd14dabffcbb0bd654d5bf6f94f863",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBK-EUC-H.bcmap",
+      "size": 14692,
+      "sha256": "2103fed28650ede096a2281104a1a8a4304dae0db414342c636867522307123b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBK-EUC-V.bcmap",
+      "size": 180,
+      "sha256": "a7fd35dd14d9dbdb955f34e6c0630618b6620dfd09d4283b2f65a65ce77fcaea",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBK2K-H.bcmap",
+      "size": 19662,
+      "sha256": "3d919ae72af16c5cc6846ec87a4326a9f125e493c59d3628429d35c2c95fe8c4",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBK2K-V.bcmap",
+      "size": 219,
+      "sha256": "b927fdfd595c07ce9158bf2ec13f4641b2e83b01c70989dadfabd6ed7c6ac2dc",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBKp-EUC-H.bcmap",
+      "size": 14686,
+      "sha256": "d15ebd8e81fb4fe8a244f1b1e877922e03500ac69eddf5001093e502430451d2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBKp-EUC-V.bcmap",
+      "size": 181,
+      "sha256": "fdc736d46e642625dccc8ad8c59f2c69fc7db7a13f2e799c6c6b779e707bb97a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBpc-EUC-H.bcmap",
+      "size": 557,
+      "sha256": "3c4a4eb82f05abe51f6650985c630e180438bfdd491318f5d20d2ec29236e1c3",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBpc-EUC-V.bcmap",
+      "size": 181,
+      "sha256": "215bdfa2842705624b4cf4cd29b8e3c720f1e192365e0305c11030a424c84d7c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBT-EUC-H.bcmap",
+      "size": 7290,
+      "sha256": "dc5f44e48a39f3367ae28665027d8ab1d8cedb5a9dcc5068a900acd6709f60f9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBT-EUC-V.bcmap",
+      "size": 180,
+      "sha256": "a1ad24e63653b8aa388c18fa5e498f007564e43dde699a9f91ccb4645c999be8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBT-H.bcmap",
+      "size": 7269,
+      "sha256": "8afda745a505763f3ff54c8126eeb48ef376ea9ed07d9f42ff9a22c5c547ec57",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBT-V.bcmap",
+      "size": 176,
+      "sha256": "cdc2ec5c3c7c7033290c9a8894878202f08674eb9b1ae7d36218430326768771",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBTpc-EUC-H.bcmap",
+      "size": 7298,
+      "sha256": "7b23e2f7bfdb6c918f567b7324bf858f398bd8cd5f268d74ece19a3c91bf4f32",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/GBTpc-EUC-V.bcmap",
+      "size": 182,
+      "sha256": "d7a1b13ead9ab511cf2cd01de6ce8b02aa8e8767e84895337d7a3b67f039f93b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/H.bcmap",
+      "size": 553,
+      "sha256": "a0233e21047ec00b852125b243cbcf30abee511155b6d8159c24f944384bc9ee",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Hankaku.bcmap",
+      "size": 132,
+      "sha256": "b454701f7aecd7856769016dfd04ca64280a060f2c67a2466d50b4395d24974e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Hiragana.bcmap",
+      "size": 124,
+      "sha256": "2ed669394756dd9458651cd9995ab29ab691ecb7686659003306cdf22767a414",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKdla-B5-H.bcmap",
+      "size": 2654,
+      "sha256": "5242bce18fb13ab4cc59b146a03eba36e4ce42667eeff09e10981a9d2aa4996b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKdla-B5-V.bcmap",
+      "size": 148,
+      "sha256": "2e0537f786c0791d41a925f72bad2d4e7268aa6cbf15a1400a722672cec38e2c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKdlb-B5-H.bcmap",
+      "size": 2414,
+      "sha256": "fdc8159984bf5dbe475c0d5dfcb621ecee4dea07c38c668bd77f4c679e23b9b3",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKdlb-B5-V.bcmap",
+      "size": 148,
+      "sha256": "b249eb9dcb915ab45057c5d4d7aa55ef88d0efbb092af6bae0b2d4705d139abf",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKgccs-B5-H.bcmap",
+      "size": 2292,
+      "sha256": "ab64c7fc5e9b2e97750cc4f269b0da14fd8649e49151b7598c8df86599bac591",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKgccs-B5-V.bcmap",
+      "size": 149,
+      "sha256": "02ebdf7cdffb5395fb21091cd58a013a18ae5388922822f9dc6292ef16b98956",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKm314-B5-H.bcmap",
+      "size": 1772,
+      "sha256": "bfd8bbde6b36a9da4c1c902c74121a30d9807a7079a00eeea218be6adc223cef",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKm314-B5-V.bcmap",
+      "size": 149,
+      "sha256": "2a64a815cfb6fdd480674a868762e3d161fda17543b20c9209978559f0667164",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKm471-B5-H.bcmap",
+      "size": 2171,
+      "sha256": "49d7c037758826b5b6c0fa329c35bbf25d3943197754e72ecd30c6fb04d745e6",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKm471-B5-V.bcmap",
+      "size": 149,
+      "sha256": "be24c109e78aa4fe3c1f27d30aab3ed0741e783fa1b6b6c2719741072b54b132",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKscs-B5-H.bcmap",
+      "size": 4437,
+      "sha256": "08599378f41d96b40537adef6e6edcc4a787bc63f5accf47c026df4905a13914",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/HKscs-B5-V.bcmap",
+      "size": 159,
+      "sha256": "d073542b7dad1c4cbf01c1af5f0cd13218d1281a491956e310c55702fc8705c4",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Katakana.bcmap",
+      "size": 100,
+      "sha256": "3b6ca6642fbf8822da00d5e58a8aa275216d5c32dbf2bd73e934197fc9fc5c53",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSC-EUC-H.bcmap",
+      "size": 1848,
+      "sha256": "6784e16dbc5861c036c23d3e55f0d4ba0975a3e464da0ee8e49bcfff0be070c4",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSC-EUC-V.bcmap",
+      "size": 164,
+      "sha256": "fdb36bad85e9924823d49db374067988e024cf80fc894711f2c9178951cbbe95",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSC-H.bcmap",
+      "size": 1831,
+      "sha256": "c1f6d61f1d3304fd539a65ae72624fa567ecc3853bf52e283958a7a2515b3eee",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSC-Johab-H.bcmap",
+      "size": 16791,
+      "sha256": "939993d213f68db763bf156217c217ae23af082b91a0eacecf3d11eb4ff8ef8c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSC-Johab-V.bcmap",
+      "size": 166,
+      "sha256": "5d61967aac0e666def721e8b8d0fed8f95a879a14f2e76ce516c3d11c621e519",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSC-V.bcmap",
+      "size": 160,
+      "sha256": "d7da5afd9f1fe74816d79c9325f0139a4efb6438664ebfdf9a7aa92f3034360f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSCms-UHC-H.bcmap",
+      "size": 2787,
+      "sha256": "5b70d8f6a4fa9e2283dc649f0ff95d906d56efbee50a20e8d2faec3a8fed078e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSCms-UHC-HW-H.bcmap",
+      "size": 2789,
+      "sha256": "a5e6ba22aceb02fdedee11bfb9ed138463d89e85b87810b9f075b469d936f8ec",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSCms-UHC-HW-V.bcmap",
+      "size": 169,
+      "sha256": "890332a6a26880d463a12f2a6ff048bf9cf7e45077cfb1ca8815b89baa7bf411",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSCms-UHC-V.bcmap",
+      "size": 166,
+      "sha256": "1631b531c9a40c8cbe24c2317dba107362e49fa6e18af620414d627c111d570c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSCpc-EUC-H.bcmap",
+      "size": 2024,
+      "sha256": "709480682c55cedbb0124b9960d78e28febeee0df2e34607d61aac6601647ec7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/KSCpc-EUC-V.bcmap",
+      "size": 166,
+      "sha256": "031707887d6fc2378a36cdb6775334fd7a236c3f95048d8436abf43fe26fc49d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/LICENSE",
+      "size": 2080,
+      "sha256": "aa92ab5a472974865a96fd4a4e9c13bb41bf6fe1b309cb6b8da48bc9e19839a2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/NWP-H.bcmap",
+      "size": 2765,
+      "sha256": "286c6c9e335da330928a01edc3c97a3a623f1f7f3c42762b0a7dc2f651b1a78f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/NWP-V.bcmap",
+      "size": 252,
+      "sha256": "3a75fb7b59adfb172710758c425d8ac6c93fd5360a64dd4afd5dd04e60ab4b4d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/RKSJ-H.bcmap",
+      "size": 534,
+      "sha256": "a70de61a22a898f693f02cc011c3e3cff2e10aaa7cddb4661e456a21ae859f78",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/RKSJ-V.bcmap",
+      "size": 170,
+      "sha256": "68c1a64506471a524ea5cfc3b3a9f8f70031989a6bd95427b1351f33ccf50b06",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/Roman.bcmap",
+      "size": 96,
+      "sha256": "1c6b3ef9d9e5cb1aa329142ce9414b90f9b6d7f9182a2a9e927378dab8f0d43f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UCS2-H.bcmap",
+      "size": 48280,
+      "sha256": "779428116752f34e2490a1941d24e4634c71e3c22d053b811d2090ae2fb3c704",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UCS2-V.bcmap",
+      "size": 156,
+      "sha256": "1e5cc184b850ea44abc2df8ae5674279df668e8edf5e2a1a2ea2bd77adbd280f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UTF16-H.bcmap",
+      "size": 50419,
+      "sha256": "32ff139b3c7b91d6ad25f994701f3ce7b242906022c418fd73e6493fc228bfe5",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UTF16-V.bcmap",
+      "size": 156,
+      "sha256": "278eb1e68d1a236c60ef59472cf0176ee0d45f364285e76ca12419a08d46fb9a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UTF32-H.bcmap",
+      "size": 52679,
+      "sha256": "bf26eb67fe19ee5ba915799e80ca72408400aa8342fdf6a244a4f44de8f97336",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UTF32-V.bcmap",
+      "size": 160,
+      "sha256": "f7da3caf83ceb1cb37936fa10700d9ba6e9c3f72c5bc9724e3ac79bff0c0179e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UTF8-H.bcmap",
+      "size": 53629,
+      "sha256": "2f2a742bcd1a84a148a4a518b9eed51a8f9c6ca5ed3bc5e2e41fff97de5dc2d8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniCNS-UTF8-V.bcmap",
+      "size": 157,
+      "sha256": "b7c3f10780a8c62dd1c8ff6c30dc1e4e23b6cdc87c3a96fcd514cc98ffd3af9d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UCS2-H.bcmap",
+      "size": 43366,
+      "sha256": "9201569b402e81ad8860650bd86350c4fa28e5dd5971f05fcacaf40f51de18ed",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UCS2-V.bcmap",
+      "size": 193,
+      "sha256": "f10282335e4d64203bc2a653a3a47d745ec76c8ae04549f4d50180c1899be216",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UTF16-H.bcmap",
+      "size": 44086,
+      "sha256": "386fd39581245c034da016a92d23f3df1117d169f996100050b264fc09a84e35",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UTF16-V.bcmap",
+      "size": 178,
+      "sha256": "0473cfbba612b92dd9918f0ff8aee9112897c48e0ffdc0eb82da3144ed8ea84a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UTF32-H.bcmap",
+      "size": 45738,
+      "sha256": "f48a145dc4e3ed1dca1dde7111716a72306a2a4191ab05c6bae3a5c3a961cd2f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UTF32-V.bcmap",
+      "size": 182,
+      "sha256": "106acc49b7118bdef944e32107b4f348238f3929a0a15d3b7aab7b9101535993",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UTF8-H.bcmap",
+      "size": 46837,
+      "sha256": "f217b439c80ee5fa1bc2cf6d1defcc319f8d84483d166a00ee199e05a68588df",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniGB-UTF8-V.bcmap",
+      "size": 181,
+      "sha256": "a64df947632878eacc532fa193c735c92a383b7d66e6f8374ac193af7c64fc63",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UCS2-H.bcmap",
+      "size": 25439,
+      "sha256": "ad2352f40870880fbf7f8ee5abadff743fbd025fbf9830b8ada472d1c5e4da0b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UCS2-HW-H.bcmap",
+      "size": 119,
+      "sha256": "16e87edca954177c0881c874859d6783220925d821b5cdfb8755b61ebd93f9ce",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UCS2-HW-V.bcmap",
+      "size": 680,
+      "sha256": "1973457e2c0192819947e56068625b34fb9a72ecc8a476ce6d7eaae5f73e2e5c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UCS2-V.bcmap",
+      "size": 664,
+      "sha256": "42a133d8e2ce9dd6d2288018e01592d2bf2435b326d39b94ea0b6e6a44ac33d3",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UTF16-H.bcmap",
+      "size": 39443,
+      "sha256": "f6a89c5688978548c83fcee990e205bc63c74274d5c69b49032a3bd4c49a05ee",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UTF16-V.bcmap",
+      "size": 643,
+      "sha256": "c67126fc7c73850855186bb0d6482ac0a365057e0b58778c4ab9f234683fef53",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UTF32-H.bcmap",
+      "size": 40539,
+      "sha256": "96195950ce0fe24443d8eb426fa6b88534ec421d7bef9046f0b2362809cfba73",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UTF32-V.bcmap",
+      "size": 677,
+      "sha256": "ed4dafda402bdd19c4d5d8bf2ab41473c0f86f384552b4c7b963d6627daedeb1",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UTF8-H.bcmap",
+      "size": 41695,
+      "sha256": "798fb0bf06ab0788d1f6a91c2db7de581612eef03c628f10e8f7ecd8f70ab448",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS-UTF8-V.bcmap",
+      "size": 678,
+      "sha256": "1021611424f913b2df0bfdbe94bd327c04e224ec89d8e821c6501ea3d21f4265",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS2004-UTF16-H.bcmap",
+      "size": 39534,
+      "sha256": "710a32d7cb43fd6bd9dbf30da5971f8c941590f74441e208d852c2be0e74cc97",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS2004-UTF16-V.bcmap",
+      "size": 647,
+      "sha256": "3b149aff5c5707b57fb3215d1775852c8b1f413ec0f679ea628f25cf87fe098d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS2004-UTF32-H.bcmap",
+      "size": 40630,
+      "sha256": "8d2658e18741af7937d586a57c89729a6fec0d86121197c1f8518aa58b29cdfb",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS2004-UTF32-V.bcmap",
+      "size": 681,
+      "sha256": "6dd475782f2897648a683c48b2fa015a15b8f06856760bddc8a17a63f418bacb",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS2004-UTF8-H.bcmap",
+      "size": 41779,
+      "sha256": "691c614ce432b3e62486efb54e5c84c6da5afe9b51b21253bde4758feb484183",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJIS2004-UTF8-V.bcmap",
+      "size": 682,
+      "sha256": "40a8c7ea2d46711c5f78fc9a878a7db68b1543ba5cd60ecf14f519a2deb829b7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJISPro-UCS2-HW-V.bcmap",
+      "size": 705,
+      "sha256": "6826f94d789d7bf1960668c1c5819c34c9585c1b23152fbc19ee81c7df08524b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJISPro-UCS2-V.bcmap",
+      "size": 689,
+      "sha256": "493de9fd1a08f7946065d8ab58f0c3c9fe489f5a0f109f2d05a3169b4bd5789f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJISPro-UTF8-V.bcmap",
+      "size": 726,
+      "sha256": "6181d382cf736c5e09492e8be9f26f31fa25b7462253f23ab16646af432cad81",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJISX0213-UTF32-H.bcmap",
+      "size": 40517,
+      "sha256": "692044e1fb33445668632bc9fe7386805c624864be1ddeb29d65bb0c99fc630c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJISX0213-UTF32-V.bcmap",
+      "size": 684,
+      "sha256": "dd54e16ca7bffb3a886242549b2bf7d78a277087f7c60d2636f118c21a5b0646",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJISX02132004-UTF32-H.bcmap",
+      "size": 40608,
+      "sha256": "f80ea5a989be30ccda5a8804baef6d3b4b044d2b339bf8b31c671b2466171cf6",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniJISX02132004-UTF32-V.bcmap",
+      "size": 688,
+      "sha256": "94c22bd99e771c5fbe0dd8dc39850570d4db0075074aca13e272813edd7cc57f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UCS2-H.bcmap",
+      "size": 25783,
+      "sha256": "a1081396ab4adb6f4a5b6c15f896963c244c1c9bcb65ce5616d06096a1b9811c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UCS2-V.bcmap",
+      "size": 178,
+      "sha256": "6cab547431958fbdc1d401d06ebd4dd61a73f5509a10f974df32bcbca11a2e43",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UTF16-H.bcmap",
+      "size": 26327,
+      "sha256": "42d35b396286499dfae1737a07adb3a64500df37b426580bfb1d3ea872938519",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UTF16-V.bcmap",
+      "size": 164,
+      "sha256": "5bdb7390c80dcc136cb47d41dc7460082560969c17322ee739fe3020fb642410",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UTF32-H.bcmap",
+      "size": 26451,
+      "sha256": "3a01ec51ed1b828101351e337ffb8250abe11880032e5210f881170fed2588de",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UTF32-V.bcmap",
+      "size": 168,
+      "sha256": "dfda895eceaed081af030dbbb962b49629eea817fc3c02bae15db93d0c68acd7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UTF8-H.bcmap",
+      "size": 27790,
+      "sha256": "3fac9c65145f72d7d42157a3b9c5ed6904632184e6a0888f2b828699afd2002f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/UniKS-UTF8-V.bcmap",
+      "size": 169,
+      "sha256": "9ecc6cf30dd354b9778ddba163b6cc7302b087ce9f39d1ba73472d2b75ed13ca",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/V.bcmap",
+      "size": 166,
+      "sha256": "b9ad1c0c09ff14bca52f9a28a9767eb857ad0e8946e64ba14c7387a7eb69866a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/cmaps/WP-Symbol.bcmap",
+      "size": 179,
+      "sha256": "543923bead225732aba30976690ee89095a19628277b5863efecc2c728d5d7bf",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-100-wght-normal.woff2",
+      "size": 64376,
+      "sha256": "2c5ddf9cdfad73afb5235e06bc8ed3b5c627849200d673978148700c78f84160",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-101-wght-normal.woff2",
+      "size": 58028,
+      "sha256": "a33308bf652e64ac2884bfe830996e933322b939b915bb823fd47383580664ad",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-102-wght-normal.woff2",
+      "size": 60516,
+      "sha256": "4ea85e144cb385ce086b21b307730d3fdb70a587aaf350b12d0c4c2f13e66d27",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-103-wght-normal.woff2",
+      "size": 63732,
+      "sha256": "1bfdb1f001006c62434577b60064c3ec0562e4a68191acbc7feeba4b303bf095",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-104-wght-normal.woff2",
+      "size": 61404,
+      "sha256": "1e716b78655e396075808be52a9e749df1b6b5d17bd0ccedc6dcb89586903737",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-105-wght-normal.woff2",
+      "size": 61612,
+      "sha256": "ade910a27a4bd65baed59a8a86a3a6a80f6083daa7123bb9ff32da15e56fda9d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-106-wght-normal.woff2",
+      "size": 62444,
+      "sha256": "d31c838eb0e43043109bd6ddc23c295c340fc50f9a2f2381076ae8c0fa7f980b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-107-wght-normal.woff2",
+      "size": 60828,
+      "sha256": "d8d9b5fd2b266fdf3f6855444e7769e54f39806e48994e7fe5e0c4ace9553c81",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-108-wght-normal.woff2",
+      "size": 64340,
+      "sha256": "12fcc1175cb6370acb056743f4fea7fdde85b6376ada2f15dfbab59f02b45988",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-109-wght-normal.woff2",
+      "size": 60208,
+      "sha256": "85ebc9985c665dd55346ebc78b93f8d8ef6ff972d78afc288b75d697a242d780",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-110-wght-normal.woff2",
+      "size": 61188,
+      "sha256": "51785f4a4d2a011d877052cab1bc4c36cabcc4e186ed0176214061c174b7f024",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-111-wght-normal.woff2",
+      "size": 62400,
+      "sha256": "aaa67a70f5e8b351c558e32345093fdfd86f089726b3b86d84b58de6a2475104",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-112-wght-normal.woff2",
+      "size": 57460,
+      "sha256": "34e76675ceffd89824fb130d7649dc92df9e57843a73b9996d405baa2ff9ecff",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-113-wght-normal.woff2",
+      "size": 58428,
+      "sha256": "40290d98d5c121bdbb1909e39c9c0242eae3a5a88f1bbe302857e525b90056df",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-114-wght-normal.woff2",
+      "size": 57740,
+      "sha256": "c49b2eb658a0c2d76de9a279945de30bf32acd8fdd6d56cf84aea9c6b14aacae",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-115-wght-normal.woff2",
+      "size": 56264,
+      "sha256": "6c0cda055b31066fb60058ac30ede37f6f9ca02265c2e1a84aee81175f567fa8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-116-wght-normal.woff2",
+      "size": 52796,
+      "sha256": "002e502515bee8b9efa1b17abf7e52b51d4cfa20538ae2b2bd82ac52e1153f5e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-117-wght-normal.woff2",
+      "size": 52228,
+      "sha256": "3d7ced7101c03dfa9bf0e60460a1b91fc6f1166fb33f718506e8110bb12e74a7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-118-wght-normal.woff2",
+      "size": 45992,
+      "sha256": "f26330ce4056382832c0f2a0d7f411e0b4140fc87937e8865d91664410cfb98c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-119-wght-normal.woff2",
+      "size": 76324,
+      "sha256": "09b9fa5a9521fbeccb8267a5abe7443c83cbe25b32eb15b00de316d913235525",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-21-wght-normal.woff2",
+      "size": 11276,
+      "sha256": "0c5afc8752b151a444ccb3b21d740cc8e429347ea52bd4cf9d22b73937624bbf",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-22-wght-normal.woff2",
+      "size": 65220,
+      "sha256": "b15b23e18f7b765bd08d12d13210c0af8d32bee34712bc3152d0b386d043ec04",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-23-wght-normal.woff2",
+      "size": 56700,
+      "sha256": "a8f6664d83439cd5d329e9b35a54fb4d9d3786e80d3eaebbaeac24e3acf950fc",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-24-wght-normal.woff2",
+      "size": 62552,
+      "sha256": "fc59757db66129052cd8e4248045f92f8273b37f719be2a058a55859de190a0e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-25-wght-normal.woff2",
+      "size": 58224,
+      "sha256": "074e6162a8ba4f9cf25881da25ce522bb949c1e2516142746daf85471bc48a9c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-26-wght-normal.woff2",
+      "size": 50744,
+      "sha256": "68074245ba1ea9745cad9cf3780b69c9def3568891296e44d60e070e45df7b7a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-27-wght-normal.woff2",
+      "size": 47324,
+      "sha256": "4e0dafaa26d924f5612a138a34a817aa06b8f72bad9798fe64d221fb13001d31",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-28-wght-normal.woff2",
+      "size": 50016,
+      "sha256": "31bb7facf7a62ee189026f7ff725b9c4639c712762036394c2996db140549746",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-29-wght-normal.woff2",
+      "size": 53848,
+      "sha256": "67d137f738bc8294a0365f60661e31b33a6e534d56d7e5ed6982d5e6ffa5663c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-30-wght-normal.woff2",
+      "size": 54416,
+      "sha256": "12acd771479c93c76f064a81447266c349d6a33d2f1893d5413c6303b1156fef",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-31-wght-normal.woff2",
+      "size": 47084,
+      "sha256": "def5793483c7abc922de654bc16262646c9ae263819e663990b52fd56a3d5d69",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-32-wght-normal.woff2",
+      "size": 52368,
+      "sha256": "2d884d1cfd97c6f72518a2d690573e4130b0b707423f25963d7cc975388adf3e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-33-wght-normal.woff2",
+      "size": 47332,
+      "sha256": "02fd273486d8e0c876b3b5d2c3c131b9ce85058196ee3ed77c7d38a7a10e139c",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-34-wght-normal.woff2",
+      "size": 46748,
+      "sha256": "13a18e443a4bf6557e252a63061914ce19c4be018c9b16eaf5c75842ee88baf5",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-35-wght-normal.woff2",
+      "size": 50464,
+      "sha256": "68413e3f3e5b912efd25702281aae9acb37c9920bb7bb941404506ab520add49",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-36-wght-normal.woff2",
+      "size": 41692,
+      "sha256": "21b841e271833161fe5f70a2052399e79faac029667abdcdffe81f260f2ce6b5",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-37-wght-normal.woff2",
+      "size": 53356,
+      "sha256": "bcbdf5fd7899c7ed192a0c89de9c6c92477be74b8c2343e74914359bfd32a10f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-38-wght-normal.woff2",
+      "size": 54424,
+      "sha256": "ca375e4a6ecc230333656ad11081b26e6b8f3240f4160e22f75150d4fdddcc9f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-39-wght-normal.woff2",
+      "size": 51616,
+      "sha256": "e73a947fa1fb1a7385e9d654fa0fe7dd8a2241e9b73282f67941c650c94de326",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-4-wght-normal.woff2",
+      "size": 3764,
+      "sha256": "29634170d5eb07f460a9eb1b2d0ef126ad0b5ef705e4c25191fd5794dc930d4d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-40-wght-normal.woff2",
+      "size": 46432,
+      "sha256": "2f186187cfd9a546d199aac41fbaed1241a47a7d5aad1804f98127506af80340",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-41-wght-normal.woff2",
+      "size": 36284,
+      "sha256": "7e2a21f95e969165ff32e2fdab8422b489d2c7b0f899f69bfc83d71872cde2af",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-42-wght-normal.woff2",
+      "size": 45432,
+      "sha256": "c53279f786dde3590baf0343d080fad8c7bd976e9dccecd2adea893cfad2f99a",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-43-wght-normal.woff2",
+      "size": 46488,
+      "sha256": "a98ffa0839e353eb7e768084e27892596616f6a3d8bb65c94202898bccb1fd68",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-44-wght-normal.woff2",
+      "size": 54096,
+      "sha256": "aa1a541dfacfcad0c66fb7f9dd4f9c12ce729d98311336c634702d066aabbbc2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-45-wght-normal.woff2",
+      "size": 67436,
+      "sha256": "ea12aaa5635e53eaf7429500be57e9e8a6030e0906f985426412a1303761f77f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-46-wght-normal.woff2",
+      "size": 57520,
+      "sha256": "d4a75aa10eb4487dcd94ff2009ef0f185d35f0e3264fa87532887c5c1517c816",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-47-wght-normal.woff2",
+      "size": 55972,
+      "sha256": "d5c48bd3b5502918adf253c96909f27be4eda7653fc0254a6564557b516cb2e1",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-48-wght-normal.woff2",
+      "size": 50616,
+      "sha256": "c4f53f8b05fa6350ac20f8a12b550f9634ed31b084dc50b1263f2080e392b9f7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-49-wght-normal.woff2",
+      "size": 52768,
+      "sha256": "2418a76f14f6299b160af41cd283ed529b0030e2448b2ec11895ea5009561e25",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-5-wght-normal.woff2",
+      "size": 20044,
+      "sha256": "08f7b17fb6a88382277dfa1b6969f1f0b73a1f87819713849bb9e1ff6017088e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-50-wght-normal.woff2",
+      "size": 45724,
+      "sha256": "050cbf869048801588356d05f1145c601ddb9063a9e9fd241bbd0997a5ca263f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-51-wght-normal.woff2",
+      "size": 41476,
+      "sha256": "48810df68807cb9a06052daa52495183575373dc1f3294cce7739a6f37ff25cf",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-52-wght-normal.woff2",
+      "size": 51772,
+      "sha256": "bf40713c12d0ae841b4cbe9d487724e4ee780fdb84844a96ba8ebae6b79a3191",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-53-wght-normal.woff2",
+      "size": 43284,
+      "sha256": "13b6821eb6534f1ac72a4bab506de7012bec7fe0b9bb0a73733d5c798dd45e29",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-54-wght-normal.woff2",
+      "size": 51816,
+      "sha256": "db60ee4c755151c036004e39bde39fa9676c6a9d1753d9842ae1a7b2e5899b83",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-55-wght-normal.woff2",
+      "size": 47948,
+      "sha256": "70105493871b782981352a0cf696487afc098a69a4708d87a7931607fe15a128",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-56-wght-normal.woff2",
+      "size": 53332,
+      "sha256": "cc5fe9a6dedd91e7b95482713b12c84d99a04f90d5124e50db3efa9f2450923f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-57-wght-normal.woff2",
+      "size": 55348,
+      "sha256": "3a4bddf6442271be898390e29e344183f5f10a97eefa04595c9537f535f34927",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-58-wght-normal.woff2",
+      "size": 57468,
+      "sha256": "b4a952b513ca0e1b594a856e5398d1e40d69b0bf220825210955fde747faa8d0",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-59-wght-normal.woff2",
+      "size": 47504,
+      "sha256": "0557109d55c77ff9c9b5c9732d732c5328bd0b61038cffe611d9d62b26ded420",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-6-wght-normal.woff2",
+      "size": 11388,
+      "sha256": "675ff09731b49aeff9031c6d8edb3d54766aec64e4c6c699be5766729e4dad98",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-60-wght-normal.woff2",
+      "size": 41300,
+      "sha256": "105d09095364787b4eef08ecd4faa975d66ad3ce2be43bb968dd37b9285e6667",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-61-wght-normal.woff2",
+      "size": 45096,
+      "sha256": "21c21d2375925f742573edc50e3bca85a63350bf1d5d566d2d762f8ce2b259d9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-62-wght-normal.woff2",
+      "size": 58956,
+      "sha256": "d532c89a0da063c68ce871a7f85fa75448efc3089335e012f107d80618512fd4",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-63-wght-normal.woff2",
+      "size": 49052,
+      "sha256": "0897654d316342cdf37bb3d16fcf1a51fdcc38fcf1fb39880b5d3f17e87bf7de",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-64-wght-normal.woff2",
+      "size": 41408,
+      "sha256": "d490960a491521936b84a4be078a9570444960a2dc73c584b802d2c9c8fba1c1",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-65-wght-normal.woff2",
+      "size": 41392,
+      "sha256": "086958b9f441a2ba9fca76e9ac4924bc4acb60559bd5620d348c707ff154ee83",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-66-wght-normal.woff2",
+      "size": 52620,
+      "sha256": "50c8a455f282618211dacd6a0a30c1dee510d6d46eea9be79937b24e69cb0353",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-67-wght-normal.woff2",
+      "size": 52464,
+      "sha256": "54fc8c9eca1c929480b2c090907dfd9d42875cec49989b0737af2b6a60097f29",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-68-wght-normal.woff2",
+      "size": 41380,
+      "sha256": "3ed406ceb43b6f73a6a42ad9e8b2a9aab96fd6603bab5b73a908ca53f0d354a8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-69-wght-normal.woff2",
+      "size": 55520,
+      "sha256": "c7d1f5b0f95f358dee4cf9e76eda5c0465eb9d0f4e21a13ef39d0cf8761e5b9d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-70-wght-normal.woff2",
+      "size": 42080,
+      "sha256": "8474823a5264bfdee208fd16e2e5f3fe689e8eb18941446678426dc5f1264d19",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-71-wght-normal.woff2",
+      "size": 47768,
+      "sha256": "734da1dcc260ca6cc29c9e42078125ae8e4583fbc1f7cc76d82572a73767f04d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-72-wght-normal.woff2",
+      "size": 46916,
+      "sha256": "71d3da5b2d0e05b8899e271aaa49982fa73a589168be26a8350ff6f79f20bfd7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-73-wght-normal.woff2",
+      "size": 39096,
+      "sha256": "92f8b99dc1a79089d18b1684447e31ef62abf48de736555cf5840b781aeb9d56",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-74-wght-normal.woff2",
+      "size": 56260,
+      "sha256": "5c8faf77fe0277b9e59904396fdf3fe24088bcb2decfc5729895b279c53754f6",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-75-wght-normal.woff2",
+      "size": 43824,
+      "sha256": "216c1c94ee016db46f8d1dc5c51f402215dbf9013fbf9f60f3db3901f9a3b035",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-76-wght-normal.woff2",
+      "size": 48240,
+      "sha256": "8a31272bf31f9340747866ad1a59ff6073bf92fe802e2ba5a531f6a8aac2a42b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-77-wght-normal.woff2",
+      "size": 36664,
+      "sha256": "bc249f82f40ec61d6ec096c748603fdb4e946adaf659392b06c6810169e81513",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-78-wght-normal.woff2",
+      "size": 48916,
+      "sha256": "26210c38ccee9b53194481bed1dfc1aa4f74810d5672b2e7ed6a2e44b169835d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-79-wght-normal.woff2",
+      "size": 41064,
+      "sha256": "db79df334235f3d72cc0a7e625bfee1c3d6a76104af15e0814c4926ceee6188e",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-80-wght-normal.woff2",
+      "size": 32448,
+      "sha256": "c9ce6e0654379a2dd291a6f29323ff2d7f06156389ffb3e4d087a9d211887a6b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-81-wght-normal.woff2",
+      "size": 47504,
+      "sha256": "9958d614924fa54de4f661febd02c1de787ef640d58970e4d928e1ecd7c17990",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-82-wght-normal.woff2",
+      "size": 46008,
+      "sha256": "2129264ef35c203e3a2c2bc16abc437c110c57006d108ff107ad775dc7ea1e39",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-83-wght-normal.woff2",
+      "size": 43356,
+      "sha256": "24a037cbb07cb4de1f92993a9ceda16ba4483f1d63f6f529ea26ae44f01243fd",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-84-wght-normal.woff2",
+      "size": 32516,
+      "sha256": "e1b9b9aee81a74fc4ec19e1709c64a0042d9d898a2f00f6c3b2012564b6a4783",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-85-wght-normal.woff2",
+      "size": 26768,
+      "sha256": "cce97c39b9304c87e55ed84d511d479afd3343b91c04b3ac7bdc5beb9ecf709d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-86-wght-normal.woff2",
+      "size": 33428,
+      "sha256": "55fd1a42ab8ace744691b59c535499ad22b22c7c98b1d69a22fe101a2cd9b0e9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-87-wght-normal.woff2",
+      "size": 7956,
+      "sha256": "40292a14f8f52accb05252b7ec7c68e00f35781d2a726223bec1685eee6312b5",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-88-wght-normal.woff2",
+      "size": 7228,
+      "sha256": "008f38db74bc1c346ba8f4d6065dd41d0fe33a4ed2f9909cb880b81c5a3f9334",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-89-wght-normal.woff2",
+      "size": 10792,
+      "sha256": "74a75243aa93eb61367a28d217ce82b76c6cf9e86d0f23fd96708bfd91b68f46",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-90-wght-normal.woff2",
+      "size": 9224,
+      "sha256": "80d51f95afbebcbed0cc53985fbce43eec3a37c8ec88b08d316c56a32aa77843",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-91-wght-normal.woff2",
+      "size": 8616,
+      "sha256": "7bf857d9d1285675fe572e64f968ae1f3213da7654ffd335633fb5b39493c057",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-97-wght-normal.woff2",
+      "size": 2072,
+      "sha256": "7671f7b32d4c5c11ba72df9e6b9a18a6441f863aade2623ac0562ebd34b82bc7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-98-wght-normal.woff2",
+      "size": 3412,
+      "sha256": "94e55b60e87bfb909709592144002c0b10a4214612ea512b38bb719c9ef45c49",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-99-wght-normal.woff2",
+      "size": 9696,
+      "sha256": "6b2d1065f737c83608088c2e241c605683d94c6160121ca976496507ebc6cc94",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-cyrillic-wght-normal.woff2",
+      "size": 9896,
+      "sha256": "811e869a2b23ff46086eeff6fa59185bb1aa982f5bcd8d34db51e10ea8e5f7e1",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-latin-ext-wght-normal.woff2",
+      "size": 8128,
+      "sha256": "0049f7154dcc3fa0d585f80383b232cb9e497084ee77e10519747d668db3cb55",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-latin-wght-normal.woff2",
+      "size": 24880,
+      "sha256": "cf5346b0747cd71123c8f74da0ad41fc0f63eda07b9d8e0382e00882ae743733",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/files/noto-sans-sc-vietnamese-wght-normal.woff2",
+      "size": 8976,
+      "sha256": "310e65da63933201c3381173106418442de6441742594001290b4056abbc9ed8",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/noto-sans-sc.css",
+      "size": 101698,
+      "sha256": "e0abf071de114db4a7f08f6188ae2de22bb5e49bf77721b01d771afa45c62621",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/fonts/OFL-1.1.txt",
+      "size": 4314,
+      "sha256": "18aabf190848725e2576eefb5c29ba06aac1029d02132252a7f312eac2e50cf3",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/pdf.worker.mjs",
+      "size": 2144871,
+      "sha256": "8a7a14f316883c7d4740da0a0a3c6a9036575b0c77c567a33a0df9001262cceb",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitDingbats.pfb",
+      "size": 29513,
+      "sha256": "845c752392b6c914fb989c75a08b7792b88f542d2499042ef2889f8c814a16ed",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitFixed.pfb",
+      "size": 17597,
+      "sha256": "b6c8fe53f134b8b6d4578cd2d544df4cee9624c4efa8d51a560fb40ea296101b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitFixedBold.pfb",
+      "size": 18055,
+      "sha256": "f1b7159702973f54fc86254ea38bcf3712b2a736eb3a0995751e9f4bb45ad603",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitFixedBoldItalic.pfb",
+      "size": 19151,
+      "sha256": "8a000945843bd31add06aee63bf9fd41b7578b4f3242a4b7cd46349ad9d24d4d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitFixedItalic.pfb",
+      "size": 18746,
+      "sha256": "5007faf8320fa1fcc08b8894b356ad976f60b992ba29ee5272578bbdebaf3876",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitSerif.pfb",
+      "size": 19469,
+      "sha256": "4f57d2b9d884af8f907bf22df6019b52d86cbf6214fdbd02b1ae05472a543f35",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitSerifBold.pfb",
+      "size": 19395,
+      "sha256": "0bdf4b04e964139818d51eda03d566ba999fc3ba2421b1c6c51f9dc969022e80",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitSerifBoldItalic.pfb",
+      "size": 20733,
+      "sha256": "a406cac82583bf98175cb62c87ed5e95c45fbb34eece63a10b0a13e793cb2e10",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitSerifItalic.pfb",
+      "size": 21227,
+      "sha256": "610ae0687198045c4db5d1a6650fd5e92536631706382eb8b72e38df578d0ae9",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/FoxitSymbol.pfb",
+      "size": 16729,
+      "sha256": "47967d055530e7357088a08403115425643ec2cdfd6201ba8af0fbd7116c1539",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/LiberationSans-Bold.ttf",
+      "size": 137052,
+      "sha256": "361c61b82d575c5c35fd9157fda8b0194bcfcd0d88ea8521a4fb5dd53d33dddc",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/LiberationSans-BoldItalic.ttf",
+      "size": 135124,
+      "sha256": "a224075ac17495ad0a3af3bc0a419ac0704a8b3fd1095456201fb9b095fc281d",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/LiberationSans-Italic.ttf",
+      "size": 162036,
+      "sha256": "832b4406dbef23628800d3aaad21048534ac84d7e3ad955be83b8172ed8ef512",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/LiberationSans-Regular.ttf",
+      "size": 139512,
+      "sha256": "f8ace1f892b2bd9dc1792ba7f097fa7588f84fed48321480e04de5390828221f",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/LICENSE_FOXIT",
+      "size": 1553,
+      "sha256": "b578cdd2345840ada550bd12519533812320d5f1d21cf4c1c7e1b1b0a31c98b7",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/standard_fonts/LICENSE_LIBERATION",
+      "size": 4414,
+      "sha256": "93fed46019c38bbe566b479d22148e2e8a1e85ada614accb0211c37b2c61c19b",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/jbig2.wasm",
+      "size": 105557,
+      "sha256": "df85117444f0f0150c5c9d0dd8eeab102d705217f838a9f6d46788b6d9b3d681",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/LICENSE_JBIG2",
+      "size": 12862,
+      "sha256": "9e66b7f1b934a28b37f3bc4dac97915de1674271e79a0a88182a18ed9731b4d1",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/LICENSE_OPENJPEG",
+      "size": 2109,
+      "sha256": "7a81d5bbd4008c63cc4bf64496b1e75b9f5fbf009ec3b06c79d8b05974f6b8b6",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/LICENSE_PDFJS_JBIG2",
+      "size": 555,
+      "sha256": "aad3cce09842e00e9e11ad5e8fef8cc02fbc3a3768fe2f007443b9cee37aaee5",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/LICENSE_PDFJS_OPENJPEG",
+      "size": 1285,
+      "sha256": "717fc62da03292dbb4dd0c8280bd4ce7bb8550dcf31d772bc93455fb50313425",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/LICENSE_PDFJS_QCMS",
+      "size": 1285,
+      "sha256": "eb5104ca33552be007857a28351bc408f379ddd4bfacab1226b09c6d1e9fd7c4",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/LICENSE_QCMS",
+      "size": 1121,
+      "sha256": "36d847ae882f6574ebc72f56a4f354e4f104fde4a584373496482e97d52d31bc",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/openjpeg_nowasm_fallback.js",
+      "size": 451777,
+      "sha256": "07c3c3361827308741bc31c561b59e705ebb4d1e8efb84e4d24884e230dbb894",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/openjpeg.wasm",
+      "size": 250009,
+      "sha256": "67b8e2b162da472e98cb48d3d32e3e38fff481b9b32ff4818e78bb248af88ab2",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/pdf/wasm/qcms_bg.wasm",
+      "size": 94519,
+      "sha256": "6017eca5939cde1836e88e6d8cd27ae039246f206515ea4487bdfd0e3fb16e26",
+      "ownership": "managed",
+      "copyGroups": [
+        "pdf"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/binary.d.ts",
+      "size": 1245,
+      "sha256": "06cf914d190175b454763423215b7bf65b5d820c2a1406034d3b48b277777516",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/binary.js",
+      "size": 3935,
+      "sha256": "242d90abdf8cd463d8260a71e677980576c5d997e2104a92215b21ac6f1b265b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/cfb.d.ts",
+      "size": 1258,
+      "sha256": "b25e61555d0e65a54521543f2292f273a4f1d6888f5b2799b3db4e57cf78dbd6",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/cfb.js",
+      "size": 11493,
+      "sha256": "8ae56f1fb57b06ba7b9501c52edcd8d43aba744ddf44d39657e88e395b203673",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/crypto.d.ts",
+      "size": 501,
+      "sha256": "ab3c6e37a4db79397bc6d2c3714711cdcc762b0638f1d11631dbddc193b8845a",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/crypto.js",
+      "size": 3612,
+      "sha256": "c5fd34fe26390bdb30a4815c0bfc2f2640cf609f695369da337f30fec6f9dea7",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/errors.d.ts",
+      "size": 170,
+      "sha256": "7672f29f19d3b9872c74d12b27a612221812c59dbb397f570c114565bb7fa6a0",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/errors.js",
+      "size": 185,
+      "sha256": "3a5a61e90e1b452dc836e4809fc392f647a9ceb8483f4ce9dcfd72d128fa05b3",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/inflate.d.ts",
+      "size": 681,
+      "sha256": "c6e7a91dc082b3c144e7e8ea710db5ae27b945d37b41d54b10f32f5e669197b3",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/inflate.js",
+      "size": 12332,
+      "sha256": "2b8dde1c4e791f9ff09bf6bbdd37b836636951847a2d9a11dcd85b61a5984c9b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/pict.d.ts",
+      "size": 387,
+      "sha256": "2dd71b86514e0b856a6ab494faf632b73ac2c7f96368613d65ecae3b902dff71",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/pict.js",
+      "size": 23534,
+      "sha256": "22b5da5b6eaf73b62ce14b4961607da8bbb7e5038a8f6c2d8ff913e84698f33b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/raster.d.ts",
+      "size": 678,
+      "sha256": "5f90f7e86001ee1d13f8de08a6c2d1cefab2d60b39422a93a542e78124658370",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/raster.js",
+      "size": 5152,
+      "sha256": "0027ceac1d555a2dbbb5c73b2e2cb62e6eb23dfb1214d4e6b2798cecc10b55de",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/tiff.d.ts",
+      "size": 737,
+      "sha256": "02cc4650002a92aa573bad680bb8297d6a2f34598a1b8da8b6dc8e543e634b39",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/tiff.js",
+      "size": 14235,
+      "sha256": "11cb37837f93f7b83ed42c1cbc3f0cc829d5b9bd8c78d8c86ae07d38c980dca1",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/utils.d.ts",
+      "size": 601,
+      "sha256": "b2d909b3375399f6c6f13a9c359c61c8c643e0ba99f89340b6ec33e891b79bb4",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/utils.js",
+      "size": 1141,
+      "sha256": "10298d93c1e93d9f582c6fa36e6dca757300000c2174424e7a05704e582bad4c",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/vector-font.d.ts",
+      "size": 391,
+      "sha256": "c5ef0a7cb6eb1eb1e15866b5969621ad8d05a6771c5cc96c0fe851cdbb06cd2c",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/vector-font.js",
+      "size": 989,
+      "sha256": "093dd21421b8e95e91cd616ee5daae67892824a254d986fb4117a2548031a52e",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/vector.d.ts",
+      "size": 608,
+      "sha256": "e88ed1172280f8fc92b473278f072629a695839d3d80b6b6db7eb34e2b55f890",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/vector.js",
+      "size": 77872,
+      "sha256": "3c39e7af66cca84c62340f9aeb080027ea145f3c003811a245a49b740042692e",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/xml-text.d.ts",
+      "size": 62,
+      "sha256": "011ef42c8c339d39c1af22444c5793830c9f9c4594cf13cf7375698268f73658",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/core/xml-text.js",
+      "size": 318,
+      "sha256": "afd4c27306607b9c2d27c998cf87c516d197c5a4c02826fd7b010f21ed2132a5",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/index.d.ts",
+      "size": 989,
+      "sha256": "e834097967c0ce8eed785a338d359fc3b7a0528b92749bd6d081b078587aaac7",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/index.js",
+      "size": 502,
+      "sha256": "32fcbb03fe6789d433f9786fa66f1b96c649485e08ec35d803814c2d1d4309c3",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/layout/measure.d.ts",
+      "size": 626,
+      "sha256": "5e8245ddbf6e43640413ce36b58c6cae4d095802fc212a05d155d80b1420c69b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/layout/measure.js",
+      "size": 2912,
+      "sha256": "eca43cac215b76eac1f97001d26ddb5a13947afe397091eefc759be9c6bb2e4b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/layout/text-layout.d.ts",
+      "size": 1532,
+      "sha256": "32cf031d28893a891bdd599706cc6fa931cb38446c44a7d37ac0bafe3b8f99ca",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/layout/text-layout.js",
+      "size": 17209,
+      "sha256": "3ec79c354ff437ef4c32b4884439dc25e27eb5af2943c80d2342afbbee65726c",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/manifest.json",
+      "size": 370,
+      "sha256": "8046d42ba3044ceb071a69aad17b2c25b22bea92bcb90411917efc69b2af3da0",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/media.d.ts",
+      "size": 438,
+      "sha256": "f6f8998048edd8beea8b57cafb09201d89655144ae0d5feb2dd74c9635b91bbe",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/media.js",
+      "size": 1658,
+      "sha256": "eb65ceed069d992d9954dacecf78f033cadd20d9a41681c6ac443b534c157236",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/navigation.d.ts",
+      "size": 231,
+      "sha256": "308e560cae4e5d89841365a8a5f06273030cbf9c4aa8e2064834367efc101240",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/navigation.js",
+      "size": 915,
+      "sha256": "20ce41a7ec3c3080842bf9fa7871afdcd6be2ea2b43aac4456c4a7ff12247120",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/timeline.d.ts",
+      "size": 1684,
+      "sha256": "c1f60eb8265d82c80e40327268940f99f84eea44a9df4c944d96eed8c12c08dd",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/timeline.js",
+      "size": 8045,
+      "sha256": "4d14dff5209ed8ed3127db8f485a62816ca80d38555e31f616043157972c83e2",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/transitions.d.ts",
+      "size": 624,
+      "sha256": "834eae3d738349350f01f4f4e3b86afcfcf75ffe6466a9b316230a0ad6a9bc64",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/playback/transitions.js",
+      "size": 2553,
+      "sha256": "1ab63a7ed485fd3d539ab89b99ebfde062e34aae98ce50c9d4435d811ec45d44",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/animation.d.ts",
+      "size": 396,
+      "sha256": "788bb743d5ab1815ab635b489e46a4d6684c75a724ff308cfb06f98cd29460b6",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/animation.js",
+      "size": 4794,
+      "sha256": "ae463b0eda1c2a8ea316cd606a38cdea19cb36119241f4de8c8abecce4485131",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/constants.d.ts",
+      "size": 2497,
+      "sha256": "576878f9f511d295faf89fb8a6cd6bea7da3a4be1fdf248a25f23c14e6b3d353",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/constants.js",
+      "size": 1818,
+      "sha256": "b14ff55f4e7d8186eda12462f0ef0c9ae305deac29ada80fd9c703b92097c347",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/drawing.d.ts",
+      "size": 1003,
+      "sha256": "ddc3cf432e3bc9cbf87de798e66e19d04b84b356be85ba035b86a4d073018983",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/drawing.js",
+      "size": 32278,
+      "sha256": "0f91d43328f3d0837d9313a3d42ae21b8f2e7bf43c20704d7cbb8c6868ac4b72",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/encryption.d.ts",
+      "size": 814,
+      "sha256": "9a4bd217094fc4772019e9a5b8a98e65fb4afaf64997de7482ed74cf4e50abe5",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/encryption.js",
+      "size": 15022,
+      "sha256": "fe3e252cd405a98f9ba35fa6fe77ee73d313572671972c8c71bda0a47309c3cf",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/extras.d.ts",
+      "size": 1197,
+      "sha256": "bf4867f1c4091e8adce56ddb1fbaf1ea789abf4b17c6247494ea4e2c2c888a9e",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/extras.js",
+      "size": 14157,
+      "sha256": "bc189ca07e33490d7f48928a9540d6eb8f7446603ca898ae9e7c40541988a45e",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/geometry.d.ts",
+      "size": 1520,
+      "sha256": "4439fd34920ab8e5400222cbab5ace9ea0fe03fbb1424626afd790859926a22d",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/geometry.js",
+      "size": 21827,
+      "sha256": "c8c98d8d9172b2e59bd80cf675b7ad9df152374b4f23e7aafd1e8b23dfb44a58",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/headers-footers.d.ts",
+      "size": 831,
+      "sha256": "de223622b7723fccc9afe9d76e8c4a2bdf4fe769c0f56371959ee41a64871594",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/headers-footers.js",
+      "size": 4637,
+      "sha256": "1aa1e7dcc4e2b76a3d1a7e9ff5464ce6140c12e9047e39d653c80221d441f2e5",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/interactions.d.ts",
+      "size": 1045,
+      "sha256": "c70e4d0c347e685f5c77a7d79384f6ef315f206398ed4229f069e873855d79e4",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/interactions.js",
+      "size": 5319,
+      "sha256": "888fa71a1ef8e8203ac34ef34bff960bcc52c5485cc26b9dae48cedda8cac8ef",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/parser.d.ts",
+      "size": 718,
+      "sha256": "8d47f860cf7cc999e20b9ab3918094dd15905b448b4d011e6ea281b840f5588c",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/parser.js",
+      "size": 23640,
+      "sha256": "cd130099022ac9d98cd4ca450ac887a63a0a7ca48d56e81faa276d83d83878bc",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/pictures.d.ts",
+      "size": 814,
+      "sha256": "c1b1b6eb55648196c4823c9a03554a8e25d791e32f8303107e5023b2d75bc50f",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/pictures.js",
+      "size": 12699,
+      "sha256": "e70f219ef585ec5b5cbd3c3ef673e29023bfc611860c56d30e0f82613ac0f407",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/records.d.ts",
+      "size": 738,
+      "sha256": "1b52bb09b50fd1023c09719747114f92c8a6340b745c3c467651498ba4b2e70b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/records.js",
+      "size": 2697,
+      "sha256": "471dbdefd6815886435ee8486ae91bf082baaddbf3b60952e9e773f42a146064",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/text.d.ts",
+      "size": 1199,
+      "sha256": "f2d3c0759956754ad1cd13913afd841fecef97c1e8bff86967cf30ee5ec5bd27",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/ppt/text.js",
+      "size": 35410,
+      "sha256": "000c5fb3428090ad497fd31aa7d0774193c987b8baad38e9e95898185555b818",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/pptjs.browser.js",
+      "size": 573455,
+      "sha256": "4892c9b8286f2885129c321431a8ba0632c690375bf6fc2f94c5db73eff906c8",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/pptjs.mjs",
+      "size": 573933,
+      "sha256": "da1d42a07d3e9b0c3bca5fef05fd04f063273f857ef64caaa61d3300a22e7cb4",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/pptjs.worker.js",
+      "size": 573351,
+      "sha256": "90dc709a3fffdf1588431333c57bd1ae8422a86dc7baf502fd2af671bef1eb6d",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/effects.d.ts",
+      "size": 1196,
+      "sha256": "8b3b9d04db76cc70d9af99aabd4dff73638272918459d2fac04214edf601e2cb",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/effects.js",
+      "size": 9772,
+      "sha256": "d92f5ef485609178804bbc4834a1a2a3d46fdc0b2eabf2776f26a0fd4b5e66ee",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/fields.d.ts",
+      "size": 545,
+      "sha256": "0d9ce33efe1bcbe2b1005ea06d0bffd47f974934233127075527c0ba17e1a919",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/fields.js",
+      "size": 12566,
+      "sha256": "305014e97d1547e8bd5939372ea8a6eec4841a7e3a2a402479758ac355951ef1",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/geometry.d.ts",
+      "size": 608,
+      "sha256": "93cee133021be28b6b781681ac24fb39f79af6b7d382e3e75bfb82e7ab84eea8",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/geometry.js",
+      "size": 9191,
+      "sha256": "5a8c03411d44ff1259c29646d26d0607bbfba8bf45f20f6a4e58b67fe0af6964",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/safe.d.ts",
+      "size": 850,
+      "sha256": "7f43a307bf61a72b01c188c274fa44014156d24c21ff2e7a252f73227fb02842",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/safe.js",
+      "size": 3492,
+      "sha256": "3440f296d6733daa1a527d9a7b57a270a24ae2e0a524641a7bea0acc89ac1c4b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/svg.d.ts",
+      "size": 511,
+      "sha256": "64dcbbbc8be7c77a980fb206a58dabaa522a63cc8af264b32886fa1a1b43045d",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/svg.js",
+      "size": 22152,
+      "sha256": "32545bd2b401cbafb976987d112da557a147592e64ec30e7466471f7159edb61",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/text.d.ts",
+      "size": 453,
+      "sha256": "787e5ce7eeb5eb2eb2d05dc25b53a2ff6689842211c4815e1573010a2d5a2398",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/text.js",
+      "size": 16955,
+      "sha256": "969787aa70bb724eee8c4e685a45377b8abe4e6f0c7fd5c4e967d9a1524127a4",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/three-d.d.ts",
+      "size": 1245,
+      "sha256": "286064a2f87f16f0e16ebf96e161558681bf6602c80356e00a6af12b167bbc30",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/three-d.js",
+      "size": 13387,
+      "sha256": "3543cb106aeb8f2c6af2c792a177ac374546f32112117ad94a12d0ac1287b9f7",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/wordart.d.ts",
+      "size": 1134,
+      "sha256": "d3d0cacf87eeac057602f38e4cfb963e71871dbb6f1374aa8a4704971d45634d",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/render/wordart.js",
+      "size": 11210,
+      "sha256": "57806b593e910d41fcb8890f7a08857efc1ab998cb1f47f02fa2d5b806758ea6",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/runtime.d.ts",
+      "size": 4845,
+      "sha256": "ce8993ac33e470ac4a2fa04da1fa88bfb29a3dabd5a5c5695ab98f29799a967c",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/runtime.js",
+      "size": 14540,
+      "sha256": "39733abfc315999e52d34af022460b5b2b70de9fb4f47133fb6ad90dd0f217d5",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/types.d.ts",
+      "size": 13811,
+      "sha256": "7b1c57fd3081dfb8fc60fe8e3bf4e817e68255acc7fb24f344f1908be671f6cd",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/types.js",
+      "size": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/viewer.d.ts",
+      "size": 255,
+      "sha256": "8696337fb86ee16c7a736443b272d0cf56c3ac7d8481fe53356b47bc40357372",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/viewer.js",
+      "size": 15042,
+      "sha256": "d7de7ccdc901cf6629475187a1dbd82e36cd9954df716ae29bf1f5cda026e984",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/worker-client.d.ts",
+      "size": 1140,
+      "sha256": "57a02aa2edd0800a3cc4935ae4ad451357d915836c673e0d6cca45134c525555",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/worker-client.js",
+      "size": 4032,
+      "sha256": "c46088b2e526fc071c911bd19cabf4658e45ddac84edf31ade860a2e25b4b00a",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/worker.d.ts",
+      "size": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/dist/worker.js",
+      "size": 1327,
+      "sha256": "b8b7211a0724f1c0e2f2b6276acbeb527148760c8d138f78e0f1f122aa601c94",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/LICENSE",
+      "size": 9140,
+      "sha256": "55ce5d9fb8138a058b60c431cb9e68e13dd3f90691f73a757e38f06fed81e69b",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/NOTICE.md",
+      "size": 5712,
+      "sha256": "c458b1c7bdbb66b4f00bcc1b6126ca1ba3ba2cd516db26f4e883711cae806c7c",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/package.json",
+      "size": 2352,
+      "sha256": "27d196141d9894afaeb08b45e7b59c2f5669d40523c43554c84de01f0364310f",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/ppt/README.md",
+      "size": 5276,
+      "sha256": "f5415a9f7ec87a4ab140d66ac6f0e3783e79b1501ad91812171fbecec1b093d1",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation-binary"
+      ]
+    },
+    {
+      "path": "vendor/pptx/pptx.worker.js",
+      "size": 492294,
+      "sha256": "abb5d633ab7f1c9418dcb8f8b0cb33944ea893235690434964d13e036563f888",
+      "ownership": "managed",
+      "copyGroups": [
+        "office-presentation"
+      ]
+    },
+    {
+      "path": "vendor/xlsx/licenses/THIRD_PARTY_LICENSES.txt",
+      "size": 76320,
+      "sha256": "cb601b1ed88a83b18a79f08e122879b979d7f71f99f93b7513be189ccbf1ba2f",
+      "ownership": "managed",
+      "copyGroups": [
+        "spreadsheet-openxml"
+      ]
+    },
+    {
+      "path": "vendor/xlsx/sheet.worker.js",
+      "size": 916651,
+      "sha256": "44d7e40431f4c6f8edcc203f6a00c6d3ef5a9f8f3ec6e475f0b1cabbf7947dbc",
+      "ownership": "managed",
+      "copyGroups": [
+        "spreadsheet-openxml"
+      ]
+    }
+  ],
+  "assetManifestSha256": "85e15a9a2629cde24c2594d4beeaf8d87b70c7c84b39d3a62f429f3c399a08be"
+}

@@ -18,7 +18,7 @@ function cspMeta(): Plugin {
           '<head>',
           '<head>\n'
           + '    <meta http-equiv="Content-Security-Policy" content="'
-          + "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+          + "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' data:; "
           + "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; "
           + "object-src 'none'; base-uri 'self'; form-action 'self'\">",
         );

@@ -14,9 +14,14 @@
     "typecheck": "vue-tsc -b",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "assets:viewer": "file-viewer-copy-assets --renderers pdf,office-word-openxml,spreadsheet-openxml,office-presentation,office-presentation-binary --clean --confirm"
   },
   "dependencies": {
+    "@file-viewer/core": "3.3.3",
+    "@file-viewer/preset-lite": "3.3.3",
+    "@file-viewer/preset-office": "3.3.3",
+    "@file-viewer/vue3": "3.3.3",
     "axios": "1.20.0",
     "dayjs": "1.11.23",
     "element-plus": "2.14.7",
@@ -31,6 +36,7 @@
     "@vue/test-utils": "^2.4.6",
     "eslint": "10.13.0",
     "eslint-plugin-vue": "10.11.1",
+    "file-viewer-copy-assets": "3.3.3",
     "jsdom": "^27",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0",

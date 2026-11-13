@@ -4,10 +4,12 @@ defineOptions({ name: 'SystemFile' });
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import AppIcon from '@/components/AppIcon.vue';
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue';
 import RowActions, { type RowAction } from '@/components/RowActions.vue';
 import {
   deleteFile,
   downloadFile,
+  fetchFileBlob,
   pageFiles,
   uploadFile,
   type FileQuery,
@@ -59,6 +61,35 @@ async function onFileChange(event: Event): Promise<void> {
   }
 }
 
+/* --------------------------------- 预览 ----------------------------------- */
+
+const previewVisible = ref(false);
+const previewLoading = ref(false);
+const previewName = ref('');
+const previewFile = ref<File | null>(null);
+
+/** 先开窗再取字节:大文件取回期间弹窗内有 loading,不是点了没反应。 */
+async function handlePreview(row: FileVO): Promise<void> {
+  previewName.value = row.fileName;
+  previewFile.value = null;
+  previewLoading.value = true;
+  previewVisible.value = true;
+  try {
+    const blob = await fetchFileBlob(row.fileId);
+    previewFile.value = new File([blob], row.fileName, { type: blob.type });
+  } catch {
+    // 拒绝理由 http 层已提示,这里只收窗
+    previewVisible.value = false;
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
+function closePreview(): void {
+  previewVisible.value = false;
+  previewFile.value = null;
+}
+
 /* ----------------------------- 下载与删除 --------------------------------- */
 
 async function handleDownload(row: FileVO): Promise<void> {
@@ -82,6 +113,13 @@ async function handleRemove(row: FileVO): Promise<void> {
 
 function rowActions(row: FileVO): RowAction[] {
   return [
+    {
+      key: 'preview',
+      label: '预览',
+      // 预览要取原始字节,与下载同一权限口径
+      show: auth.has('system:file:download'),
+      handler: () => void handlePreview(row),
+    },
     {
       key: 'download',
       label: '下载',
@@ -245,7 +283,7 @@ function rowActions(row: FileVO): RowAction[] {
         </ElTableColumn>
         <ElTableColumn
           label="操作"
-          width="140"
+          width="170"
           align="center"
           fixed="right"
         >
@@ -267,5 +305,13 @@ function rowActions(row: FileVO): RowAction[] {
         />
       </div>
     </ElCard>
+
+    <FilePreviewDialog
+      :visible="previewVisible"
+      :file-name="previewName"
+      :file="previewFile"
+      :loading="previewLoading"
+      @closed="closePreview"
+    />
   </div>
 </template>

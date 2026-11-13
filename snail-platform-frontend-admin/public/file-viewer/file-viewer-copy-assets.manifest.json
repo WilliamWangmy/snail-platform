@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-13T07:27:00.149Z",
+  "packageName": "file-viewer-copy-assets",
+  "packageVersion": "3.3.3",
+  "rendererAssetManifests": [
+    {
+      "rendererId": "pdf",
+      "assets": [
+        {
+          "id": "pdf-worker",
+          "rendererId": "pdf",
+          "kind": "worker",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/pdf.worker.mjs",
+          "optionPath": "pdf.workerUrl",
+          "description": "PDF.js module worker copied into viewer assets for offline PDF rendering."
+        },
+        {
+          "id": "pdf-cmaps",
+          "rendererId": "pdf",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/cmaps/",
+          "optionPath": "pdf.cMapUrl",
+          "description": "PDF.js packed CMaps used for CJK and embedded text decoding."
+        },
+        {
+          "id": "pdf-wasm",
+          "rendererId": "pdf",
+          "kind": "wasm-directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/wasm/",
+          "optionPath": "pdf.wasmUrl",
+          "description": "PDF.js WebAssembly helpers for image decoding and fully self-hosted PDF rendering."
+        },
+        {
+          "id": "pdf-standard-fonts",
+          "rendererId": "pdf",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/standard_fonts/",
+          "optionPath": "pdf.standardFontDataUrl",
+          "description": "PDF.js standard font data used when PDF files reference base fonts."
+        },
+        {
+          "id": "pdf-cjk-font-fallback",
+          "rendererId": "pdf",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/pdf/fonts/",
+          "optionPath": "pdf.cjkFontFallbackPath",
+          "description": "Self-hosted Noto Sans SC variable font shards used for missing unembedded CJK fonts."
+        }
+      ]
+    },
+    {
+      "rendererId": "office-word-openxml",
+      "assets": [
+        {
+          "id": "docx-worker",
+          "rendererId": "office-word-openxml",
+          "kind": "worker",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/docx/docx.worker.js",
+          "optionPath": "docx.workerUrl",
+          "description": "Optional @file-viewer/docx worker for off-main-thread DOCX ZIP/XML parsing."
+        },
+        {
+          "id": "docx-worker-jszip",
+          "rendererId": "office-word-openxml",
+          "kind": "script",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/docx/jszip.min.js",
+          "optionPath": "docx.workerJsZipUrl",
+          "description": "JSZip runtime loaded by the @file-viewer/docx worker for fully offline DOCX parsing."
+        }
+      ]
+    },
+    {
+      "rendererId": "office-presentation-binary",
+      "assets": [
+        {
+          "id": "ppt-module",
+          "rendererId": "office-presentation-binary",
+          "kind": "script",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/dist/pptjs.mjs",
+          "optionPath": "presentation.pptModuleUrl",
+          "description": "Self-hosted TypeScript PPT standalone module for PowerPoint 97–2003 preview."
+        },
+        {
+          "id": "ppt-worker",
+          "rendererId": "office-presentation-binary",
+          "kind": "worker",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/dist/pptjs.worker.js",
+          "optionPath": "presentation.pptWorkerUrl",
+          "description": "TypeScript PPT parsing Worker; layout and Canvas rendering use the main thread."
+        },
+        {
+          "id": "ppt-runtime-dist",
+          "rendererId": "office-presentation-binary",
+          "kind": "directory",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/dist",
+          "description": "Unmodified compiled JavaScript and declarations from the installed PPT package."
+        },
+        {
+          "id": "ppt-runtime-manifest",
+          "rendererId": "office-presentation-binary",
+          "kind": "metadata",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/dist/manifest.json",
+          "description": "Integrity and edition metadata for the official binary-PPT runtime."
+        },
+        {
+          "id": "ppt-runtime-package",
+          "rendererId": "office-presentation-binary",
+          "kind": "metadata",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/package.json",
+          "description": "Package identity metadata for the official binary-PPT runtime."
+        },
+        {
+          "id": "ppt-runtime-readme",
+          "rendererId": "office-presentation-binary",
+          "kind": "metadata",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/README.md",
+          "description": "Usage and supported-format limits shipped with the PPT runtime."
+        },
+        {
+          "id": "ppt-runtime-license",
+          "rendererId": "office-presentation-binary",
+          "kind": "license",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/LICENSE",
+          "description": "License shipped by the independently versioned @file-viewer/ppt package."
+        },
+        {
+          "id": "ppt-runtime-notice",
+          "rendererId": "office-presentation-binary",
+          "kind": "license",
+          "target": "public",
+          "required": true,
+          "defaultPath": "vendor/ppt/NOTICE.md",
+          "description": "Notices shipped by the independently versioned @file-viewer/ppt package."
+        }
+      ]
+    },
+    {
+      "rendererId": "office-presentation",
+      "assets": [
+        {
+          "id": "pptx-worker",
+          "rendererId": "office-presentation",
+          "kind": "worker",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/pptx/pptx.worker.js",
+          "optionPath": "presentation.workerUrl",
+          "description": "Optional @file-viewer/pptx worker for stable PPTX parsing in IIFE, CDN, and offline deployments."
+        }
+      ]
+    },
+    {
+      "rendererId": "spreadsheet-openxml",
+      "assets": [
+        {
+          "id": "spreadsheet-worker",
+          "rendererId": "spreadsheet-openxml",
+          "kind": "worker",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/xlsx/sheet.worker.js",
+          "optionPath": "spreadsheet.workerUrl",
+          "description": "Optional Spreadsheet worker for off-main-thread styled-exceljs workbook parsing."
+        },
+        {
+          "id": "spreadsheet-worker-licenses",
+          "rendererId": "spreadsheet-openxml",
+          "kind": "directory",
+          "target": "public",
+          "required": false,
+          "defaultPath": "vendor/xlsx/licenses/",
+          "description": "Complete original third-party licenses distributed with this runtime."
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "valid": true,
+    "assets": [
+      {
+        "id": "pdf-worker",
+        "rendererId": "pdf",
+        "kind": "worker",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/pdf.worker.mjs",
+        "exists": true,
+        "description": "PDF.js module worker copied into viewer assets for offline PDF rendering."
+      },
+      {
+        "id": "pdf-cmaps",
+        "rendererId": "pdf",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/cmaps/",
+        "exists": true,
+        "description": "PDF.js packed CMaps used for CJK and embedded text decoding."
+      },
+      {
+        "id": "pdf-wasm",
+        "rendererId": "pdf",
+        "kind": "wasm-directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/wasm/",
+        "exists": true,
+        "description": "PDF.js WebAssembly helpers for image decoding and fully self-hosted PDF rendering."
+      },
+      {
+        "id": "pdf-standard-fonts",
+        "rendererId": "pdf",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/standard_fonts/",
+        "exists": true,
+        "description": "PDF.js standard font data used when PDF files reference base fonts."
+      },
+      {
+        "id": "pdf-cjk-font-fallback",
+        "rendererId": "pdf",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/pdf/fonts/",
+        "exists": true,
+        "description": "Self-hosted Noto Sans SC variable font shards used for missing unembedded CJK fonts."
+      },
+      {
+        "id": "docx-worker",
+        "rendererId": "office-word-openxml",
+        "kind": "worker",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/docx/docx.worker.js",
+        "exists": true,
+        "description": "Optional @file-viewer/docx worker for off-main-thread DOCX ZIP/XML parsing."
+      },
+      {
+        "id": "docx-worker-jszip",
+        "rendererId": "office-word-openxml",
+        "kind": "script",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/docx/jszip.min.js",
+        "exists": true,
+        "description": "JSZip runtime loaded by the @file-viewer/docx worker for fully offline DOCX parsing."
+      },
+      {
+        "id": "ppt-module",
+        "rendererId": "office-presentation-binary",
+        "kind": "script",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/dist/pptjs.mjs",
+        "exists": true,
+        "description": "Self-hosted TypeScript PPT standalone module for PowerPoint 97–2003 preview."
+      },
+      {
+        "id": "ppt-worker",
+        "rendererId": "office-presentation-binary",
+        "kind": "worker",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/dist/pptjs.worker.js",
+        "exists": true,
+        "description": "TypeScript PPT parsing Worker; layout and Canvas rendering use the main thread."
+      },
+      {
+        "id": "ppt-runtime-dist",
+        "rendererId": "office-presentation-binary",
+        "kind": "directory",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/dist",
+        "exists": true,
+        "description": "Unmodified compiled JavaScript and declarations from the installed PPT package."
+      },
+      {
+        "id": "ppt-runtime-manifest",
+        "rendererId": "office-presentation-binary",
+        "kind": "metadata",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/dist/manifest.json",
+        "exists": true,
+        "description": "Integrity and edition metadata for the official binary-PPT runtime."
+      },
+      {
+        "id": "ppt-runtime-package",
+        "rendererId": "office-presentation-binary",
+        "kind": "metadata",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/package.json",
+        "exists": true,
+        "description": "Package identity metadata for the official binary-PPT runtime."
+      },
+      {
+        "id": "ppt-runtime-readme",
+        "rendererId": "office-presentation-binary",
+        "kind": "metadata",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/README.md",
+        "exists": true,
+        "description": "Usage and supported-format limits shipped with the PPT runtime."
+      },
+      {
+        "id": "ppt-runtime-license",
+        "rendererId": "office-presentation-binary",
+        "kind": "license",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/LICENSE",
+        "exists": true,
+        "description": "License shipped by the independently versioned @file-viewer/ppt package."
+      },
+      {
+        "id": "ppt-runtime-notice",
+        "rendererId": "office-presentation-binary",
+        "kind": "license",
+        "target": "public",
+        "required": true,
+        "relativePath": "vendor/ppt/NOTICE.md",
+        "exists": true,
+        "description": "Notices shipped by the independently versioned @file-viewer/ppt package."
+      },
+      {
+        "id": "pptx-worker",
+        "rendererId": "office-presentation",
+        "kind": "worker",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/pptx/pptx.worker.js",
+        "exists": true,
+        "description": "Optional @file-viewer/pptx worker for stable PPTX parsing in IIFE, CDN, and offline deployments."
+      },
+      {
+        "id": "spreadsheet-worker",
+        "rendererId": "spreadsheet-openxml",
+        "kind": "worker",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/xlsx/sheet.worker.js",
+        "exists": true,
+        "description": "Optional Spreadsheet worker for off-main-thread styled-exceljs workbook parsing."
+      },
+      {
+        "id": "spreadsheet-worker-licenses",
+        "rendererId": "spreadsheet-openxml",
+        "kind": "directory",
+        "target": "public",
+        "required": false,
+        "relativePath": "vendor/xlsx/licenses/",
+        "exists": true,
+        "description": "Complete original third-party licenses distributed with this runtime."
+      }
+    ],
+    "missingRequired": [],
+    "missingOptional": [],
+    "checkedAt": "2026-11-13T07:27:00.149Z"
+  }
+}

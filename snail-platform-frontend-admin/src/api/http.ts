@@ -114,8 +114,8 @@ export async function del<T>(url: string): Promise<T> {
   return response.data.data;
 }
 
-/** 导出端点返回 xlsx 流;同一路径若返回 JSON 说明是业务失败信封,按错误处理。 */
-export async function download(url: string, params: object, fallbackName: string): Promise<void> {
+/** 流式端点若返回 JSON 说明是业务失败信封,按错误处理,不让拒绝理由被吞成"网络异常"。 */
+async function requestBlob(url: string, params?: object): Promise<{ blob: Blob; name?: string }> {
   const response = await http.get<Blob>(url, { params: prune(params), responseType: 'blob' });
   const blob = response.data;
   if (blob.type.includes('application/json')) {
@@ -123,11 +123,22 @@ export async function download(url: string, params: object, fallbackName: string
     report(body.code, body.message);
     throw new ApiError(body.code, body.message);
   }
-  const name = fileName(response.headers['content-disposition']) ?? fallbackName;
+  return { blob, name: fileName(response.headers['content-disposition']) };
+}
+
+/** 只取字节不落盘:浏览器内预览用,与下载共用同一套信封判定。 */
+export async function getBlob(url: string, params?: object): Promise<Blob> {
+  const { blob } = await requestBlob(url, params);
+  return blob;
+}
+
+/** 导出端点返回 xlsx 流。 */
+export async function download(url: string, params: object, fallbackName: string): Promise<void> {
+  const { blob, name } = await requestBlob(url, params);
   const href = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = href;
-  link.download = name;
+  link.download = name ?? fallbackName;
   link.click();
   URL.revokeObjectURL(href);
 }
