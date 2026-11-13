@@ -11,6 +11,10 @@ import com.snail.platform.framework.db.PageAssembler;
 import com.snail.platform.framework.redis.SnailRedisKeys;
 import com.snail.platform.framework.storage.BucketProvisioner;
 import com.snail.platform.framework.storage.S3BucketNames;
+import com.snail.platform.function.system.dict.entity.SysDictData;
+import com.snail.platform.function.system.dict.entity.SysDictType;
+import com.snail.platform.function.system.dict.mapper.SysDictDataMapper;
+import com.snail.platform.function.system.dict.mapper.SysDictTypeMapper;
 import com.snail.platform.function.system.log.mapper.SysLoginLogMapper;
 import com.snail.platform.function.system.org.entity.SysOrg;
 import com.snail.platform.function.system.org.mapper.SysOrgMapper;
@@ -67,6 +71,13 @@ public class TenantService {
     private static final String SCENE_MINIAPP = "miniapp";
     private static final String SCENE_DASHBOARD = "dashboard";
 
+    /** 内置文件类型字典的类型标识:与 V2 种子逐字对齐,文件管理按它取下拉 */
+    private static final String FILE_TYPE_DICT = "sys_file_type";
+
+    /** 内置文件类型字典的默认数据项:平台文件,业务落库值 platform(与 sys_file.file_type 列默认值同码) */
+    private static final String FILE_TYPE_DEFAULT_LABEL = "平台文件";
+    private static final String FILE_TYPE_DEFAULT_VALUE = "platform";
+
     /** 租户表读写,ignore 表 */
     private final SysTenantMapper tenantMapper;
 
@@ -81,6 +92,12 @@ public class TenantService {
 
     /** 开通模板:管理员-角色绑定 */
     private final SysUserRoleMapper userRoleMapper;
+
+    /** 开通模板:内置文件类型字典(tenant->dict 开通复制种子,登记边) */
+    private final SysDictTypeMapper dictTypeMapper;
+
+    /** 开通模板:内置文件类型字典的默认数据项 */
+    private final SysDictDataMapper dictDataMapper;
 
     /** 本租户登录快照的点清出口 */
     private final CacheEvictor cacheEvictor;
@@ -102,6 +119,7 @@ public class TenantService {
 
     public TenantService(SysTenantMapper tenantMapper, SysOrgMapper orgMapper, SysRoleMapper roleMapper,
                          SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
+                         SysDictTypeMapper dictTypeMapper, SysDictDataMapper dictDataMapper,
                          CacheEvictor cacheEvictor, OnlineSessionService onlineSessionService,
                          SysLoginLogMapper loginLogMapper, StringRedisTemplate redisTemplate,
                          ObjectProvider<BucketProvisioner> bucketProvisioner) {
@@ -110,6 +128,8 @@ public class TenantService {
         this.roleMapper = roleMapper;
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
+        this.dictTypeMapper = dictTypeMapper;
+        this.dictDataMapper = dictDataMapper;
         this.cacheEvictor = cacheEvictor;
         this.onlineSessionService = onlineSessionService;
         this.loginLogMapper = loginLogMapper;
@@ -138,7 +158,8 @@ public class TenantService {
     }
 
     /**
-     * 开通租户:同事务落租户行,再以新租户身份复制 V4 种子模板(根组织 + admin/common 内置角色 + 管理员并绑定)。
+     * 开通租户:同事务落租户行,再以新租户身份复制种子模板(根组织 + admin/common 内置角色 +
+     * 内置文件类型字典 + 管理员并绑定)。
      * 租户行必须先 insert 拿到自增 tenantId,才能进 asTenant 窗口——后续每条 insert 的 tenant_id 由拦截器从这个上下文里取。
      * 管理员登录名先在全局口径下查重——username 全表唯一是"登录不选租户"的代价。
      * 管理员口令不传即按 PasswordPolicy 随机生成,明文随响应返回一次、不落日志。
@@ -201,6 +222,8 @@ public class TenantService {
 
             SysRole adminRole = insertBuiltinRole("超级管理员", "admin", 1, 1);
             insertBuiltinRole("普通角色", "common", 4, 2);
+
+            insertBuiltinFileTypeDict();
 
             SysUser admin = new SysUser();
             admin.setUsername(adminUsername);
@@ -482,5 +505,29 @@ public class TenantService {
         role.setStatus(0);
         roleMapper.insert(role);
         return role;
+    }
+
+    /**
+     * 复制内置文件类型字典,取值与 V2 种子逐列对齐(类型 sys_file_type + 默认数据项 平台文件/platform)。
+     * is_system 恒为 1:内置字典只有种子与本处能造,DictService 的删除接口对内置类型与数据项一律拒绝;
+     * 字典值仍可维护(新增/改标签/启停),文件管理上传与筛选按这个类型取下拉。
+     */
+    private void insertBuiltinFileTypeDict() {
+        SysDictType type = new SysDictType();
+        type.setDictName("文件类型");
+        type.setDictType(FILE_TYPE_DICT);
+        type.setStatus(0);
+        type.setIsSystem(1);
+        type.setRemark("内置字典:文件管理的文件类型,可维护字典值但不可删除");
+        dictTypeMapper.insert(type);
+
+        SysDictData data = new SysDictData();
+        data.setDictId(type.getDictId());
+        data.setDictLabel(FILE_TYPE_DEFAULT_LABEL);
+        data.setDictValue(FILE_TYPE_DEFAULT_VALUE);
+        data.setSort(0);
+        data.setStatus(0);
+        data.setRemark("内置默认值,不可删除");
+        dictDataMapper.insert(data);
     }
 }

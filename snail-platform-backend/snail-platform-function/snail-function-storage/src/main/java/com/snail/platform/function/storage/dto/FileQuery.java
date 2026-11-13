@@ -23,7 +23,10 @@ public record FileQuery(
         String fileName,
 
         @Schema(description = "业务域标签,精确匹配")
-        String bizType) implements PageQuery {
+        String bizType,
+
+        @Schema(description = "文件类型,内置字典 sys_file_type 的值,精确匹配")
+        String fileType) implements PageQuery {
 
     public FileQuery {
         pageNum = pageNum == null ? 1 : pageNum;

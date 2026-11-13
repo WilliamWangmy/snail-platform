@@ -1,24 +1,44 @@
 <script setup lang="ts">
 /** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
 defineOptions({ name: 'PlatformFile' });
-import { onMounted, reactive } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import { pagePlatformFiles, type FileQuery, type FileVO } from '@/api/file';
+import { fetchDictItems, type DictItem } from '@/api/dict';
 import { usePageList } from '@/composables/usePageList';
 import { dateTime, fileSize } from '@/utils/format';
 
-const query = reactive<FileQuery>({ fileName: '', bizType: '' });
+const query = reactive<FileQuery>({ fileName: '', bizType: '', fileType: '' });
 
 const { rows, total, loading, pageNum, pageSize, refresh, search } = usePageList<FileVO>(
   (page) => pagePlatformFiles({ ...query, ...page }),
   20,
 );
 
-onMounted(refresh);
+/** 文件类型由内置字典 sys_file_type 维护:筛选下拉与列表列都按字典标签展示 */
+const fileTypeItems = ref<DictItem[]>([]);
+
+const fileTypeLabel = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {};
+  for (const item of fileTypeItems.value) map[item.value] = item.label;
+  return map;
+});
+
+function fileTypeText(value: string): string {
+  return fileTypeLabel.value[value] ?? value;
+}
+
+onMounted(() => {
+  void refresh();
+  void fetchDictItems('sys_file_type').then((items) => {
+    fileTypeItems.value = items;
+  });
+});
 
 function reset(): void {
   query.fileName = '';
   query.bizType = '';
+  query.fileType = '';
   void search();
 }
 </script>
@@ -69,6 +89,21 @@ function reset(): void {
             @keyup.enter="search"
           />
         </ElFormItem>
+        <ElFormItem label="文件类型">
+          <ElSelect
+            v-model="query.fileType"
+            clearable
+            placeholder="全部类型"
+            style="width: 160px"
+          >
+            <ElOption
+              v-for="item in fileTypeItems"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </ElSelect>
+        </ElFormItem>
         <ElFormItem>
           <ElButton @click="reset">
             重置
@@ -116,6 +151,14 @@ function reset(): void {
         >
           <template #default="{ row }">
             {{ (row as FileVO).ext ?? '—' }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn
+          label="文件类型"
+          width="110"
+        >
+          <template #default="{ row }">
+            {{ fileTypeText((row as FileVO).fileType) }}
           </template>
         </ElTableColumn>
         <ElTableColumn

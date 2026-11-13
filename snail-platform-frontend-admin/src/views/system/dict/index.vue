@@ -391,7 +391,13 @@ onMounted(typeList.refresh);
             />
           </span>
           <span class="tile-body">
-            <span class="tile-name">{{ row.dictName }}</span>
+            <span class="tile-name">
+              {{ row.dictName }}
+              <span
+                v-if="row.isSystem === 1"
+                class="builtin-tag"
+              >内置</span>
+            </span>
             <code class="tile-code">{{ row.dictType }}</code>
           </span>
           <span
@@ -444,13 +450,21 @@ onMounted(typeList.refresh);
             <h2>{{ activeType.dictName }}</h2>
             <code class="hero-code">{{ activeType.dictType }}</code>
             <span
+              v-if="activeType.isSystem === 1"
+              class="builtin-tag"
+            >内置</span>
+            <span
               class="status-pill"
               :class="activeType.status === 0 ? 'success' : 'info'"
             >
               {{ activeType.status === 0 ? '正常' : '停用' }}
             </span>
           </div>
-          <p>该类型下的字典项用于业务侧下拉选项,标签展示给用户,值存进业务数据。</p>
+          <p>
+            {{ activeType.isSystem === 1
+              ? '内置字典由系统种子提供:字典值可维护(新增/修改/启停),类型与字典值不可删除。'
+              : '该类型下的字典项用于业务侧下拉选项,标签展示给用户,值存进业务数据。' }}
+          </p>
         </div>
         <div class="hero-acts">
           <button
@@ -477,8 +491,9 @@ onMounted(typeList.refresh);
             />
             {{ activeType.status === 0 ? '停用' : '启用' }}
           </button>
+          <!-- 内置字典不给删除入口:后端 deleteType 对 is_system=1 一律业务拒绝 -->
           <button
-            v-if="auth.has('system:dict:delete')"
+            v-if="auth.has('system:dict:delete') && activeType.isSystem !== 1"
             class="hero-btn danger"
             type="button"
             @click="removeType(activeType)"
@@ -527,7 +542,7 @@ onMounted(typeList.refresh);
               class="tile-state"
               :class="{ off: item.status !== 0 }"
             >
-              <i class="state-dot" />
+              <i class="state-dot"></i>
               {{ item.status === 0 ? '正常' : '停用' }}
             </span>
             <span class="tile-sort">排序 {{ item.sort }}</span>
@@ -581,8 +596,9 @@ onMounted(typeList.refresh);
               />
               {{ item.status === 0 ? '停用' : '启用' }}
             </button>
+            <!-- 内置字典的数据项不给删除入口:后端 deleteData 对 is_system=1 的类型一律业务拒绝 -->
             <button
-              v-if="auth.has('system:dict:delete')"
+              v-if="auth.has('system:dict:delete') && activeType.isSystem !== 1"
               class="mini-btn danger"
               type="button"
               title="删除字典项"
@@ -1027,6 +1043,19 @@ onMounted(typeList.refresh);
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 内置标记:种子/租户开通模板所造,类型与数据项均不可删除 */
+.builtin-tag {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(var(--app-primary-rgb), 0.12);
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 500;
+  vertical-align: 1px;
 }
 
 .tile-code {

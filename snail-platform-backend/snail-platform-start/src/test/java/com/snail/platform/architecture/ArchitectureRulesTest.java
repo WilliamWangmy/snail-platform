@@ -99,6 +99,8 @@ class ArchitectureRulesTest {
             "role->user", "role->org", "role->menu",
             "org->user", "org->role",
             "tenant->org", "tenant->role", "tenant->user",
+            // tenant->dict 开通复制种子:新租户复制内置文件类型字典(V2 种子同款,sys_file_type + 平台文件)
+            "tenant->dict",
             // tenant->log 租户详情统计的分端登录回填(租户管理增强 §5.6:usage-stats lazy 自愈
             // 按 sys_login_log 事实源回填,单条只读 SELECT;先改名单再改代码)
             "tenant->log");

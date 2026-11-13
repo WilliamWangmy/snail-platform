@@ -73,6 +73,15 @@ public class FileStorageService {
     /** bizType 长度上限,与列宽对齐即可,不需要更长 */
     private static final int BIZ_TYPE_MAX_LENGTH = 64;
 
+    /** 文件类型长度上限,与 sys_file.file_type 列宽对齐 */
+    private static final int FILE_TYPE_MAX_LENGTH = 50;
+
+    /**
+     * 文件类型缺省值:平台文件(platform),与内置字典 sys_file_type 的种子默认项、
+     * sys_file.file_type 列默认值三方同码——字典值建后不可改且内置项不许删,该码终身稳定。
+     */
+    private static final String DEFAULT_FILE_TYPE = "platform";
+
     /** 写入端口缺席时的统一文案 */
     private static final String STORAGE_NOT_CONFIGURED = "文件存储未配置";
 
@@ -123,7 +132,7 @@ public class FileStorageService {
      * 通过后对象键服务端生成,原文件名只进元数据,下载路径永不拼用户输入。
      * 对象写成功后元数据入库失败(含授权配额竞态)时,尽力回收刚写入的对象,避免孤儿文件。
      */
-    public FileVO upload(MultipartFile file, String bizType, Long bizId) {
+    public FileVO upload(MultipartFile file, String bizType, Long bizId, String fileType) {
         StoragePort port = requireActivePort();
         if (file == null || file.isEmpty()) {
             throw BizException.badRequest("上传文件为空");
@@ -135,6 +144,8 @@ public class FileStorageService {
         }
         // bizType 是自由标注字段,但会进查询条件与元数据落库:收口长度与字符集,防当垃圾场
         String normalizedBizType = normalizeBizType(bizType);
+        // fileType 取自内置字典 sys_file_type 的下拉:不传按缺省值(平台文件)归一,超长按业务拒绝
+        String normalizedFileType = normalizeFileType(fileType);
         long size = file.getSize();
         if (size > maxSizeBytes) {
             throw BizException.badRequest("文件超过单文件上限 " + properties.getUpload().getMaxSizeMb() + "MB");
@@ -159,6 +170,7 @@ public class FileStorageService {
         row.setStorageType(storageRegistry.activeType());
         row.setBizType(normalizedBizType);
         row.setBizId(bizId);
+        row.setFileType(normalizedFileType);
         LoginUser uploader = LoginUserContextHolder.get();
         row.setUploadBy(uploader == null ? null : uploader.userId());
         row.setUploadByName(uploader == null ? null : uploader.nickname());
@@ -213,9 +225,11 @@ public class FileStorageService {
         Page<SysFile> page = PageAssembler.from(query);
         String fileName = trimToNull(query.fileName());
         String bizType = trimToNull(query.bizType());
+        String fileType = trimToNull(query.fileType());
         IPage<SysFile> result = fileMapper.selectPage(page, Wrappers.<SysFile>lambdaQuery()
                 .like(fileName != null, SysFile::getFileName, fileName)
                 .eq(bizType != null, SysFile::getBizType, bizType)
+                .eq(fileType != null, SysFile::getFileType, fileType)
                 .orderByDesc(SysFile::getFileId));
         return PageResult.of(result.getRecords().stream().map(FileVO::from).toList(),
                 result.getTotal());
@@ -304,6 +318,21 @@ public class FileStorageService {
         }
         if (value.length() > BIZ_TYPE_MAX_LENGTH || !BIZ_TYPE_PATTERN.matcher(value).matches()) {
             throw BizException.badRequest("bizType 仅允许字母数字与 _ : - ,长度不超过 " + BIZ_TYPE_MAX_LENGTH);
+        }
+        return value;
+    }
+
+    /**
+     * fileType 收口:空归缺省值(平台文件 platform),超长按业务拒绝;
+     * 合法取值域由前端下拉(内置字典 sys_file_type)圈定,这里只守列宽。
+     */
+    private static String normalizeFileType(String fileType) {
+        String value = trimToNull(fileType);
+        if (value == null) {
+            return DEFAULT_FILE_TYPE;
+        }
+        if (value.length() > FILE_TYPE_MAX_LENGTH) {
+            throw BizException.badRequest("fileType 长度不超过 " + FILE_TYPE_MAX_LENGTH);
         }
         return value;
     }

@@ -115,7 +115,7 @@ com.snail.platform.function.storage
 
 | 方法 路径 | 准入 | 留痕 | 说明 |
 | --- | --- | --- | --- |
-| `POST /system/file/upload` | `system:file:upload` | `@OperLog` IMPORT | `multipart/form-data`，`file` 必填，`bizType`/`bizId` 可空 |
+| `POST /system/file/upload` | `system:file:upload` | `@OperLog` IMPORT | `multipart/form-data`，`file` 必填，`bizType`/`bizId`/`fileType` 可空（`fileType` 缺省按平台文件 `platform` 归一） |
 | `GET /system/file/page` | `system:file:list` | — | 本租户分页，租户拦截器圈定 |
 | `GET /system/file/{fileId}/raw` | `system:file:download` | — | 流式下载；还要再过文件级可见性 |
 | `DELETE /system/file/{fileId}` | `system:file:delete` | `@OperLog` DELETE | 逻辑删 + 尽力物理删 |
@@ -341,15 +341,18 @@ PO 字段与列一一对应；`SysFileMapper` 是空 `BaseMapper`，查询全走
 | `storage_key` | VARCHAR(500) | 对象键 `{tenantId}/{yyyyMM}/{uuid}.{ext}` |
 | `storage_type` | VARCHAR(20) | 写入时的后端类型，路由依据 |
 | `biz_type` / `biz_id` | VARCHAR(50) / BIGINT | 业务挂载标签与单据 ID |
+| `file_type` | VARCHAR(50) NOT NULL DEFAULT 'platform' | 文件类型，内置字典 `sys_file_type` 的字典值 |
 | `upload_by` / `upload_by_name` | BIGINT / VARCHAR(30) | 上传人 ID 与显示名快照 |
 | 审计四件套 + `deleted` | — | 逻辑删除即"移出文件库" |
 
-索引三条：`idx_file_biz (tenant_id, biz_type, biz_id)`（业务侧反查附件）、
-`idx_file_uploader (tenant_id, upload_by)`（按人检索）、`idx_file_name (tenant_id, file_name)`（前缀过滤）。
+索引四条：`idx_file_biz (tenant_id, biz_type, biz_id)`（业务侧反查附件）、
+`idx_file_uploader (tenant_id, upload_by)`（按人检索）、`idx_file_name (tenant_id, file_name)`（前缀过滤）、
+`idx_file_type (tenant_id, file_type)`（按文件类型过滤）。
 
 菜单/权限码：`180 文件管理`（`system:file:list`）与按钮 `1801 delete`、`1802 upload`、`1803 download`；
 平台面 `230 平台文件`（`platform:file:list`）。租户内置 `admin` 按语义 A 隐式持有全部 `scope=2` 码，
-不落 `sys_role_menu`；平台面 `scope=1` 必须显式授权，V5 文末自备一条幂等补授。
+不落 `sys_role_menu`；平台面 `scope=1` 必须显式授权，V2 文末自备一条幂等补授。
+种子同脚本内置文件类型字典：`sys_dict_type.is_system` 标记 + 类型 `sys_file_type` + 默认项 平台文件(`platform`)，租户开通时由 `TenantService.provision` 复制同款。
 
 **没有缓存**：元数据、配额 SUM 都直查库；`userPerms` 缓存归 system，本模块不点清。
 

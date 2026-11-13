@@ -29,6 +29,9 @@ public class SysDictType extends TenantAuditedEntity {
     /** 状态:0 正常 1 停用;停用后该类型下数据不可取 */
     private Integer status;
 
+    /** 内置标记:0 普通 1 内置;内置类型与其数据项不可删除,只有种子与租户开通模板能置 1 */
+    private Integer isSystem;
+
     /** 备注 */
     private String remark;
 }

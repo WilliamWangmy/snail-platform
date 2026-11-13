@@ -35,6 +35,9 @@ public record FileVO(
         @Schema(description = "业务域标签")
         String bizType,
 
+        @Schema(description = "文件类型,内置字典 sys_file_type 的值,platform=平台文件")
+        String fileType,
+
         @Schema(description = "关联业务 ID")
         Long bizId,
 
@@ -50,6 +53,7 @@ public record FileVO(
     public static FileVO from(SysFile file) {
         return new FileVO(file.getFileId(), file.getTenantId(), file.getFileName(), file.getExt(),
                 file.getContentType(), file.getSize(), file.getStorageType(), file.getBizType(),
-                file.getBizId(), file.getUploadBy(), file.getUploadByName(), file.getCreateTime());
+                file.getFileType(), file.getBizId(), file.getUploadBy(), file.getUploadByName(),
+                file.getCreateTime());
     }
 }

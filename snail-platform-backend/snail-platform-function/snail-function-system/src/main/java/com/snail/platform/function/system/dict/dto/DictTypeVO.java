@@ -23,6 +23,9 @@ public record DictTypeVO(
         @Schema(description = "状态:0 正常 1 停用")
         Integer status,
 
+        @Schema(description = "内置标记:0 普通 1 内置;内置类型与数据项不可删除")
+        Integer isSystem,
+
         @Schema(description = "备注")
         String remark,
 
@@ -31,6 +34,6 @@ public record DictTypeVO(
 
     public static DictTypeVO from(SysDictType type) {
         return new DictTypeVO(type.getDictId(), type.getDictName(), type.getDictType(),
-                type.getStatus(), type.getRemark(), type.getCreateTime());
+                type.getStatus(), type.getIsSystem(), type.getRemark(), type.getCreateTime());
     }
 }

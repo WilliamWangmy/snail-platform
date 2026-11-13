@@ -79,8 +79,9 @@ public class FileController {
     @PostMapping("/upload")
     public R<FileVO> upload(@RequestPart("file") MultipartFile file,
                             @RequestParam(required = false) String bizType,
-                            @RequestParam(required = false) Long bizId) {
-        return R.ok(fileStorageService.upload(file, bizType, bizId));
+                            @RequestParam(required = false) Long bizId,
+                            @RequestParam(required = false) String fileType) {
+        return R.ok(fileStorageService.upload(file, bizType, bizId, fileType));
     }
 
     @PreAuthorize("hasAuthority('system:file:list')")

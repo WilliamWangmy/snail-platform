@@ -197,7 +197,7 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
 | `sys_org` | `TenantAuditedEntity` | 生效 | — | `ancestors` 逗号路径（如 `0,1,5`），层级靠它推导不另存 |
 | `sys_role` | `TenantAuditedEntity` | 生效 | `uk_role_code(tenant_id, role_code)` | 租户内唯一；`is_system=1` 内置角色管理端只读 |
 | `sys_menu` | `AuditedEntity` | ignore | `uk_menu_perm_code(perm_code)` | 全局目录一份；目录与外链 `perm_code` 为 `NULL`（MySQL 唯一索引允许多个 NULL） |
-| `sys_dict_type` | `TenantAuditedEntity` | 生效 | `uk_dict_type(tenant_id, dict_type)` | 租户各自维护，无平台内置与并集 |
+| `sys_dict_type` | `TenantAuditedEntity` | 生效 | `uk_dict_type(tenant_id, dict_type)` | 租户各自维护,无跨租户并集;`is_system=1` 内置类型(种子/开通模板所造)与其数据项不可删除 |
 | `sys_dict_data` | `TenantAuditedEntity` | 生效 | `uk_dict_data(tenant_id, dict_id, dict_value)` | 删类型时同事务逻辑删其数据项 |
 | `sys_user_role` | 裸实体 | ignore | 主键 `(user_id, role_id)` | 纯关系表：关联即事实，不配审计字段、不带 `tenant_id` |
 | `sys_role_menu` | 裸实体 | ignore | 主键 `(role_id, menu_id)` | 整包替换是物理删改 |
@@ -322,7 +322,7 @@ caffeine.spec: maximumSize=2000,expireAfterWrite=10m
 
 源码：[`dict/`](src/main/java/com/snail/platform/function/system/dict)
 
-- 类型 + 数据项两级，租户各自维护，无平台内置、无并集、无默认种子。
+- 类型 + 数据项两级，租户各自维护，无跨租户并集；唯一内置类型 `sys_file_type`（文件类型）由存储域 `V2` 种子与租户开通模板（`is_system=1`）提供，默认数据项 平台文件(`platform`)——内置类型与其数据项不可删除，字典值仍可维护。
 - 守护口径：`dict_type` 建后不可改、租户内唯一（含已删记录）；`dict_value` 建后不可改、同类型内唯一（含已删记录）；
   停用类型或停用数据项都不进入下拉解析。删类型同事务逻辑删其数据项。
 - 查询条件与可空列共用一把尺子：**空串一律折成 `null`**——前者据此不拼 `like`，后者据此把"清空"落库。

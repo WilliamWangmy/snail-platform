@@ -42,6 +42,9 @@ public class SysFile extends TenantAuditedEntity {
     /** 业务域标签:contract/avatar/… */
     private String bizType;
 
+    /** 文件类型,内置字典 sys_file_type 的字典值;缺省 platform=平台文件 */
+    private String fileType;
+
     /** 关联业务 ID */
     private Long bizId;
 

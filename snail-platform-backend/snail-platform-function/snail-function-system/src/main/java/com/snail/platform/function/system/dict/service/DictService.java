@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 职责:租户字典管理的全部写入与读取——类型分页/新增/修改/启停/删除(删类型级联逻辑删数据)、
  * 数据分页/新增/修改/删除,以及给任意登录用户的下拉项解析。
  * 守护口径:dict_type 建后不可改、租户内唯一含已删记录;dict_value 建后不可改、同类型内唯一含已删记录;
+ * 内置类型(is_system=1,种子与租户开通模板所造)与其数据项一律不给删,字典值仍可维护(增改/启停);
  * 停用类型或停用数据项都不进入下拉解析。dictItem 的键是 (租户, 类型标识),写操作只点清受影响的那一个键,
  * 别的租户、别的类型都留着。
  * 上游:DictController;下游:sys_dict_type/sys_dict_data 读写(租户拦截器圈定本租户)。
@@ -45,6 +46,9 @@ public class DictService {
 
     /** 状态:正常 */
     private static final int STATUS_ENABLED = 0;
+
+    /** 内置标记:1 内置;内置类型与其数据项不可删除 */
+    private static final int STATUS_BUILTIN = 1;
 
     /** 字典类型读写 */
     private final SysDictTypeMapper typeMapper;
@@ -136,10 +140,15 @@ public class DictService {
      * 删类型同事务逻辑删其全部数据项;历史业务行保留原始 dictValue,不做回写。
      * 不拦"仍有数据项":字典是配置而不是被外键引用的实体,删类型就是整组作废。
      * 类型标识终身占用唯一键(uk_dict_type 不含 deleted),同标识重建必被数据库拦下,只能另起一个码。
+     * 内置类型(is_system=1)不可删除:业务按其标识取值(如文件管理的 sys_file_type),
+     * 删掉等于业务侧下拉当场断供,故这里在级联之前先挡。
      */
     @Transactional
     public void deleteType(Long dictId) {
         SysDictType type = requireType(dictId);
+        if (Integer.valueOf(STATUS_BUILTIN).equals(type.getIsSystem())) {
+            throw BizException.badRequest("内置字典类型不允许删除");
+        }
         dataMapper.delete(Wrappers.<SysDictData>lambdaQuery().eq(SysDictData::getDictId, dictId));
         typeMapper.deleteById(dictId);
         cacheEvictor.evict("dictItem", dictItemKey(type));
@@ -204,12 +213,17 @@ public class DictService {
     /**
      * 删数据项:不查业务引用,已落库的历史值不回写。逻辑删行仍占 (tenant_id, dict_id, dict_value) 唯一键,
      * 删掉的值在同类型下不能原样重建——与"值建后不可改"是同一条终身口径。
+     * 内置类型下的数据项同样不给删:值可以维护(新增/改标签/启停),但内置字典的取值域不许收窄。
      */
     @Transactional
     public void deleteData(Long dictDataId) {
         SysDictData data = requireData(dictDataId);
+        SysDictType type = requireType(data.getDictId());
+        if (Integer.valueOf(STATUS_BUILTIN).equals(type.getIsSystem())) {
+            throw BizException.badRequest("内置字典的数据项不允许删除");
+        }
         dataMapper.deleteById(dictDataId);
-        cacheEvictor.evict("dictItem", dictItemKey(requireType(data.getDictId())));
+        cacheEvictor.evict("dictItem", dictItemKey(type));
     }
 
     /**

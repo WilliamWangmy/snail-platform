@@ -13,6 +13,8 @@ export interface FileVO {
   /** sftp | s3 */
   storageType: string;
   bizType: string | null;
+  /** 文件类型,内置字典 sys_file_type 的值,platform=平台文件 */
+  fileType: string;
   bizId: number | null;
   uploadBy: number | null;
   uploadByName: string | null;
@@ -24,6 +26,8 @@ export interface FileQuery extends PageParams {
   fileName?: string;
   /** 业务域标签,精确匹配 */
   bizType?: string;
+  /** 文件类型,内置字典 sys_file_type 的值,精确匹配 */
+  fileType?: string;
 }
 
 export function pageFiles(query: FileQuery): Promise<PageResult<FileVO>> {
@@ -34,10 +38,19 @@ export function pagePlatformFiles(query: FileQuery): Promise<PageResult<FileVO>>
   return get<PageResult<FileVO>>('/platform/file/page', query);
 }
 
-/** FormData 走唯一 axios 实例:实例未设全局 JSON 头,axios 会按 multipart 自动带 boundary。 */
-export function uploadFile(file: File, bizType?: string, bizId?: number): Promise<FileVO> {
+/**
+ * FormData 走唯一 axios 实例:实例未设全局 JSON 头,axios 会按 multipart 自动带 boundary。
+ * fileType 取内置字典 sys_file_type 的字典值,不传后端按缺省值(平台文件 platform)归一。
+ */
+export function uploadFile(
+  file: File,
+  fileType?: string,
+  bizType?: string,
+  bizId?: number,
+): Promise<FileVO> {
   const form = new FormData();
   form.append('file', file);
+  if (fileType) form.append('fileType', fileType);
   if (bizType) form.append('bizType', bizType);
   if (bizId !== undefined) form.append('bizId', String(bizId));
   return post<FileVO>('/system/file/upload', form);

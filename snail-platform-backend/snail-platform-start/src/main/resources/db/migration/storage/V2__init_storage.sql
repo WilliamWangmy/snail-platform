@@ -1,11 +1,15 @@
 -- =========================================================
--- 文件存储域全量脚本:建表 + 菜单权限种子,一个文件装齐
--- 干什么:sys_file 元数据表;文件管理/平台文件菜单与权限码;默认租户 admin 平台面补授
+-- 文件存储域全量脚本:建表 + 内置文件类型字典 + 菜单权限种子,一个文件装齐
+-- 干什么:sys_file 元数据表(含 file_type);sys_dict_type 加 is_system 内置标记;
+--         种子内置字典 sys_file_type(文件类型)与默认值 平台文件(platform);
+--         文件管理/平台文件菜单与权限码;默认租户 admin 平台面补授
 -- 能否重跑:不能;Flyway 版本迁移仅执行一次,重放需整库重建
--- 前置条件:先跑 V1(系统域),菜单挂在 sys_menu 的 1/2 号目录下
+-- 前置条件:先跑 V1(系统域,含 sys_dict_type),菜单挂在 sys_menu 的 1/2 号目录下
 -- 对象内容不在库,平台只存元数据与 storage_key
 -- 配额列挂在 sys_tenant.storage_limit_mb,不在本表算总量;无唯一键(同名文件合法)
 -- 删除走逻辑删,物理残留由将来的 GC 任务清扫(MVP 不算内容摘要,sha256 列与去重同批后置)
+-- 口径:file_type 存 sys_file_type 的 dict_value,缺省 platform=平台文件;内置字典
+--      (is_system=1)与其数据项不可删除,后续开通的租户由 TenantService.provision 复制同款
 -- =========================================================
 
 CREATE TABLE sys_file (
@@ -19,6 +23,7 @@ CREATE TABLE sys_file (
     storage_type   VARCHAR(20)  NOT NULL COMMENT '存储后端:sftp | s3',
     biz_type       VARCHAR(50)  DEFAULT NULL COMMENT '业务域标签:contract/avatar/…',
     biz_id         BIGINT       DEFAULT NULL COMMENT '关联业务ID',
+    file_type      VARCHAR(50)  NOT NULL DEFAULT 'platform' COMMENT '文件类型,内置字典 sys_file_type 的值,缺省 platform=平台文件',
     upload_by      BIGINT       DEFAULT NULL COMMENT '上传人用户ID',
     upload_by_name VARCHAR(30)  DEFAULT NULL COMMENT '上传人显示名快照,管理页免跨模块读',
     create_by      BIGINT       DEFAULT NULL COMMENT '创建人用户ID',
@@ -29,7 +34,8 @@ CREATE TABLE sys_file (
     PRIMARY KEY (file_id),
     KEY idx_file_biz (tenant_id, biz_type, biz_id),
     KEY idx_file_uploader (tenant_id, upload_by),
-    KEY idx_file_name (tenant_id, file_name)
+    KEY idx_file_name (tenant_id, file_name),
+    KEY idx_file_type (tenant_id, file_type)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '文件元数据,租户托管';
 
 -- ---------- 菜单与权限码种子 ----------
@@ -55,3 +61,17 @@ JOIN sys_menu m ON m.scope = 1 AND m.deleted = 0
 WHERE r.tenant_id = 1
   AND r.role_code = 'admin'
   AND r.deleted = 0;
+
+-- ---------- 字典内置标记 + 内置文件类型字典种子 ----------
+-- is_system=1 的类型只有种子与租户开通模板(TenantService.provision)能造,DictService 的删除接口
+-- 对内置类型与其数据项一律业务拒绝——字典值可以维护(增改/启停)但不许删
+ALTER TABLE sys_dict_type
+    ADD COLUMN is_system TINYINT NOT NULL DEFAULT 0 COMMENT '内置标记:0 普通 1 内置;内置类型与数据项不可删除' AFTER status;
+
+INSERT INTO sys_dict_type (tenant_id, dict_name, dict_type, status, is_system, remark, create_time)
+VALUES (1, '文件类型', 'sys_file_type', 0, 1, '内置字典:文件管理的文件类型,可维护字典值但不可删除', NOW());
+
+INSERT INTO sys_dict_data (tenant_id, dict_id, dict_label, dict_value, sort, status, remark, create_time)
+SELECT 1, dict_id, '平台文件', 'platform', 0, 0, '内置默认值,不可删除', NOW()
+FROM sys_dict_type
+WHERE tenant_id = 1 AND dict_type = 'sys_file_type' AND deleted = 0;

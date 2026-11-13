@@ -1,7 +1,7 @@
 import { del, get, post, put } from './http';
 import type { PageParams, PageResult } from './types';
 
-/** 字典类型行:租户各自维护,平台不内置也没有跨租户并集。 */
+/** 字典类型行:租户各自维护;is_system=1 的内置类型由种子/租户开通模板所造,类型与数据项都不可删除。 */
 export interface DictTypeVO {
   dictId: number;
   dictName: string;
@@ -9,6 +9,8 @@ export interface DictTypeVO {
   dictType: string;
   /** 0 正常 1 停用;停用后本类型下拉整体取不到 */
   status: number;
+  /** 0 普通 1 内置;内置类型与其数据项不可删除 */
+  isSystem: number;
   remark: string | null;
   createTime: string;
 }

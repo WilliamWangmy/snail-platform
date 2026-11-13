@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 /**
@@ -90,12 +92,28 @@ class FileStorageServiceTest {
                 "text/plain", "hello".getBytes(StandardCharsets.UTF_8));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> service.upload(file, "test", null));
+                () -> service.upload(file, "test", null, null));
 
         assertEquals("db down", error.getMessage(), "原异常应原样抛出");
         assertEquals(1, s3.puts.size(), "对象应已写入");
         assertEquals(s3.puts, s3.deletes, "入库失败后应补偿删除同一个对象键");
         verify(quotaService).assertCapacity(file.getSize());
+    }
+
+    @Test
+    void uploadNormalizesFileTypeWithPlatformDefault() {
+        ArgumentCaptor<SysFile> captor = ArgumentCaptor.forClass(SysFile.class);
+        MockMultipartFile file = new MockMultipartFile("file", "note.txt",
+                "text/plain", "hello".getBytes(StandardCharsets.UTF_8));
+
+        // 不传 fileType 归一为缺省值 平台文件(platform);传值则 trim 后原样落库
+        service.upload(file, null, null, null);
+        verify(quotaService).insertWithinQuota(captor.capture());
+        assertEquals("platform", captor.getValue().getFileType(), "缺省文件类型应为平台文件");
+
+        service.upload(file, null, null, " contract ");
+        verify(quotaService, times(2)).insertWithinQuota(captor.capture());
+        assertEquals("contract", captor.getValue().getFileType(), "传入的文件类型应 trim 后落库");
     }
 
     private static SysFile file(Long fileId, String storageType, String storageKey, Long uploadBy) {
