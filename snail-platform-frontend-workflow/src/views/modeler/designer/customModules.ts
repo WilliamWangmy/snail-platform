@@ -1,14 +1,45 @@
 /**
  * bpmn-js 自定义模块：元素栏裁剪（v1 六项）、ContextPad/ReplaceMenu 裁剪与中文化（2.1 白名单）、
- * 连线规则（仅 sequenceFlow、禁连开始事件）、驳回线红色虚线渲染。注册方式见 BpmnCanvas.vue 的 additionalModules。
+ * 连线规则（仅 sequenceFlow、禁连开始事件）、新建开始/结束事件默认值（id=start|end/名=开始|结束）、
+ * 新连线默认条件（网关出线 ${approved}）、Task→UserTask 统一映射、驳回线红色虚线渲染。
+ * 注册方式见 BpmnCanvas.vue 的 additionalModules。
  */
 import BaseRenderer from 'diagram-js/lib/draw/BaseRenderer';
 import CommandInterceptor from 'diagram-js/lib/command/CommandInterceptor';
 import type { Connection } from 'diagram-js/lib/model/Types';
 import { createLine } from 'diagram-js/lib/util/RenderUtil';
-import { append, create as svgCreate } from 'tiny-svg';
+import BpmnElementFactory from 'bpmn-js/lib/features/modeling/ElementFactory';
+import { append } from 'tiny-svg';
 
-import { DEFAULT_FLOW_NAME, FLOW_CONDITIONS, detectFlowType } from './flowType';
+import { FLOW_CONDITIONS, detectFlowType } from './flowType';
+
+/* ---------------------------------- 元素工厂（Task→UserTask） ---------------------------------- */
+
+/**
+ * v1 白名单只开放用户任务：任何途径新建的 bpmn:Task（ContextPad 追加任务等）统一映射为
+ * bpmn:UserTask。拦截点在 createElement（createShape/create/replace 全部经此汇聚），
+ * 映射发生在元素落盘前，撤销/重做语义与直接创建 UserTask 一致。
+ */
+class FlowElementFactory extends BpmnElementFactory {
+  static $inject = ['bpmnFactory', 'moddle'];
+}
+
+const BaseCreateElement = BpmnElementFactory.prototype.createElement as unknown as (
+  this: BpmnElementFactory,
+  elementType: string,
+  attrs?: Record<string, unknown>,
+) => unknown;
+
+FlowElementFactory.prototype.createElement = function (
+  this: BpmnElementFactory,
+  elementType: 'root' | 'shape' | 'connection',
+  attrs?: Record<string, unknown>,
+) {
+  if (elementType === 'shape' && attrs?.type === 'bpmn:Task') {
+    return BaseCreateElement.call(this, elementType, { ...attrs, type: 'bpmn:UserTask' });
+  }
+  return BaseCreateElement.call(this, elementType, attrs);
+} as unknown as typeof FlowElementFactory.prototype.createElement;
 
 /* ---------------------------------- 元素栏 ---------------------------------- */
 
@@ -150,8 +181,9 @@ class FlowConnectRules {
  * actionName id）。未命中类型不裁剪（无法经调色板/ContextPad 创建的类型本就不会出现）。
  */
 const REPLACE_WHITELIST: Record<string, Set<string>> = {
-  'bpmn:Task': new Set(['replace-with-task', 'replace-with-user-task']),
-  'bpmn:UserTask': new Set(['replace-with-task', 'replace-with-user-task']),
+  // bpmn:Task 不在 v1 白名单：扳手菜单只保留「换为用户任务」（新建 Task 也会被元素工厂映射为 UserTask）
+  'bpmn:Task': new Set(['replace-with-user-task']),
+  'bpmn:UserTask': new Set(['replace-with-user-task']),
   'bpmn:StartEvent': new Set(['replace-with-none-start', 'replace-with-none-end', 'replace-with-timer-start', 'replace-with-message-start']),
   'bpmn:EndEvent': new Set(['replace-with-none-start', 'replace-with-none-end', 'replace-with-terminate-end']),
   'bpmn:ExclusiveGateway': new Set(['replace-with-parallel-gateway', 'replace-with-inclusive-gateway']),
@@ -164,7 +196,6 @@ const REPLACE_WHITELIST: Record<string, Set<string>> = {
 
 /** 扳手条目中文文案（待接入 = 运行端能力未跟上，见 2.1 配套机制③） */
 const REPLACE_LABELS: Record<string, string> = {
-  'replace-with-task': '任务',
   'replace-with-user-task': '用户任务',
   'replace-with-none-start': '开始事件',
   'replace-with-none-end': '结束事件',
@@ -264,8 +295,70 @@ class FlowPadTrimmer {
   }
 }
 
-/* ---------------------------------- 新连线默认值 ---------------------------------- */
+/* ---------------------------------- 新建事件默认值 ---------------------------------- */
 
+interface ShapeCreateEvent {
+  context?: {
+    shape?: { businessObject?: Record<string, unknown> };
+  };
+}
+
+/** 新建开始/结束事件的默认节点标识与名称 */
+const EVENT_DEFAULTS: Record<string, { id: string; name: string }> = {
+  'bpmn:StartEvent': { id: 'start', name: '开始' },
+  'bpmn:EndEvent': { id: 'end', name: '结束' },
+};
+
+/** 现存元素 id 集合（含流程图内全部元素） */
+function collectUsedIds(elementRegistry: {
+  getAll: () => Array<{ businessObject?: { id?: unknown } }>;
+}): Set<string> {
+  const used = new Set<string>();
+  for (const el of elementRegistry.getAll()) {
+    const id = el.businessObject?.id;
+    if (typeof id === 'string') {
+      used.add(id);
+    }
+  }
+  return used;
+}
+
+/**
+ * 新建开始/结束事件默认值：节点标识 start/end（被占用时自动追加序号）、名称「开始/结束」。
+ * 仅覆盖引擎自动生成的 id（Event_xxx），用户已自定义或模板导入的 id 不动。
+ * shape.append 内部会嵌套执行 shape.create，故只挂 shape.create 即可覆盖全部新建入口。
+ */
+class FlowEventDefaults extends CommandInterceptor {
+  static $inject = ['eventBus', 'elementRegistry'];
+
+  constructor(
+    eventBus: unknown,
+    elementRegistry: {
+      getAll: () => Array<{ businessObject?: { id?: unknown } }>;
+    },
+  ) {
+    super(eventBus as never);
+    this.on('shape.create.preExecute', (event: ShapeCreateEvent) => {
+      const bo = event.context?.shape?.businessObject;
+      const defaults = bo?.$type ? EVENT_DEFAULTS[bo.$type as string] : undefined;
+      if (!bo || !defaults) return;
+      if (!bo.name) {
+        bo.name = defaults.name;
+      }
+      const id = typeof bo.id === 'string' ? bo.id : '';
+      if (id.startsWith('Event_')) {
+        const used = collectUsedIds(elementRegistry);
+        let next = defaults.id;
+        for (let n = 2; used.has(next); n++) {
+          next = `${defaults.id}${n}`;
+        }
+        bo.id = next;
+      }
+    });
+  }
+}
+
+/* ---------------------------------- 新连线默认条件 ---------------------------------- */
 interface ConnectionCreateEvent {
   context?: {
     source?: { businessObject?: { $type?: string } };
@@ -274,7 +367,7 @@ interface ConnectionCreateEvent {
 }
 
 /**
- * 新连线默认值：名称「提交」；来源为排他网关时默认写通过条件 ${approved}
+ * 新连线默认条件：来源为排他网关时默认写通过条件 ${approved}
  * （等价于流转类型「正常提交」，用户仍可在连线面板改成「驳回」）。
  * 在 preExecute 阶段写入 businessObject：随建线命令一体撤销/重做，且重放不覆盖用户改动。
  */
@@ -289,7 +382,6 @@ class FlowLineDefaults extends CommandInterceptor {
     this.on('connection.create.preExecute', (event: ConnectionCreateEvent) => {
       const bo = event.context?.connection?.businessObject;
       if (!bo) return;
-      bo.name = DEFAULT_FLOW_NAME;
       if (event.context?.source?.businessObject?.$type === 'bpmn:ExclusiveGateway') {
         bo.conditionExpression = bpmnFactory.create('bpmn:FormalExpression', {
           body: FLOW_CONDITIONS.normal,
@@ -303,7 +395,10 @@ class FlowLineDefaults extends CommandInterceptor {
 
 const REJECT_PRIORITY = 1500;
 
-/** 驳回线：红色虚线 + “驳回”标签；其余元素交给默认渲染器 */
+/**
+ * 驳回线：红色虚线。连线名称不在此渲染——bpmn-js 已为具名连线生成外部标签
+ * （LabelBehavior），自定义文本会和标准标签重复显示。
+ */
 class RejectFlowRenderer extends BaseRenderer {
   constructor(eventBus: unknown) {
     super(eventBus as never, REJECT_PRIORITY);
@@ -324,28 +419,25 @@ class RejectFlowRenderer extends BaseRenderer {
       strokeDasharray: '6, 4',
     });
     append(visuals, line);
-
-    const name = connection.businessObject?.name;
-    if (name) {
-      const label = svgCreate('text', {
-        fill: REJECT_COLOR,
-        fontSize: 12,
-        textAnchor: 'middle',
-        x: connection.waypoints[0]?.x ?? 0,
-        y: (connection.waypoints[0]?.y ?? 0) - 6,
-      });
-      label.textContent = name;
-      append(visuals, label);
-    }
     return line;
   }
 }
 
 export const flowCustomModules = {
-  __init__: ['flowPadTrimmer', 'flowPaletteProvider', 'flowConnectRules', 'flowLineDefaults', 'rejectFlowRenderer'],
+  __init__: [
+    'flowPadTrimmer',
+    'flowPaletteProvider',
+    'flowConnectRules',
+    'flowEventDefaults',
+    'flowLineDefaults',
+    'rejectFlowRenderer',
+  ],
+  // 覆盖 bpmn-js 内置元素工厂：新建 bpmn:Task 统一映射为 bpmn:UserTask
+  elementFactory: ['type', FlowElementFactory],
   flowConnectRules: ['type', FlowConnectRules],
   flowPadTrimmer: ['type', FlowPadTrimmer],
   flowPaletteProvider: ['type', FlowPaletteProvider],
+  flowEventDefaults: ['type', FlowEventDefaults],
   flowLineDefaults: ['type', FlowLineDefaults],
   rejectFlowRenderer: ['type', RejectFlowRenderer],
 };

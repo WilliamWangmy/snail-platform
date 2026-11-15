@@ -75,9 +75,6 @@ export function buildCompletionCondition(kind: PassCondition, value?: number): s
   }
 }
 
-/** 流程线默认名称（新建连线与正常提交线共用） */
-export const DEFAULT_FLOW_NAME = '提交';
-
 /** 创建人绑定：assignee 写 ${initiator}，流程初始化时由网关注入发起人 ID（不接受调用方传值） */
 export const CREATOR_ASSIGNEE = '${initiator}';
 
@@ -115,9 +112,9 @@ export const BLANK_XML_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
                    id="defs_blank" targetNamespace="http://flowable.org/bpmn">
   <bpmn2:process id="__MODEL_KEY__" name="__MODEL_NAME__" isExecutable="true">
     <bpmn2:startEvent id="start" name="开始"/>
-    <bpmn2:sequenceFlow id="flow1" name="提交" sourceRef="start" targetRef="task_first"/>
+    <bpmn2:sequenceFlow id="flow1" sourceRef="start" targetRef="task_first"/>
     <bpmn2:userTask id="task_first" name="审批"/>
-    <bpmn2:sequenceFlow id="flow2" name="提交" sourceRef="task_first" targetRef="end"/>
+    <bpmn2:sequenceFlow id="flow2" sourceRef="task_first" targetRef="end"/>
     <bpmn2:endEvent id="end" name="结束"/>
   </bpmn2:process>
   <bpmndi:BPMNDiagram id="di_blank">

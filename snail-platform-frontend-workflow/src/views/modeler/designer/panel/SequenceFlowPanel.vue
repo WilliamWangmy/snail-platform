@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
  * 连线面板：常规编辑 + 流转类型（正常提交/驳回，仅网关出线显示）+ 高级模式手写条件。
- * 类型选择即自动写入条件表达式；正常提交线默认名「提交」，驳回线以 name="驳回" 持久化（画布渲染红色虚线）。
+ * 类型选择即自动写入条件表达式；驳回线以 name="驳回" 持久化（画布渲染红色虚线），切回正常提交清空名称。
  */
 import { computed, ref } from 'vue';
 
-import { DEFAULT_FLOW_NAME, FLOW_CONDITIONS, FLOW_TYPE_LABELS, detectFlowType, type FlowType } from '../flowType';
+import { FLOW_CONDITIONS, FLOW_TYPE_LABELS, detectFlowType, type FlowType } from '../flowType';
 import { readConditionBody, writeConditionBody, type ModelingLike } from '../flowableExtension';
 
 const props = defineProps<{
@@ -44,9 +44,8 @@ function switchFlowType(type: FlowType): void {
   writeConditionBody(props.services.modeling, props.services.bpmnFactory, props.element, FLOW_CONDITIONS[type]);
   if (type === 'reject') {
     props.services.modeling.updateProperties(props.element, { name: '驳回' });
-  } else if (name.value === '驳回' || !name.value) {
-    // 正常提交线回默认名称「提交」（与新连线默认值一致）
-    props.services.modeling.updateProperties(props.element, { name: DEFAULT_FLOW_NAME });
+  } else if (name.value === '驳回') {
+    props.services.modeling.updateProperties(props.element, { name: '' });
   }
 }
 
