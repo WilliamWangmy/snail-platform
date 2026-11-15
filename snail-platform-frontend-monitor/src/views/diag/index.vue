@@ -1,152 +1,326 @@
 <template>
-  <div class="page">
+  <div>
     <el-tabs v-model="activeTab">
-      <!-- 系统体检:12 项检查,10s 限频(§6.9) -->
-      <el-tab-pane label="系统体检" name="checkup">
-        <div class="toolbar">
-          <el-button type="primary" size="small" :loading="running" v-permission="'platform:monitor:diag'" @click="runNow">立即体检</el-button>
-          <span class="hint">12 项检查并行执行,单项与整体超时保护;限频 10 秒</span>
-        </div>
-        <el-descriptions v-if="report" :column="3" size="small" border class="mb">
-          <el-descriptions-item label="总体结论">
-            <el-tag :type="overallType(report.overall)" size="small">{{ overallText(report.overall) }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="耗时">{{ report.costMs }} ms</el-descriptions-item>
-          <el-descriptions-item label="触发时间">{{ formatTime(report.triggerTime) }}({{ report.triggerBy }})</el-descriptions-item>
-        </el-descriptions>
-        <el-table :data="report?.items ?? []" v-loading="running" size="small" border>
-          <el-table-column label="状态" width="90">
-            <template #default="{ row }">
-              <el-tag :type="itemType(row.status)" size="small" effect="plain">{{ itemText(row.status) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="name" label="检查项" width="180" />
-          <el-table-column label="耗时" width="90">
-            <template #default="{ row }">{{ row.latencyMs === null ? '—' : `${row.latencyMs} ms` }}</template>
-          </el-table-column>
-          <el-table-column label="说明" min-width="220">
-            <template #default="{ row }">{{ row.detail || '—' }}</template>
-          </el-table-column>
-          <el-table-column label="建议" min-width="220">
-            <template #default="{ row }">{{ row.suggestion || '—' }}</template>
-          </el-table-column>
-        </el-table>
-
-        <h5>历史体检报告</h5>
-        <el-table :data="reportPage.rows" size="small" border>
-          <el-table-column prop="reportId" label="ID" width="80" />
-          <el-table-column label="结论" width="90">
-            <template #default="{ row }">
-              <el-tag :type="overallType(row.overall)" size="small" effect="plain">{{ overallText(row.overall) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="triggerBy" label="触发人" width="120" />
-          <el-table-column label="触发时间" width="170">
-            <template #default="{ row }">{{ formatTime(row.triggerTime) }}</template>
-          </el-table-column>
-          <el-table-column prop="costMs" label="耗时(ms)" width="100" />
-          <el-table-column label="操作" width="90">
-            <template #default="{ row }">
-              <el-button size="small" link type="primary" @click="openHistory(row.reportId)">查看</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-pagination
-          class="pager"
-          layout="total, prev, pager, next"
-          :total="reportPage.total"
-          :page-size="reportPage.size"
-          :current-page="reportPage.current"
-          @current-change="(p: number) => loadReports(p)"
-        />
-      </el-tab-pane>
-
-      <!-- 线程快照 -->
-      <el-tab-pane label="线程快照" name="threads">
-        <div class="toolbar">
-          <el-button size="small" :loading="threadsLoading" @click="loadThreads">刷新快照</el-button>
-          <el-button size="small" @click="downloadThreads">下载完整 dump</el-button>
-          <el-tag v-if="threads && threads.deadlocked.length" type="danger" size="small">检测到死锁:{{ threads.deadlocked.join(',') }}</el-tag>
-          <el-tag v-else-if="threads" type="success" size="small" effect="plain">无死锁</el-tag>
-        </div>
-        <el-table v-if="threads" :data="pagedThreads" v-loading="threadsLoading" size="small" border>
-          <el-table-column prop="name" label="线程名" min-width="200" />
-          <el-table-column prop="state" label="状态" width="120">
-            <template #default="{ row }">
-              <el-tag :type="threadType(row.state)" size="small" effect="plain">{{ row.state }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="守护" width="70">
-            <template #default="{ row }">{{ row.daemon ? '是' : '否' }}</template>
-          </el-table-column>
-          <el-table-column label="栈顶" min-width="360">
-            <template #default="{ row }">
-              <div v-for="(frame, i) in row.stackTop" :key="i" class="stack-frame">{{ frame }}</div>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-pagination
-          v-if="threads"
-          class="pager"
-          layout="total, prev, pager, next"
-          :total="threads.threads.length"
-          :page-size="threadPageSize"
-          :current-page="threadPage"
-          @current-change="(p: number) => (threadPage = p)"
-        />
-      </el-tab-pane>
-
-      <!-- 环境快照:敏感项已脱敏(DD-26/EnvSnapshotService) -->
-      <el-tab-pane label="环境快照" name="env">
-        <div class="toolbar">
-          <el-button size="small" :loading="envLoading" @click="loadEnv">刷新</el-button>
-          <span class="hint">含 secret/password/token/key/credential 的项已脱敏展示</span>
-        </div>
-        <template v-if="env">
-          <h5>系统属性</h5>
-          <el-table :data="envRows.system" size="small" border>
-            <el-table-column prop="k" label="键" width="320" />
-            <el-table-column prop="v" label="值" min-width="400">
-              <template #default="{ row }">
-                <span class="mono break">{{ row.v }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-          <h5>环境变量</h5>
-          <el-table :data="envRows.env" size="small" border>
-            <el-table-column prop="k" label="键" width="320" />
-            <el-table-column prop="v" label="值" min-width="400">
-              <template #default="{ row }">
-                <span class="mono break">{{ row.v }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
+      <!-- 一键体检:12 项检查,10s 限频(§6.9) -->
+      <el-tab-pane name="check">
+        <template #label>
+          一键体检
         </template>
+        <div
+          class="card"
+          style="margin-bottom: 14px"
+        >
+          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap">
+            <el-button
+              type="primary"
+              size="default"
+              v-permission="'platform:monitor:diag'"
+              :loading="running"
+              @click="runNow"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                style="width: 14px; height: 14px; margin-right: 4px"
+              ><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+              一键体检
+            </el-button>
+            <span
+              class="muted"
+              style="font-size: 12px"
+            >12 项检查 · 单项超时 2s · 总超时 10s · 同用户限频 10s</span>
+            <span style="flex: 1" />
+            <span
+              v-if="report"
+              class="chip"
+              :class="overallChip(report.overall)"
+            >{{ overallText(report.overall) }}</span>
+            <el-button
+              size="small"
+              @click="threadsDrawer = true; loadThreads()"
+            >线程快照</el-button>
+            <el-button
+              size="small"
+              @click="envDrawer = true; loadEnv()"
+            >环境快照</el-button>
+          </div>
+          <div
+            v-if="running"
+            class="progress"
+          >
+            <i style="width: 60%" />
+          </div>
+        </div>
+
+        <div
+          v-if="report?.items?.length"
+          class="diag-grid"
+          style="margin-bottom: 14px"
+        >
+          <div
+            v-for="item in report.items"
+            :key="item.key"
+            class="diag-item"
+          >
+            <div
+              class="diag-ico"
+              :class="item.status"
+            >{{ itemIcon(item.status) }}</div>
+            <div style="min-width: 0">
+              <div class="diag-name">
+                {{ item.name }}
+                <span
+                  class="chip"
+                  :class="itemChip(item.status)"
+                  style="font-size: 9.5px"
+                >{{ itemText(item.status) }}</span>
+                <span
+                  v-if="item.latencyMs !== null"
+                  class="muted"
+                  style="font-size: 10px; font-weight: 400"
+                >{{ item.latencyMs }}ms</span>
+              </div>
+              <div
+                v-if="item.detail"
+                class="diag-detail"
+              >{{ item.detail }}</div>
+              <div
+                v-if="item.suggestion"
+                class="diag-sug"
+              >建议：{{ item.suggestion }}</div>
+            </div>
+          </div>
+        </div>
+        <div
+          v-else
+          class="card"
+          style="margin-bottom: 14px"
+        >
+          <div class="empty">点击「一键体检」运行 12 项检查；结果落库保留 30 天</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            诊断报告历史
+            <span class="sub">保留 30 天</span>
+          </div>
+          <el-table
+            :data="reportPage.rows"
+            size="default"
+          >
+            <el-table-column
+              label="报告时间"
+              width="170"
+            >
+              <template #default="{ row }"><span class="mono">{{ formatTime(row.triggerTime) }}</span></template>
+            </el-table-column>
+            <el-table-column
+              prop="triggerBy"
+              label="触发人"
+              width="110"
+            />
+            <el-table-column
+              label="耗时"
+              width="90"
+            >
+              <template #default="{ row }">{{ row.costMs }}ms</template>
+            </el-table-column>
+            <el-table-column
+              label="结论"
+              width="90"
+            >
+              <template #default="{ row }">
+                <span
+                  class="chip"
+                  :class="overallChip(row.overall)"
+                >{{ overallText(row.overall) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="异常项">
+              <template #default="{ row }">
+                <span class="muted">{{ badItems(row.items) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column
+              label="操作"
+              align="right"
+              width="80"
+            >
+              <template #default="{ row }">
+                <el-button
+                  size="small"
+                  link
+                  type="primary"
+                  @click="openHistory(row.reportId)"
+                >查看</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            layout="total, prev, pager, next"
+            :total="reportPage.total"
+            :page-size="reportPage.size"
+            :current-page="reportPage.current"
+            @current-change="(p: number) => loadReports(p)"
+          />
+        </div>
       </el-tab-pane>
 
-      <!-- Arthas 控制台:iframe + agent 表(§6.9) -->
-      <el-tab-pane label="Arthas 控制台" name="arthas">
+      <!-- Arthas 在线诊断 -->
+      <el-tab-pane
+        label="Arthas 在线诊断"
+        name="arthas"
+      >
         <ArthasConsole />
       </el-tab-pane>
     </el-tabs>
 
+    <!-- 线程快照抽屉 -->
+    <el-drawer
+      v-model="threadsDrawer"
+      title="线程快照"
+      size="720px"
+    >
+      <div class="filter-bar">
+        <span
+          v-if="threads && threads.deadlocked.length"
+          class="chip chip-danger"
+        >检测到死锁：{{ threads.deadlocked.join(',') }}</span>
+        <span
+          v-else-if="threads"
+          class="chip chip-success"
+        >无死锁</span>
+        <span style="flex: 1" />
+        <el-button
+          size="small"
+          :loading="threadsLoading"
+          @click="loadThreads"
+        >刷新快照</el-button>
+        <el-button
+          size="small"
+          @click="downloadThreads"
+        >下载完整 dump</el-button>
+      </div>
+      <el-table
+        :data="pagedThreads"
+        v-loading="threadsLoading"
+        size="small"
+      >
+        <el-table-column
+          prop="name"
+          label="线程名"
+          min-width="180"
+        />
+        <el-table-column
+          label="状态"
+          width="130"
+        >
+          <template #default="{ row }">
+            <span
+              class="chip"
+              :class="threadChip(row.state)"
+            >{{ row.state }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="守护"
+          width="60"
+        >
+          <template #default="{ row }">{{ row.daemon ? '是' : '否' }}</template>
+        </el-table-column>
+        <el-table-column label="栈顶">
+          <template #default="{ row }">
+            <div
+              v-for="(frame, i) in row.stackTop"
+              :key="i"
+              class="mono muted"
+              style="font-size: 11px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
+            >{{ frame }}</div>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination
+        layout="total, prev, pager, next"
+        :total="threads?.threads.length ?? 0"
+        :page-size="threadPageSize"
+        :current-page="threadPage"
+        @current-change="(p: number) => (threadPage = p)"
+      />
+    </el-drawer>
+
+    <!-- 环境快照抽屉:敏感项已脱敏(EnvSnapshotService) -->
+    <el-drawer
+      v-model="envDrawer"
+      title="环境快照"
+      size="680px"
+    >
+      <p
+        class="muted"
+        style="font-size: 11.5px; margin-bottom: 12px"
+      >
+        含 secret/password/token/key/credential 的项已脱敏展示（******）。
+      </p>
+      <template v-if="env">
+        <div class="card-title">系统属性</div>
+        <el-table
+          :data="envRows.system"
+          size="small"
+        >
+          <el-table-column
+            prop="k"
+            label="键"
+            width="300"
+          />
+          <el-table-column label="值">
+            <template #default="{ row }"><span class="mono" style="font-size: 11.5px; word-break: break-all">{{ row.v }}</span></template>
+          </el-table-column>
+        </el-table>
+        <div class="card-title" style="margin-top: 16px">环境变量</div>
+        <el-table
+          :data="envRows.env"
+          size="small"
+        >
+          <el-table-column
+            prop="k"
+            label="键"
+            width="300"
+          />
+          <el-table-column label="值">
+            <template #default="{ row }"><span class="mono" style="font-size: 11.5px; word-break: break-all">{{ row.v }}</span></template>
+          </el-table-column>
+        </el-table>
+      </template>
+    </el-drawer>
+
     <!-- 历史报告详情抽屉 -->
-    <el-drawer v-model="historyDrawer" :title="`体检报告 #${historyReport?.reportId ?? ''}`" size="640px">
+    <el-drawer
+      v-model="historyDrawer"
+      size="620px"
+      :title="historyReport ? `体检报告 #${historyReport.reportId}` : '体检报告'"
+    >
       <template v-if="historyReport">
-        <el-descriptions :column="2" size="small" border class="mb">
-          <el-descriptions-item label="总体结论">{{ overallText(historyReport.overall) }}</el-descriptions-item>
-          <el-descriptions-item label="耗时">{{ historyReport.costMs }} ms</el-descriptions-item>
-          <el-descriptions-item label="触发">{{ historyReport.triggerBy }}</el-descriptions-item>
-          <el-descriptions-item label="时间">{{ formatTime(historyReport.triggerTime) }}</el-descriptions-item>
-        </el-descriptions>
-        <el-table :data="historyReport.items ?? []" size="small" border>
+        <div class="kv" style="margin-bottom: 14px">
+          <div>总体结论</div><div><span class="chip" :class="overallChip(historyReport.overall)">{{ overallText(historyReport.overall) }}</span></div>
+          <div>耗时</div><div>{{ historyReport.costMs }} ms</div>
+          <div>触发</div><div>{{ historyReport.triggerBy }} · {{ formatTime(historyReport.triggerTime) }}</div>
+        </div>
+        <el-table
+          :data="historyReport.items ?? []"
+          size="small"
+        >
           <el-table-column label="状态" width="80">
             <template #default="{ row }">
-              <el-tag :type="itemType(row.status)" size="small" effect="plain">{{ itemText(row.status) }}</el-tag>
+              <span class="chip" :class="itemChip(row.status)">{{ itemText(row.status) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="name" label="检查项" width="160" />
-          <el-table-column label="说明" min-width="180">
+          <el-table-column
+            prop="name"
+            label="检查项"
+            width="160"
+          />
+          <el-table-column label="说明">
             <template #default="{ row }">{{ row.detail || '—' }}</template>
           </el-table-column>
         </el-table>
@@ -156,7 +330,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   downloadThreads,
@@ -171,9 +345,9 @@ import {
 } from '@/api/monitor/diag';
 import ArthasConsole from './components/ArthasConsole.vue';
 
-const activeTab = ref('checkup');
+const activeTab = ref('check');
 
-// ---- 系统体检 ----
+// ---------- 系统体检 ----------
 const running = ref(false);
 const report = ref<DiagReport | null>(null);
 const reportPage = ref({ rows: [] as DiagReport[], total: 0, size: 20, current: 1 });
@@ -182,7 +356,7 @@ async function runNow(): Promise<void> {
   running.value = true;
   try {
     report.value = await runDiag();
-    ElMessage.success(`体检完成:${overallText(report.value.overall)}`);
+    ElMessage.success(`体检完成：${overallText(report.value.overall)}`);
     await loadReports(1);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '体检失败');
@@ -204,23 +378,34 @@ async function openHistory(reportId: number): Promise<void> {
   historyDrawer.value = true;
 }
 
-function itemType(status: string): 'success' | 'warning' | 'danger' | 'info' {
-  return status === 'pass' ? 'success' : status === 'warn' ? 'warning' : status === 'fail' ? 'danger' : 'info';
+function itemIcon(status: string): string {
+  return status === 'pass' ? '✓' : status === 'warn' ? '!' : status === 'fail' ? '✕' : '–';
+}
+
+function itemChip(status: string): string {
+  return status === 'pass' ? 'chip-success' : status === 'warn' ? 'chip-warning' : status === 'fail' ? 'chip-danger' : 'chip-muted';
 }
 
 function itemText(status: string): string {
   return status === 'pass' ? '通过' : status === 'warn' ? '警告' : status === 'fail' ? '失败' : '跳过';
 }
 
-function overallType(status: string): 'success' | 'warning' | 'danger' {
-  return status === 'pass' ? 'success' : status === 'warn' ? 'warning' : 'danger';
+function overallChip(status: string): string {
+  return status === 'pass' ? 'chip-success' : status === 'warn' ? 'chip-warning' : 'chip-danger';
 }
 
 function overallText(status: string): string {
   return status === 'pass' ? '通过' : status === 'warn' ? '警告' : '失败';
 }
 
-// ---- 线程快照 ----
+function badItems(items: DiagItem[] | null): string {
+  if (!items) return '—';
+  const bad = items.filter((i) => i.status === 'warn' || i.status === 'fail').map((i) => i.key);
+  return bad.length ? bad.join(' / ') : '—';
+}
+
+// ---------- 线程快照 ----------
+const threadsDrawer = ref(false);
 const threads = ref<ThreadSnapshot | null>(null);
 const threadsLoading = ref(false);
 const threadPage = ref(1);
@@ -237,15 +422,15 @@ async function loadThreads(): Promise<void> {
   }
 }
 
-function threadType(state: string): 'danger' | 'warning' | 'info' {
-  if (state === 'BLOCKED' || state === 'WAITING') return 'warning';
-  if (state === 'RUNNABLE') return 'info';
-  return 'danger';
+function threadChip(state: string): string {
+  if (state === 'RUNNABLE') return 'chip-info';
+  if (state === 'BLOCKED') return 'chip-danger';
+  return 'chip-warning';
 }
 
-// ---- 环境快照 ----
+// ---------- 环境快照 ----------
+const envDrawer = ref(false);
 const env = ref<Record<string, Record<string, string>> | null>(null);
-const envLoading = ref(false);
 const envRows = computed(() => {
   const system = Object.entries(env.value?.system ?? {}).map(([k, v]) => ({ k, v }));
   const processEnv = Object.entries(env.value?.env ?? {}).map(([k, v]) => ({ k, v }));
@@ -253,12 +438,7 @@ const envRows = computed(() => {
 });
 
 async function loadEnv(): Promise<void> {
-  envLoading.value = true;
-  try {
-    env.value = await fetchEnv();
-  } finally {
-    envLoading.value = false;
-  }
+  env.value = await fetchEnv();
 }
 
 function formatTime(value?: string | null): string {
@@ -266,59 +446,19 @@ function formatTime(value?: string | null): string {
   return value.replace('T', ' ').slice(0, 19);
 }
 
+function onRefresh(): void {
+  void loadReports(reportPage.value.current);
+}
+
+let refreshListener: (() => void) | undefined;
+
 onMounted(() => {
   void loadReports(1);
+  refreshListener = onRefresh;
+  window.addEventListener('monitor-refresh', refreshListener);
+});
+
+onUnmounted(() => {
+  if (refreshListener) window.removeEventListener('monitor-refresh', refreshListener);
 });
 </script>
-
-<style scoped>
-.page {
-  padding: 16px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.pager {
-  margin-top: 12px;
-  justify-content: flex-end;
-}
-
-.mb {
-  margin-bottom: 12px;
-}
-
-.mono {
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-}
-
-.break {
-  word-break: break-all;
-}
-
-.stack-frame {
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  line-height: 18px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-h5 {
-  margin: 16px 0 8px;
-  font-size: 13px;
-}
-</style>

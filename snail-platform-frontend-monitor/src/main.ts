@@ -10,6 +10,8 @@ import { permission } from './directives/permission';
 import 'element-plus/dist/index.css';
 import 'element-plus/theme-chalk/dark/css-vars.css';
 import './styles/index.scss';
+/* 监控端设计系统:照 vibe_images/system-monitor 原型移植,含 Element Plus 观感调校段 */
+import './styles/monitor.css';
 
 import { useThemeStore } from '@/stores/theme';
 

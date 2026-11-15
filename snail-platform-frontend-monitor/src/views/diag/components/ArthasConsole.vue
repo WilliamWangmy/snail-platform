@@ -1,46 +1,146 @@
 <template>
-  <div class="arthas">
-    <!-- 状态行:可达性 / 版本 / agent 数(§5.8) -->
-    <div class="toolbar">
-      <el-tag :type="statusType" size="small">{{ statusText }}</el-tag>
-      <span v-if="status?.reachable" class="hint">
-        tunnel {{ status.tunnelVersion || '未知版本' }} · {{ status.agentCount }} 个 agent · {{ status.clientConnectionCount }} 个连接
-        <template v-if="status.latencyMs !== null"> · {{ status.latencyMs }}ms</template>
-      </span>
-      <span v-else-if="status?.lastError" class="hint error">{{ status.lastError }}</span>
-      <el-button size="small" :loading="loading" @click="loadStatus">刷新</el-button>
+  <div>
+    <!-- 状态卡(照原型:状态芯片 + 说明 + 元信息 + 刷新) -->
+    <div
+      class="card"
+      style="margin-bottom: 14px"
+    >
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <span
+          class="chip"
+          :class="statusChipClass"
+        >{{ statusChipText }}</span>
+        <span style="font-size: 13px; font-weight: 600">{{ statusText }}</span>
+        <span
+          class="muted mono"
+          style="font-size: 11px"
+        >{{ statusMeta }}</span>
+        <span style="flex: 1" />
+        <el-button
+          size="small"
+          :loading="loading"
+          @click="loadStatus"
+        >刷新状态</el-button>
+      </div>
+      <div
+        v-if="status && !status.enabled"
+        class="empty"
+        style="margin-top: 12px"
+      >
+        未启用：<span class="mono">snail.monitor.arthas.enabled=false</span> 或 <span class="mono">base-url</span> 为空 —— 真实页面不渲染本 tab。
+      </div>
     </div>
 
-    <!-- Agent 列表:选中后在 iframe 打开对应控制台 -->
-    <el-table v-if="status?.reachable && status.agents.length" :data="status.agents" size="small" border class="mb">
-      <el-table-column prop="agentId" label="AgentId" min-width="200">
-        <template #default="{ row }">
-          <span class="mono">{{ row.agentId }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="来源" min-width="180">
-        <template #default="{ row }">{{ row.host || '未知来源' }}<template v-if="row.port">:{{ row.port }}</template></template>
-      </el-table-column>
-      <el-table-column prop="arthasVersion" label="Arthas 版本" width="120">
-        <template #default="{ row }">{{ row.arthasVersion || '—' }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="130" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" type="primary" link @click="openConsole(row.agentId)">打开控制台</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-empty v-else-if="status?.reachable" description="tunnel 已可达,当前无注册 agent" :image-size="72" />
-    <el-empty v-else description="Arthas tunnel 未启用或不可达" :image-size="72" />
-
-    <!-- 控制台 iframe:按 agentId 拼接 tunnel 控制台地址;CSP frame-src 限本域 + tunnel 域(DD-13) -->
-    <template v-if="iframeUrl">
-      <div class="iframe-bar">
-        <span class="hint">agentId:{{ activeAgentId }} · 控制台直接操作目标 JVM,请谨慎执行命令</span>
-        <el-button size="small" @click="closeConsole">关闭</el-button>
+    <!-- 已接入 Agent(照原型表) -->
+    <div
+      v-if="status?.reachable && status.agents.length"
+      class="card"
+      style="margin-bottom: 14px"
+    >
+      <div class="card-title">
+        已接入 Agent
+        <span class="sub">GET /monitor/arthas/status · 30s 缓存 · 凭据不回吐</span>
       </div>
-      <iframe :src="iframeUrl" class="console-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
-    </template>
+      <el-table
+        :data="status.agents"
+        size="default"
+      >
+        <el-table-column label="agentId">
+          <template #default="{ row }"><span class="mono">{{ row.agentId }}</span></template>
+        </el-table-column>
+        <el-table-column label="主机 : 端口">
+          <template #default="{ row }">{{ row.host || '未知来源' }}<template v-if="row.port">:{{ row.port }}</template></template>
+        </el-table-column>
+        <el-table-column label="Arthas 版本">
+          <template #default="{ row }">{{ row.arthasVersion || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="状态">
+          <template #default><span class="chip chip-success">在线</span></template>
+        </el-table-column>
+        <el-table-column
+          label="操作"
+          align="right"
+          width="110"
+        >
+          <template #default="{ row }">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              @click="openConsole(row.agentId)"
+            >打开控制台</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+    <div
+      v-else-if="status?.reachable"
+      class="card"
+      style="margin-bottom: 14px"
+    >
+      <div class="empty">tunnel 已可达，当前无注册 agent —— agent 启动需加 <span class="mono">--tunnel-server ws://{host}:7777/ws --agent-id {全局唯一}</span></div>
+    </div>
+
+    <!-- 在线控制台(照原型:arthas-frame 深底框 + bar + iframe) -->
+    <div
+      v-if="iframeUrl"
+      class="card"
+      style="margin-bottom: 14px"
+    >
+      <div class="card-title">
+        在线控制台
+        <span class="sub">iframe 加载 tunnel 官方控制台 · 命令由浏览器直连隧道 WS</span>
+        <span class="right">
+          <el-button
+            size="small"
+            @click="closeConsole"
+          >收起</el-button>
+        </span>
+      </div>
+      <div class="arthas-frame">
+        <div class="arthas-bar">
+          <span class="dot" />
+          <span
+            class="mono"
+            style="color: #cfe0f5"
+          >Arthas Console · agentId {{ activeAgentId }}</span>
+          <span
+            class="mono"
+            style="margin-left: auto; overflow: hidden; text-overflow: ellipsis"
+          >{{ iframeUrl }}</span>
+        </div>
+        <iframe
+          :src="iframeUrl"
+          class="arthas-iframe"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        />
+      </div>
+      <p
+        class="muted"
+        style="font-size: 11.5px; margin-top: 10px; line-height: 1.7"
+      >
+        控制台用 <span class="mono">&lt;iframe&gt;</span> 加载
+        <span class="mono">{tunnel}/index.html?agentId=…&amp;iframe=true&amp;port=7777</span>，控制台自行连接 WS。平台后端不参与命令执行、不落命令历史。
+      </p>
+    </div>
+
+    <!-- 安全与部署前置(照原型) -->
+    <div class="card">
+      <div class="card-title">
+        安全与部署前置
+        <span class="sub">OQ-25</span>
+      </div>
+      <ul
+        class="muted"
+        style="font-size: 12px; line-height: 1.95; padding-left: 18px; margin: 0"
+      >
+        <li>本系统只做「壳」：不代理 Arthas 命令、不托管会话、不保存命令历史；</li>
+        <li>tunnel 控制台自身<b>无鉴权</b> —— 必须内网或反代白名单，禁止直接公网暴露；</li>
+        <li>监控页为 HTTPS 时 tunnel 必须 HTTPS/WSS，否则 iframe 会被混合内容拦截；</li>
+        <li>构建期 CSP 需用 <span class="mono">frame-src</span> 放行 tunnel 源（<span class="mono">VITE_MONITOR_ARTHAS_ORIGIN</span>）；</li>
+        <li>agent 启动加 <span class="mono">--tunnel-server ws://{tunnel-host}:7777/ws --agent-id {全局唯一}</span>，否则列表为空。</li>
+      </ul>
+    </div>
   </div>
 </template>
 
@@ -53,11 +153,34 @@ const loading = ref(false);
 const activeAgentId = ref('');
 const iframeUrl = ref('');
 
-const statusType = computed(() => (status.value?.reachable ? 'success' : status.value?.enabled ? 'danger' : 'info'));
-const statusText = computed(() => {
+const statusChipClass = computed(() => {
+  if (!status.value) return 'chip-muted';
+  if (!status.value.enabled) return 'chip-muted';
+  return status.value.reachable ? 'chip-success' : 'chip-danger';
+});
+
+const statusChipText = computed(() => {
   if (!status.value) return '加载中';
   if (!status.value.enabled) return '未启用';
-  return status.value.reachable ? 'tunnel 可达' : 'tunnel 不可达';
+  return status.value.reachable ? '隧道可达' : '隧道不可达';
+});
+
+const statusText = computed(() => {
+  if (!status.value) return '加载中…';
+  if (!status.value.enabled) return 'Arthas 未开启';
+  return status.value.reachable ? 'Arthas 已开启 · 可在页面内查看' : 'Arthas 已开启 · tunnel 当前不可达';
+});
+
+const statusMeta = computed(() => {
+  const s = status.value;
+  if (!s || !s.enabled) return '';
+  const parts: string[] = [];
+  if (s.tunnelVersion) parts.push(`tunnel ${s.tunnelVersion}`);
+  if (s.consoleBaseUrl) parts.push(s.consoleBaseUrl);
+  if (s.wsPort) parts.push(`WS :${s.wsPort}`);
+  if (s.latencyMs !== null) parts.push(`探测 ${s.latencyMs}ms`);
+  if (s.lastError) parts.push(s.lastError);
+  return parts.join(' · ');
 });
 
 async function loadStatus(): Promise<void> {
@@ -69,14 +192,12 @@ async function loadStatus(): Promise<void> {
   }
 }
 
-/** consoleBaseUrl 来自后端探测(/actuator/arthas),前端不自行拼接未知域。 */
+/** consoleBaseUrl 来自后端探测(/actuator/arthas),前端不自行拼接未知域;CSP frame-src 白名单构建期注入。 */
 function openConsole(agentId: string): void {
   const base = status.value?.consoleBaseUrl;
-  if (!base) {
-    return;
-  }
+  if (!base) return;
   activeAgentId.value = agentId;
-  iframeUrl.value = `${base.replace(/\/$/, '')}?agentId=${encodeURIComponent(agentId)}`;
+  iframeUrl.value = `${base.replace(/\/$/, '')}?agentId=${encodeURIComponent(agentId)}&iframe=true`;
 }
 
 function closeConsole(): void {
@@ -88,50 +209,3 @@ onMounted(() => {
   void loadStatus();
 });
 </script>
-
-<style scoped>
-.arthas {
-  min-height: 320px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.hint.error {
-  color: var(--danger-color, #f56c6c);
-}
-
-.mb {
-  margin-bottom: 12px;
-}
-
-.mono {
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-}
-
-.iframe-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.console-frame {
-  width: 100%;
-  height: 560px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--panel-bg);
-}
-</style>

@@ -1,23 +1,25 @@
 <template>
-  <div class="shell">
+  <div class="app">
     <TopNav />
-    <main class="content">
+    <div class="content">
+      <div class="page-head">
+        <span class="page-title">{{ pageTitle }}</span>
+        <span class="page-crumb">监控中心 / {{ pageTitle }}</span>
+      </div>
       <RouterView />
-    </main>
+    </div>
+    <footer class="app-foot">
+      <span>snail-platform · 系统监控</span>
+      <span>前端 :8003 · 后端 snail-function-monitor · 一级导航为静态路由（meta.perm 控显隐）</span>
+    </footer>
   </div>
 </template>
 
 <script lang="ts" setup>
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 import TopNav from './components/TopNav.vue';
-</script>
 
-<style scoped>
-.shell {
-  min-height: 100vh;
-  background: var(--app-bg);
-}
-.content {
-  max-width: 1440px;
-  margin: 0 auto;
-}
-</style>
+const route = useRoute();
+const pageTitle = computed(() => (route.meta.title as string) ?? '');
+</script>
