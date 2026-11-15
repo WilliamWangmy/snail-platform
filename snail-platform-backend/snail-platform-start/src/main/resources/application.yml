@@ -14,6 +14,10 @@ spring:
     name: snail-platform
   profiles:
     active: ${SNAIL_PROFILE:dev}
+  # JWT 单链没有 httpBasic/formLogin,该自动配置只会造一个不可达的内存账号并往日志打印随机口令;
+  # 排除后启动日志干净,也避免日后误开基础认证时默认账号成为后门
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   threads:
     virtual:
       # 运行时 JDK≥21 才生效，JDK 17 静默关闭；产物仍按 17 编译
