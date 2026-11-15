@@ -1,6 +1,7 @@
 package com.snail.platform.function.monitor.config;
 
 import com.snail.platform.function.monitor.metric.MetricTickEvent;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -35,5 +36,18 @@ public class MonitorAutoConfiguration {
         registration.setOrder(0);
         registration.setName("monitorGateFilter");
         return registration;
+    }
+
+    /**
+     * 慢 SQL 拦截器:db.slow-sql.enabled=false 时不注册(MyBatis starter 自动收集 Interceptor[],
+     * 不改 MybatisPlusConfig);关闭即摘除,qps 键断点(§5.2.2)。
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "snail.monitor.db.slow-sql", name = "enabled",
+            havingValue = "true", matchIfMissing = true)
+    public com.snail.platform.function.monitor.db.slow.SlowSqlInterceptor slowSqlInterceptor(
+            MonitorProperties properties,
+            com.snail.platform.function.monitor.db.slow.SlowSqlCollector collector) {
+        return new com.snail.platform.function.monitor.db.slow.SlowSqlInterceptor(collector, properties);
     }
 }
