@@ -86,16 +86,21 @@ async function signOut(): Promise<void> {
   void router.push('/login');
 }
 
-/** 独立端地址:三端共用一套会话,跳转一律带一次性 ssotoken(大屏收下后可再交接);均新开页签。 */
+/** 独立端地址:各端共用一套会话,跳转一律带一次性 ssotoken(落地端收下后可再交接);均新开页签。 */
 const SCREEN_URL = import.meta.env.VITE_SCREEN_URL ?? 'http://localhost:8001/';
 const FLOW_URL = import.meta.env.VITE_FLOW_URL ?? 'http://localhost:8002/';
+const MONITOR_URL = import.meta.env.VITE_MONITOR_URL ?? 'http://localhost:8003/';
 
-/** 顶栏系统切换入口:按租户五系统开通态过滤,开关明确为 true 才显示——数据缺失(null/拉取失败)一律隐藏,宁可少显示不越权。 */
+/** 监控系统不设租户开关,只对平台默认租户(default,tenant_id=1)开放,与后端 scene=monitor 的租户闸同口径。 */
+const isPlatformTenant = computed(() => auth.user?.tenantId === 1);
+
+/** 顶栏系统切换入口:管理系统为本端自身不进菜单;其余三端按租户开通态过滤,开关明确为 true 才显示——数据缺失(null/拉取失败)一律隐藏,宁可少显示不越权。 */
 const systems = computed(() => {
   const features = auth.user?.tenantFeatures;
   return [
+    { key: 'flow', name: '流程系统', desc: '流程控制台', icon: 'flow', url: FLOW_URL, enabled: features?.workflowEnabled === true },
+    { key: 'monitor', name: '监控系统', desc: '运行监控与诊断', icon: 'monitor', url: MONITOR_URL, enabled: isPlatformTenant.value },
     { key: 'screen', name: '数据大屏', desc: '三维态势可视化', icon: 'chart', url: SCREEN_URL, enabled: features?.dashboardEnabled === true },
-    { key: 'flow', name: '流程平台', desc: '流程控制台', icon: 'flow', url: FLOW_URL, enabled: features?.workflowEnabled === true },
   ].filter((item) => item.enabled);
 });
 
@@ -123,6 +128,7 @@ function handleUserCommand(command: string | number | object): void {
 
 const unread = ref(0);
 const latestUnread = ref<NotifyInboxItem[]>([]);
+const messagePopover = ref<{ hide: () => void } | null>(null);
 let unreadTimer: number | undefined;
 
 /** 推送到达时铃铛抖一下:纯视觉提示,不依赖 toast(收件箱页内到达时 toast 被降噪) */
@@ -165,6 +171,7 @@ function shortTime(value: string | null): string {
 }
 
 function openInbox(): void {
+  messagePopover.value?.hide();
   void router.push('/system/notify');
 }
 
@@ -320,7 +327,8 @@ onBeforeUnmount(() => {
           <span class="env-pill">{{ env }}</span>
           <ElPopover
             v-if="auth.has('system:notify:list')"
-            trigger="click"
+            ref="messagePopover"
+            trigger="hover"
             placement="bottom-end"
             :width="316"
             popper-class="msg-popper"
