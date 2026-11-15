@@ -3,11 +3,12 @@
  * 连线规则（仅 sequenceFlow、禁连开始事件）、驳回线红色虚线渲染。注册方式见 BpmnCanvas.vue 的 additionalModules。
  */
 import BaseRenderer from 'diagram-js/lib/draw/BaseRenderer';
+import CommandInterceptor from 'diagram-js/lib/command/CommandInterceptor';
 import type { Connection } from 'diagram-js/lib/model/Types';
 import { createLine } from 'diagram-js/lib/util/RenderUtil';
 import { append, create as svgCreate } from 'tiny-svg';
 
-import { detectFlowType } from './flowType';
+import { DEFAULT_FLOW_NAME, FLOW_CONDITIONS, detectFlowType } from './flowType';
 
 /* ---------------------------------- 元素栏 ---------------------------------- */
 
@@ -263,6 +264,41 @@ class FlowPadTrimmer {
   }
 }
 
+/* ---------------------------------- 新连线默认值 ---------------------------------- */
+
+interface ConnectionCreateEvent {
+  context?: {
+    source?: { businessObject?: { $type?: string } };
+    connection?: { businessObject?: Record<string, unknown> };
+  };
+}
+
+/**
+ * 新连线默认值：名称「提交」；来源为排他网关时默认写通过条件 ${approved}
+ * （等价于流转类型「正常提交」，用户仍可在连线面板改成「驳回」）。
+ * 在 preExecute 阶段写入 businessObject：随建线命令一体撤销/重做，且重放不覆盖用户改动。
+ */
+class FlowLineDefaults extends CommandInterceptor {
+  static $inject = ['eventBus', 'bpmnFactory'];
+
+  constructor(
+    eventBus: unknown,
+    bpmnFactory: { create: (type: string, props?: Record<string, unknown>) => Record<string, unknown> },
+  ) {
+    super(eventBus as never);
+    this.on('connection.create.preExecute', (event: ConnectionCreateEvent) => {
+      const bo = event.context?.connection?.businessObject;
+      if (!bo) return;
+      bo.name = DEFAULT_FLOW_NAME;
+      if (event.context?.source?.businessObject?.$type === 'bpmn:ExclusiveGateway') {
+        bo.conditionExpression = bpmnFactory.create('bpmn:FormalExpression', {
+          body: FLOW_CONDITIONS.normal,
+        });
+      }
+    });
+  }
+}
+
 /* ---------------------------------- 驳回线渲染 ---------------------------------- */
 
 const REJECT_PRIORITY = 1500;
@@ -306,9 +342,10 @@ class RejectFlowRenderer extends BaseRenderer {
 }
 
 export const flowCustomModules = {
-  __init__: ['flowPadTrimmer', 'flowPaletteProvider', 'flowConnectRules', 'rejectFlowRenderer'],
+  __init__: ['flowPadTrimmer', 'flowPaletteProvider', 'flowConnectRules', 'flowLineDefaults', 'rejectFlowRenderer'],
   flowConnectRules: ['type', FlowConnectRules],
   flowPadTrimmer: ['type', FlowPadTrimmer],
   flowPaletteProvider: ['type', FlowPaletteProvider],
+  flowLineDefaults: ['type', FlowLineDefaults],
   rejectFlowRenderer: ['type', RejectFlowRenderer],
 };

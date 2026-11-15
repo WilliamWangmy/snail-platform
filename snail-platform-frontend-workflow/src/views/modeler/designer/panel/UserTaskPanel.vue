@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 用户任务面板：审批模式两维设置（单人绑定 / 多人执行方式+通过条件）、
+ * 用户任务面板：审批模式两维设置（单人绑定（指定人员/候选组/创建人）/ 多人执行方式+通过条件）、
  * 通知方式、抄送人、办理按钮设置。切换保留/清空规则见设计文档 5.3 定稿项。
  * 本组件以 :key="element.id" 挂载，选中切换即重挂载，状态从 businessObject 一次性回显。
  */
@@ -9,6 +9,7 @@ import { ElMessageBox } from 'element-plus';
 
 import {
   ACTION_BUTTONS,
+  CREATOR_ASSIGNEE,
   DEFAULT_ACTION_BUTTONS,
   DEFAULT_COLLECTION,
   ELEMENT_VARIABLE,
@@ -115,17 +116,23 @@ const candidateGroups = computed({
     writeFlowableAttrs(props.services.modeling, props.element, { candidateGroups: v.join(',') }),
 });
 
-// 二选一：点选即锁定界面态（两项都为空时派生值是 none，否则点选无反馈）；有值一侧切换时清掉另一侧
-const bindingChoice = ref<'assignee' | 'groups' | null>(null);
-const bindingMode = computed<'assignee' | 'groups' | 'none'>(() => {
+// 三选一：点选即锁定界面态（都为空时派生值是 none，否则点选无反馈）；切换时清掉其余侧
+const bindingChoice = ref<'assignee' | 'groups' | 'creator' | null>(null);
+const bindingMode = computed<'assignee' | 'groups' | 'creator' | 'none'>(() => {
   if (bindingChoice.value) return bindingChoice.value;
-  return assignee.value ? 'assignee' : candidateGroups.value.length > 0 ? 'groups' : 'none';
+  if (assignee.value) return assignee.value === CREATOR_ASSIGNEE ? 'creator' : 'assignee';
+  return candidateGroups.value.length > 0 ? 'groups' : 'none';
 });
 
-function switchBinding(mode: 'assignee' | 'groups'): void {
+function switchBinding(mode: 'assignee' | 'groups' | 'creator'): void {
   bindingChoice.value = mode;
+  // 创建人绑定写变量表达式 ${initiator}（网关初始化注入发起人 ID）；转指定人员时先清掉旧表达式
+  const nextAssignee =
+    mode === 'creator'
+      ? CREATOR_ASSIGNEE
+      : mode === 'assignee' && assignee.value !== CREATOR_ASSIGNEE ? assignee.value : '';
   writeFlowableAttrs(props.services.modeling, props.element, {
-    assignee: mode === 'assignee' ? assignee.value : '',
+    assignee: nextAssignee,
     candidateGroups: mode === 'groups' ? candidateGroups.value.join(',') : '',
   });
 }
@@ -317,7 +324,11 @@ const selectedButtons = computed({
 
 /* ------------------------------------ 远程搜索数据源（每实例独立） ------------------------------------ */
 
-const assigneeSearch = useUserRemoteSearch(readFlowableAttr(props.element, 'assignee') ? [readFlowableAttr(props.element, 'assignee')] : []);
+// 创建人绑定下 assignee 是变量表达式而非用户 ID，不进用户搜索回显
+const initialAssignee = readFlowableAttr(props.element, 'assignee');
+const assigneeSearch = useUserRemoteSearch(
+  initialAssignee && !initialAssignee.startsWith('${') ? [initialAssignee] : [],
+);
 const groupSearch = useRoleRemoteSearch(readFlowableAttr(props.element, 'candidateGroups').split(',').filter(Boolean));
 const candidateUserSearch = useUserRemoteSearch(readFlowableAttr(props.element, 'candidateUsers').split(',').filter(Boolean));
 const ccUserSearch = useUserRemoteSearch(ccUsers.value);
@@ -391,13 +402,16 @@ const candidateUsers = computed(() => {
         <el-radio-group
           class="flow-choices"
           :model-value="bindingMode"
-          @update:model-value="(v: string | number | boolean | undefined) => switchBinding(v as 'assignee' | 'groups')"
+          @update:model-value="(v: string | number | boolean | undefined) => switchBinding(v as 'assignee' | 'groups' | 'creator')"
         >
           <el-radio-button value="assignee">
             指定人员
           </el-radio-button>
           <el-radio-button value="groups">
             候选组（角色）
+          </el-radio-button>
+          <el-radio-button value="creator">
+            创建人
           </el-radio-button>
         </el-radio-group>
 
@@ -444,6 +458,13 @@ const candidateUsers = computed(() => {
           />
         </el-select>
 
+        <p
+          v-if="bindingMode === 'creator'"
+          class="field-hint section-hint"
+        >
+          审批人为流程创建人（发起人）：流程初始化时系统自动把创建人 ID 注入流程参数（assignee 为 ${initiator} 表达式），无需选择具体人员。
+        </p>
+
         <el-alert
           v-if="bindingMode === 'none'"
           class="flow-alert flow-alert--warning section-alert"
@@ -451,7 +472,7 @@ const candidateUsers = computed(() => {
           :closable="false"
           show-icon
           title="该任务无审批人"
-          description="请在指定人员、候选组中二选一，否则流程无法流转。"
+          description="请在指定人员、候选组、创建人中三选一，否则流程无法流转。"
         />
       </div>
 
