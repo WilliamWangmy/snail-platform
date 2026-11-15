@@ -3,8 +3,10 @@
     <TopNav />
     <div class="content">
       <div class="page-head">
-        <span class="page-title">{{ pageTitle }}</span>
-        <span class="page-crumb">监控中心 / {{ pageTitle }}</span>
+        <div>
+          <div class="eyebrow">Snail Platform · Monitor</div>
+          <h1 class="page-title">{{ pageTitle }}</h1>
+        </div>
       </div>
       <RouterView />
     </div>

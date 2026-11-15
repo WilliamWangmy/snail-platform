@@ -8,34 +8,34 @@
    全局导入（main.ts），视图中直接使用类名。
    ============================================================ */
 
-/* ===== 布局（品牌 + 顶栏一级导航，无侧栏） ===== */
+/* ===== 布局（品牌 + 顶栏一级导航，无侧栏；壳层对齐流程端 flow-ui） ===== */
 .app {
+  --header-h: 64px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--app-bg);
   color: var(--app-ink);
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .app-header {
   position: sticky;
   top: 0;
   z-index: 70;
-  height: 60px;
+  height: var(--header-h);
   border-bottom: 1px solid var(--app-line);
-  background: var(--app-card);
+  background: rgba(var(--app-card-rgb), 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .app-header-inner {
   display: flex;
   height: 100%;
-  width: 100%;
-  max-width: 1560px;
-  margin: 0 auto;
   align-items: center;
   gap: 22px;
-  padding: 0 22px;
+  padding: 0 30px;
 }
 
 .brand {
@@ -49,17 +49,21 @@
 }
 
 .brand-mark {
+  display: grid;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: var(--app-primary);
-  color: var(--app-on-primary);
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 15px;
   flex: none;
-  box-shadow: rgba(var(--app-primary-rgb), 0.22) 0 6px 16px;
+  place-items: center;
+  border: 1px solid rgba(var(--app-primary-rgb), 0.35);
+  border-radius: 10px;
+  background: rgba(var(--app-primary-rgb), 0.12);
+  box-shadow: 0 0 26px rgba(var(--app-primary-rgb), 0.12), inset 0 1px 0 var(--app-soft-2);
+  color: var(--app-primary);
+}
+
+.brand-mark svg {
+  width: 19px;
+  height: 19px;
 }
 
 .brand-copy {
@@ -80,8 +84,8 @@
 
 .brand-sub {
   margin-top: 1px;
-  font-family: Consolas, 'Courier New', monospace;
-  font-size: 8.5px;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', 'Cascadia Code', Consolas, monospace;
+  font-size: 8px;
   letter-spacing: 0.16em;
   color: var(--app-muted);
 }
@@ -129,8 +133,8 @@
 }
 
 .nav-item.active {
-  border-color: var(--app-primary);
-  background: rgba(var(--app-primary-rgb), 0.1);
+  border-color: rgba(var(--app-primary-rgb), 0.2);
+  background: rgba(var(--app-primary-rgb), 0.12);
   color: var(--app-primary);
   font-weight: 600;
 }
@@ -141,22 +145,21 @@
 
 .nav-badge {
   margin-left: 2px;
-  border: 1px solid var(--app-danger);
+  padding: 1px 7px;
+  border: 1px solid rgba(var(--app-danger-rgb), 0.28);
   border-radius: 999px;
-  background: rgba(var(--app-danger-rgb), 0.12);
+  background: rgba(var(--app-danger-rgb), 0.1);
   color: var(--app-danger);
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 10px;
-  padding: 0 7px;
-  line-height: 16px;
-  font-weight: 700;
+  line-height: 1.2;
 }
 
 .header-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-left: auto;
-  flex: none;
 }
 
 .header-divider {
@@ -216,23 +219,24 @@
 }
 
 .icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid var(--app-line);
-  background: var(--app-card);
-  color: var(--app-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
   position: relative;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--app-line);
+  border-radius: 9px;
+  background: var(--app-soft-2);
+  color: var(--app-muted);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.18s, border-color 0.18s, background 0.18s;
 }
 
 .icon-btn:hover {
+  border-color: rgba(var(--app-primary-rgb), 0.35);
+  background: var(--app-soft);
   color: var(--app-primary);
-  border-color: var(--app-primary);
 }
 
 .icon-btn svg {
@@ -251,98 +255,176 @@
   border: 1.5px solid var(--app-card);
 }
 
-/* 系统切换菜单（跨端） */
-.sys-wrap {
-  position: relative;
-}
-
-.sys-menu {
-  display: none;
-  position: absolute;
-  right: 0;
-  top: 40px;
-  width: 216px;
-  background: var(--app-card);
-  border: 1px solid var(--app-line);
-  border-radius: 10px;
-  box-shadow: var(--app-shadow);
-  padding: 6px;
-  z-index: 120;
-}
-
-.sys-menu.open {
-  display: block;
-}
-
-.sys-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: none;
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: var(--app-ink);
-  font-size: 12.5px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.sys-item:hover {
-  background: var(--app-soft-2);
-}
-
-.sys-item span {
-  color: var(--app-muted);
+/* 顶栏日期与 ENV 胶囊（照流程端 header-tools） */
+.top-date {
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--app-muted);
+}
+
+.env-pill {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  background: var(--app-soft);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--app-muted);
+}
+
+.env-pill::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--app-warning);
+  box-shadow: 0 0 8px rgba(var(--app-warning-rgb), 0.7);
+}
+
+/* 顶栏未读角标:超 99 由调用方收敛成 99+（照流程端 icon-badge） */
+.icon-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--app-danger);
+  color: var(--app-card);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* 账号区（照流程端 header-user:头像 + 姓名 + 租户双行 + 箭头） */
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  outline-offset: 4px;
+}
+
+.header-user-copy {
+  min-width: 0;
+}
+
+.header-user-name {
+  display: block;
+  overflow: hidden;
+  color: var(--app-ink);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-user-role {
+  display: block;
+  margin-top: 1px;
+  font-size: 9.5px;
+  color: var(--app-muted);
+}
+
+.user-caret {
+  flex: none;
+  color: var(--app-muted);
+  transition: transform 0.18s ease;
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  display: grid;
+  width: 31px;
+  height: 31px;
+  flex: none;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
   background: var(--app-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
   color: var(--app-on-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 11.5px;
   font-weight: 700;
-  font-size: 12px;
+  transition: border-color 0.18s;
+}
+
+.header-user:hover .avatar {
+  border-color: rgba(var(--app-primary-rgb), 0.28);
 }
 
 .content {
-  width: 100%;
-  max-width: 1560px;
-  margin: 0 auto;
-  padding: 20px 22px 26px;
+  position: relative;
   flex: 1;
+  min-width: 0;
+  padding: 26px 30px 42px;
+}
+
+/* 网格纹理背景（照流程端 .content::before） */
+.content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(var(--app-primary-rgb), 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--app-primary-rgb), 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(1100px 420px at 70% 0%, #000 0%, transparent 78%);
+  -webkit-mask-image: radial-gradient(1100px 420px at 70% 0%, #000 0%, transparent 78%);
 }
 
 .page-head {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0 0 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--app-primary);
+}
+
+.eyebrow::before {
+  content: '';
+  width: 18px;
+  height: 1px;
+  background: var(--app-primary);
 }
 
 .page-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .page-crumb {
   color: var(--app-muted);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .app-foot {
-  width: 100%;
-  max-width: 1560px;
-  margin: 0 auto;
-  padding: 0 22px 22px;
+  padding: 0 30px 26px;
   color: var(--app-muted);
   font-size: 10.5px;
   display: flex;
@@ -368,7 +450,7 @@
   }
 
   .content {
-    padding: 16px 14px 22px;
+    padding: 18px 14px 30px;
   }
 
   .app-foot {
@@ -1071,7 +1153,74 @@
   border-radius: 12px;
 }
 
-/* 消息弹窗顶部偏移避开 60px 顶栏 */
+/* 下拉菜单贴流程端:透明底 + 圆角项 */
+.el-dropdown-menu {
+  padding: 5px;
+  background: transparent;
+}
+
+.el-dropdown-menu__item {
+  padding: 7px 10px;
+  border-radius: 7px;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.el-dropdown-menu__item:not(.is-disabled):focus,
+.el-dropdown-menu__item:not(.is-disabled):hover {
+  background: var(--app-soft);
+  color: var(--app-ink);
+}
+
+.el-dropdown-menu__item--divided {
+  margin: 4px 3px 0;
+  border-top: 1px solid var(--app-line);
+}
+
+.el-dropdown-menu__item--divided::before {
+  display: none;
+}
+
+/* 顶栏系统切换下拉（popper 挂在 body 下，需全局样式；照流程端） */
+.system-switch-popper .system-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 186px;
+}
+
+.system-switch-popper .system-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--app-muted);
+}
+
+.system-switch-popper .system-item-name {
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.system-switch-popper .system-item-desc {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+/* 顶栏账号菜单（popper 挂在 body 下，需全局样式；照流程端） */
+.user-menu-popper .user-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 108px;
+}
+
+.user-menu-popper .user-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--app-muted);
+}
+
+/* 消息弹窗顶部偏移避开 64px 顶栏 */
 .el-message {
-  top: 70px;
+  top: 74px;
 }
