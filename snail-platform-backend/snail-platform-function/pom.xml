@@ -27,6 +27,7 @@
         <module>snail-function-external</module>
         <module>snail-function-storage</module>
         <module>snail-function-workflow</module>
+        <module>snail-function-monitor</module>
     </modules>
 
     <dependencies>

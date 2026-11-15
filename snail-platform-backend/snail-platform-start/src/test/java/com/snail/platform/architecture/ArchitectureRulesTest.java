@@ -46,6 +46,7 @@ class ArchitectureRulesTest {
     private static final String EXTERNAL = "com.snail.platform.function.external";
     private static final String STORAGE = "com.snail.platform.function.storage";
     private static final String WORKFLOW = "com.snail.platform.function.workflow.";
+    private static final String MONITOR = "com.snail.platform.function.monitor";
 
     /**
      * 第三方 SDK 包前缀:厂商/协议 SDK 只准住在 external 网关(设计 §8)——
@@ -80,8 +81,9 @@ class ArchitectureRulesTest {
      * auth 的整体豁免与 storage 的豁免是另一笔登记在案的债务。
      * storage 暂不列入:它直读 sys_tenant 的 SysTenantMapper 取存储配额,与 auth 同款登记例外
      * (storage→tenant 的单一只读边),变密时收敛 system.api 包,再补进本清单。
+     * monitor 一期不建 api 包(无消费方),但其出边必须落目标模块 api 包(DD-04),故同样入网。
      */
-    private static final Set<String> API_PACKAGE_ENFORCED = Set.of(NOTIFY, EXTERNAL, AUTH, WORKFLOW);
+    private static final Set<String> API_PACKAGE_ENFORCED = Set.of(NOTIFY, EXTERNAL, AUTH, WORKFLOW, MONITOR);
 
     /** 功能模块包根:跨模块依赖的判定范围,落在此根内且不是目标模块 api 包的引用即为越界 */
     private static final String FUNCTION_ROOT = "com.snail.platform.function.";

@@ -46,6 +46,11 @@
             <groupId>com.snail.platform</groupId>
             <artifactId>snail-function-workflow</artifactId>
         </dependency>
+        <!-- 监控模块:actuator starter 由它声明传递带入,start 不重复声明(DD-02);跨模块只经各模块 api 包 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-monitor</artifactId>
+        </dependency>
         <!-- 存储端口层的内嵌 SFTP 测试夹具:仅测试期使用,不进入运行时依赖树 -->
         <dependency>
             <groupId>com.snail.platform</groupId>

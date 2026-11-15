@@ -75,6 +75,9 @@ public class AuthService {
     /** 锁定命中时的统一文案 */
     private static final String LOCKED_MESSAGE = "失败次数过多,请稍后再试";
 
+    /** 平台租户 ID:V1 种子 default 租户即平台自身——monitor 闸唯一放行的租户(DD-12) */
+    private static final long PLATFORM_TENANT_ID = 1L;
+
     /** 密码登录方式编码,落登录日志 login_type 列 */
     private static final String LOGIN_TYPE_PASSWORD = "password";
 
@@ -457,6 +460,8 @@ public class AuthService {
      * scene 闸:按 LoginScene 常量集把 scene 映射到 sys_tenant 对应开关列——
      * admin→admin_enabled、workflow→workflow_enabled、app/miniapp→mobile_enabled(D-06 单开关双 scene)、
      * dashboard→dashboard_enabled、portal→portal_enabled。
+     * 例外:monitor 不对应租户开关——监控系统仅平台管理员使用(OQ-19 B′/DD-12),
+     * 只放行平台租户(tenant_id=1,V1 种子 default 租户即平台自身),拒绝文案专属。
      * 未开通抛 LoginRejects.Scene(准入类子类:不计失败数;调用方在凭证验真后调用,文案可透传);
      * 开关实时读 sys_tenant 不走缓存(NFR-4:开关变更对新登录立即生效)。
      * oauth 链本期缺省 admin(ASM-3),调用方直接传 LoginScene.ADMIN。
@@ -468,10 +473,15 @@ public class AuthService {
             case LoginScene.APP, LoginScene.MINIAPP -> Integer.valueOf(1).equals(tenant.getMobileEnabled());
             case LoginScene.DASHBOARD -> Integer.valueOf(1).equals(tenant.getDashboardEnabled());
             case LoginScene.PORTAL -> Integer.valueOf(1).equals(tenant.getPortalEnabled());
+            // monitor 不看租户开关:只认平台租户(tenant_id=1),其余租户一律拒绝
+            case LoginScene.MONITOR -> Objects.equals(tenant.getTenantId(), PLATFORM_TENANT_ID);
             // 理论不可达:DTO @Pattern 已在参数校验层拦下白名单外的值
             default -> throw BizException.badRequest("非法的登录端");
         };
         if (!enabled) {
+            if (LoginScene.MONITOR.equals(scene)) {
+                throw new LoginRejects.Scene("监控系统仅限平台管理员使用");
+            }
             throw new LoginRejects.Scene("租户未开通" + LoginScene.label(scene) + "权限,请联系平台管理员");
         }
     }

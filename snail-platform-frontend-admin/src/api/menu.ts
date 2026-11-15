@@ -7,7 +7,7 @@ export interface MenuRoute {
   menuName: string;
   /** 1 目录 2 菜单 */
   menuType: number;
-  /** 1 站内 2 数据大屏 3 外链 */
+  /** 展示端:1 管理端 2 数据大屏 3 外链 4 流程端 5 移动端 6 监控端 */
   target: number;
   /** 站内/大屏为路由;外链为完整 URL,前端只把它挂在新标签上,不注册路由 */
   path: string | null;
@@ -27,7 +27,7 @@ export interface MenuNode {
   menuName: string;
   /** 1 目录 2 菜单 3 按钮;建后不可改 */
   menuType: number;
-  /** 1 站内 2 数据大屏 3 外链;建后不可改 */
+  /** 展示端:1 管理端 2 数据大屏 3 外链 4 流程端 5 移动端 6 监控端;建后不可改 */
   target: number;
   /** 1 平台 2 租户;建后不可改,决定谁能看见与授予 */
   scope: number;

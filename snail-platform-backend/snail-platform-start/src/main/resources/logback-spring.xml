@@ -41,6 +41,8 @@
     <springProfile name="!prod">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
+            <!-- OQ-20 拍板 A:非 prod 也落盘,监控日志页 dev 起即有数据;logs/ 相对启动工作目录,容器部署需挂卷 -->
+            <appender-ref ref="ASYNC_FILE"/>
         </root>
     </springProfile>
 </configuration>

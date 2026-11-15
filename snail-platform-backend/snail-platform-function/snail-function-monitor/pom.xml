@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  snail-function-monitor：系统监控模块。子域到包级：config/overview/metric/datasource/alert/db/log/diag/arthas/job。
+  表分组 sys_monitor_*；定时采集/评估/清理的调度装配住 config；总闸只对 /monitor/** 生效。
+  跨模块只准 import 各模块 api 包（ArchUnit API_PACKAGE_ENFORCED 执法，DD-04）。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.snail.platform</groupId>
+        <artifactId>snail-platform-function</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>snail-function-monitor</artifactId>
+    <name>snail-function-monitor</name>
+
+    <dependencies>
+        <!-- 平台横切:响应/异常/上下文/追踪 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-core</artifactId>
+        </dependency>
+        <!-- MP/分页/租户拦截器 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-db</artifactId>
+        </dependency>
+        <!-- 在线用户索引只读 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-redis</artifactId>
+        </dependency>
+        <!-- 登录人快照/权限码 -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-security</artifactId>
+        </dependency>
+        <!-- @OperLog -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-framework-log</artifactId>
+        </dependency>
+        <!-- 跨模块只准经各模块 api 包(ArchUnit 执法) -->
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-notify</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-system</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-external</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.snail.platform</groupId>
+            <artifactId>snail-function-workflow</artifactId>
+        </dependency>
+        <!-- MeterRegistry / http.server.requests 指标(DD-02):由本模块声明,start 经传递获得 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+</project>

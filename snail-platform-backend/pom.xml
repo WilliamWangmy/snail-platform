@@ -147,6 +147,11 @@
                 <artifactId>snail-function-workflow</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.snail.platform</groupId>
+                <artifactId>snail-function-monitor</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- 对象存储客户端单一收敛：JSch 只在 framework-storage 内使用 -->
             <dependency>

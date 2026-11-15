@@ -30,6 +30,7 @@ const TARGETS = [
   { value: 3, label: '外链' },
   { value: 4, label: '流程端' },
   { value: 5, label: '移动端' },
+  { value: 6, label: '监控端' },
 ];
 const SCOPES = [
   { value: 1, label: '平台' },
@@ -146,7 +147,7 @@ const typeOptions = computed(() => {
 /**
  * 展示端可选项(与 MenuService.validateParent/validateShape 同口径):
  * 按钮跟随父节点的展示端(后端要求子承父端);父在管理端树里可选管理端或外链;
- * 流程端/移动端各自成树,子节点只能承父端;根层只给 管理端/流程端/移动端——
+ * 流程端/移动端/监控端各自成树,子节点只能承父端;根层只给 管理端/流程端/移动端/监控端——
  * 数据大屏树是内置固定菜单不做新增入口(见 canHaveChild),外链不做根,它不能挂下级。
  */
 const targetOptions = computed(() => {
@@ -154,7 +155,7 @@ const targetOptions = computed(() => {
   if (form.menuType === 3) return TARGETS.filter((item) => item.value === (p?.target ?? 1));
   if (p?.target === 1) return TARGETS.filter((item) => item.value === 1 || item.value === 3);
   if (p) return TARGETS.filter((item) => item.value === p.target);
-  return TARGETS.filter((item) => item.value === 1 || item.value === 4 || item.value === 5);
+  return TARGETS.filter((item) => item.value === 1 || item.value === 4 || item.value === 5 || item.value === 6);
 });
 
 const scopeOptions = computed(() => {

@@ -25,7 +25,7 @@ public record SmsLoginRequest(
         @Size(max = 8, message = "验证码过长")
         String smsCode,
 
-        @Schema(description = "登录端:admin/workflow/app/miniapp/dashboard/portal,缺省 admin;非法值 400「非法的登录端」")
+        @Schema(description = "登录端:admin/workflow/app/miniapp/dashboard/portal/monitor,缺省 admin;非法值 400「非法的登录端」")
         @Pattern(regexp = LoginScene.PATTERN, message = "非法的登录端")
         String scene) {
 }

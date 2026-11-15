@@ -7,7 +7,10 @@ import java.util.Set;
  * scene 与 sys_tenant 五开关的映射:admin→admin_enabled、workflow→workflow_enabled、
  * app/miniapp→mobile_enabled(同一位产品位)、dashboard→dashboard_enabled、portal→portal_enabled;
  * oauth 链本期不加 scene,缺省按 admin 校验(ASM-3),移动端/门户接入 oauth 时再透传。
- * 上游:LoginRequest/SmsLoginRequest/SmsPickRequest 的 @Pattern 白名单;下游:AuthService 的 scene 闸与登录日志。
+ * 例外:monitor 不对应租户开关——监控系统仅平台管理员使用(OQ-19 B′),登录闸只认平台租户
+ * (tenant_id=1,V1 种子 default 租户即平台自身),映射口径见 AuthService.requireSceneEnabled。
+ * 上游:LoginRequest/SmsLoginRequest/SmsPickRequest/SsoCheckInRequest 的 @Pattern 白名单;
+ * 下游:AuthService 的 scene 闸与登录日志。
  * 口径:非法 scene 在参数校验层就拒(400「非法的登录端」,不涉账号、不进登录日志);
  *      合法但未开通走 LoginRejects.Scene——scene 闸在凭证验真之后(密码链在密码比对后,
  *      短信/OAuth 链在码验真后),「租户未开通{端名}权限,请联系平台管理员」文案可对外透传
@@ -33,16 +36,19 @@ public final class LoginScene {
     /** 企业门户(门户立项前无调用方,枚举预留) */
     public static final String PORTAL = "portal";
 
+    /** 监控系统(frontend-monitor):不对应租户开关,登录闸只认平台租户(例外口径见类注释) */
+    public static final String MONITOR = "monitor";
+
     /** 全部合法 scene:闸内归一与日志归属都以此为准 */
     public static final Set<String> ALL =
-            Set.of(ADMIN, WORKFLOW, APP, MINIAPP, DASHBOARD, PORTAL);
+            Set.of(ADMIN, WORKFLOW, APP, MINIAPP, DASHBOARD, PORTAL, MONITOR);
 
     /**
      * Bean 校验用正则(编译期常量,@Pattern 引用):白名单外一律 400「非法的登录端」。
      * 写成正则而不是 @Pattern 定制校验器,是为了让非法值死在参数校验层——
      * 进了 service 的 try/catch 会被准入改写吞掉文案,违背"不涉账号"的口径。
      */
-    public static final String PATTERN = "admin|workflow|app|miniapp|dashboard|portal";
+    public static final String PATTERN = "admin|workflow|app|miniapp|dashboard|portal|monitor";
 
     private LoginScene() {
     }
@@ -66,6 +72,7 @@ public final class LoginScene {
             case APP, MINIAPP -> "移动端";
             case DASHBOARD -> "数据大屏";
             case PORTAL -> "企业门户";
+            case MONITOR -> "监控系统";
             default -> scene;
         };
     }

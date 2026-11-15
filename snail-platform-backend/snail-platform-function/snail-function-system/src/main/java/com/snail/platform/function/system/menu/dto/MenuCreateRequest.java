@@ -30,10 +30,10 @@ public record MenuCreateRequest(
         @Max(value = 3, message = "菜单类型取值 1-3")
         Integer menuType,
 
-        @Schema(description = "展示端:1 管理端 2 数据大屏 3 外链 4 流程端 5 移动端", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(description = "展示端:1 管理端 2 数据大屏 3 外链 4 流程端 5 移动端 6 监控端", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "请选择展示端")
-        @Min(value = 1, message = "展示端取值 1-5")
-        @Max(value = 5, message = "展示端取值 1-5")
+        @Min(value = 1, message = "展示端取值 1-6")
+        @Max(value = 6, message = "展示端取值 1-6")
         Integer target,
 
         @Schema(description = "归属面:1 平台 2 租户", requiredMode = Schema.RequiredMode.REQUIRED)

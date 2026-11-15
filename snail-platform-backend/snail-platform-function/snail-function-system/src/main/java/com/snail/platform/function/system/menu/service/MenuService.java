@@ -55,6 +55,9 @@ public class MenuService {
     /** 展示端:移动端(app/小程序) */
     private static final int TARGET_MOBILE = 5;
 
+    /** 展示端:监控端(monitor 前端静态路由的权限树载体,不参与导航渲染) */
+    private static final int TARGET_MONITOR = 6;
+
     /** 归属面:平台 */
     private static final int SCOPE_PLATFORM = 1;
 
@@ -287,7 +290,7 @@ public class MenuService {
                 throw BizException.badRequest("按钮不能配置路由与组件");
             }
             if (target == TARGET_DASHBOARD || target == TARGET_EXTERNAL) {
-                throw BizException.badRequest("按钮只能挂在管理端/流程端/移动端页面下");
+                throw BizException.badRequest("按钮只能挂在管理端/流程端/移动端/监控端页面下");
             }
             if (visible != 0) {
                 throw BizException.badRequest("按钮固定为显示状态");

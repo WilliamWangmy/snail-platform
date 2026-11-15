@@ -61,5 +61,10 @@ snail:
         - sys_workflow_template
         # 第三方身份绑定:登录按(source,open_id)跨租户定位,tenant_id 只是绑定时刻的展示快照
         - sys_user_identity
+        # 监控四表:平台级观测数据,不带租户列,拦截器豁免
+        - sys_monitor_metric
+        - sys_monitor_alert_rule
+        - sys_monitor_alert
+        - sys_monitor_diag_report
   pagination:
     max-limit: 500

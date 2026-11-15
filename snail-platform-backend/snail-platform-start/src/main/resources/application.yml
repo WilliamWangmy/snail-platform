@@ -7,6 +7,7 @@
 #   notify.yml    消息触达(snail-function-notify)
 #   storage.yml   文件存储(snail-function-storage)
 #   workflow.yml  流程引擎(snail-function-workflow)
+#   monitor.yml   系统监控(snail-function-monitor)
 # 凭据一律环境变量注入,共享配置不留真实默认值。
 spring:
   application:
@@ -33,6 +34,7 @@ spring:
       - optional:classpath:config/notify.yml
       - optional:classpath:config/storage.yml
       - optional:classpath:config/workflow.yml
+      - optional:classpath:config/monitor.yml
   # 缓存规格不再走统一 spec:userSession 是会话态需要 expireAfterAccess+大容量,
   # 配置类缓存只需小容量——分规格声明迁至 com.snail.platform.config.CacheSpecConfig,
   # 新增缓存名必须去那里登记,业务侧不各自建缓存

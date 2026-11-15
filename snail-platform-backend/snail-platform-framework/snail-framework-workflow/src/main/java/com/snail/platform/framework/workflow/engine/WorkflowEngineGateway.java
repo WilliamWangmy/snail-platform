@@ -401,6 +401,16 @@ public class WorkflowEngineGateway {
                 .count());
     }
 
+    /**
+     * 当前租户的流程定义数量(诊断探针用,WorkflowHealthPort 消费);只读,不触发部署/缓存。
+     */
+    public long countProcessDefinitions() {
+        String tenantId = WorkflowTenantIds.requireEngineTenant();
+        return WorkflowEngineErrors.supply("查询流程定义", () ->
+                repositoryService.createProcessDefinitionQuery()
+                        .processDefinitionTenantId(tenantId).count());
+    }
+
     /** 业务单是否已有在途实例(方案 §7:一单一条流程的判据) */
     public boolean hasRunningInstance(String businessKey) {
         String tenantId = WorkflowTenantIds.requireEngineTenant();

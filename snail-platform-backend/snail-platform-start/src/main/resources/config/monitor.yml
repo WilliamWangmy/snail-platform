@@ -1,0 +1,78 @@
+# 系统监控配置（snail-function-monitor）：结构与开关住本文件，凭据一律环境变量注入。
+# 默认值即代码默认值（MonitorProperties），本文件只做显式化，运维改值不用翻代码。
+# 监控端仅平台管理员使用（OQ-19 B′），登录闸在后端 scene=monitor；本文件不含租户开关。
+snail:
+  monitor:
+    # 总闸:false 时 /monitor/** 全部 400「监控功能未开放」,采样/评估/清理调度空转(DD-01,Bean 图恒定)
+    enabled: true
+    # 采样 tick 间隔(秒),同时驱动评估与数据源状态刷新
+    sample-interval-seconds: 60
+    metrics:
+      # builtin=进程内置采集;prometheus=外部源,未映射/失败键回退内置
+      source: builtin
+      prometheus:
+        base-url: ${SNAIL_MONITOR_PROM_URL:}
+        username: ${SNAIL_MONITOR_PROM_USER:}
+        password: ${SNAIL_MONITOR_PROM_PASSWORD:}
+        timeout-ms: 3000
+        # 单 tick 外部查询总预算(DD-06)
+        total-timeout-ms: 5000
+        # MetricKey → PromQL 映射;未映射键回退 builtin。示例三条,其余键同理
+        queries:
+          system.cpu.usage: 'avg(rate(node_cpu_seconds_total{mode!="idle"}[1m]))*100'
+          db.pool.active: 'sum(hikaricp_connections_active)'
+          disk.usage.percent: 'max(node_filesystem_size_bytes{fstype!="tmpfs"})'
+    logs:
+      # file=本地日志文件检索;loki=外部日志源(不可达报错,不静默回退 file)
+      source: file
+      file:
+        dir: logs
+        active-name: snail-platform.log
+      scan-max-lines: 2000000
+      scan-timeout-ms: 3000
+      # tail 只读活跃文件末尾字节数(DD-26)
+      tail-max-bytes: 2097152
+      loki:
+        base-url: ${SNAIL_MONITOR_LOKI_URL:}
+        timeout-ms: 5000
+        selector: '{job="snail-platform"}'
+    db:
+      slow-sql:
+        enabled: true                 # false = 摘除拦截器口径（停采集，回滚开关）
+        threshold-ms: 1000            # ≥ 该值计入慢 SQL 与 db.sql.slow.5m
+        max-digests: 500              # SQL 模板摘要上限，超出淘汰最久未命中
+        recent-size: 100              # 最近慢 SQL 事件条数（内存，不落库）
+        max-sql-length: 500           # 归一化后 SQL 截断长度
+      server:
+        enabled: true                 # SHOW GLOBAL STATUS / @@global.max_connections
+        timeout-ms: 1000              # 失败置 server.available=false，不影响池与慢 SQL
+    arthas:
+      enabled: false                  # true 且 base-url 可达时，诊断页出现「Arthas 在线诊断」tab
+      base-url: ${SNAIL_MONITOR_ARTHAS_URL:}       # tunnel web 地址，如 https://arthas-tunnel.internal
+      ws-port: 7777                   # 浏览器直连 tunnel 的 agent WS 端口
+      username: ${SNAIL_MONITOR_ARTHAS_USER:arthas}
+      password: ${SNAIL_MONITOR_ARTHAS_PASSWORD:}  # actuator basic auth，仅服务端使用
+      timeout-ms: 2000
+      cache-seconds: 30
+    links:
+      grafana-url: ${SNAIL_MONITOR_GRAFANA_URL:}
+    diag:
+      agent-health-url: ${SNAIL_MONITOR_AGENT_HEALTH_URL:}
+      item-timeout-ms: 2000
+      total-timeout-ms: 10000
+      rate-limit-seconds: 10
+    cleanup:
+      cron: '0 30 3 * * ?'
+      metric-retention-days: 7
+      alert-retention-days: 90
+      report-retention-days: 30
+      batch-size: 1000
+      max-batches: 200
+
+# actuator 只放 health 端点(主方案 §4.1):本模块声明 starter、start 传递获得(DD-02);
+# /actuator/health 不进安全白名单,同样走 JWT;业务数据一律经 /monitor/**。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
