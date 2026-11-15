@@ -16,6 +16,8 @@ const props = defineProps<{
   xml: string;
   /** true 时为只读查看器（pan/zoom 可用，编辑关闭） */
   readonly?: boolean;
+  /** 元素标记（只读视图着色用）：按元素 id 追加 class，随 XML 重载重新应用 */
+  markers?: Array<{ id: string; className: string }>;
 }>();
 
 const emit = defineEmits<{
@@ -39,6 +41,10 @@ interface CanvasService {
   zoom(): number;
   zoom(target: number | string): number | string;
   viewbox(): { scale: number };
+}
+interface MarkerCanvasService {
+  addMarker: (elementId: string, className: string) => void;
+  removeMarker: (elementId: string, className: string) => void;
 }
 interface ToggleTool {
   isActive: () => boolean;
@@ -107,6 +113,7 @@ const stageRef = ref<HTMLDivElement>();
 let diagram: Modeler | NavigatedViewer | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let imported = false;
+let appliedMarkers: Array<{ id: string; className: string }> = [];
 
 function getService<T>(name: string): T | null {
   return diagram ? (diagram.get(name) as T) : null;
@@ -129,6 +136,7 @@ async function render(): Promise<void> {
   if (!stageRef.value || !props.xml) return;
 
   diagram?.destroy();
+  appliedMarkers = [];
   const options = {
     container: stageRef.value,
     moddleExtensions: { flowable: FLOWABLE_MODDLE_DESCRIPTOR },
@@ -169,6 +177,7 @@ async function render(): Promise<void> {
     await diagram.importXML(props.xml);
     imported = true;
     currentXml = props.xml;
+    applyMarkers();
     getService<CanvasService>('canvas')?.zoom('fit-viewport');
     emitZoom();
     emit('imported');
@@ -178,6 +187,17 @@ async function render(): Promise<void> {
 }
 
 let currentXml = '';
+
+function applyMarkers(): void {
+  const canvas = getService<MarkerCanvasService>('canvas');
+  if (!canvas) return;
+  appliedMarkers.forEach((marker) => canvas.removeMarker(marker.id, marker.className));
+  appliedMarkers = [];
+  for (const marker of props.markers ?? []) {
+    canvas.addMarker(marker.id, marker.className);
+    appliedMarkers.push(marker);
+  }
+}
 
 onMounted(() => {
   void render();
@@ -208,6 +228,12 @@ watch(() => props.xml, (next) => {
 watch(() => props.readonly, () => {
   void render();
 });
+
+watch(() => props.markers, () => {
+  if (diagram) {
+    applyMarkers();
+  }
+}, { deep: true });
 
 /* ---------------------------------- 外部元素栏 ---------------------------------- */
 

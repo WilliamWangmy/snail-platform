@@ -48,9 +48,25 @@ export interface WorkflowTraceStep {
 /** WorkflowTraceVO.Waiting 镜像 */
 export interface WorkflowTraceWaiting {
   taskId: string;
+  activityId?: string;
   taskName?: string;
   assigneeId?: number | null;
   assigneeName?: string | null;
+}
+
+/** 流程图节点状态：DONE 已通过 / ACTIVE 当前停留 / REJECTED 驳回路径 / WITHDRAWN 撤销终止点 */
+export type WorkflowDiagramNodeState = 'DONE' | 'ACTIVE' | 'REJECTED' | 'WITHDRAWN';
+
+/** WorkflowTraceVO.Diagram.Node 镜像 */
+export interface WorkflowDiagramNode {
+  activityId: string;
+  state: WorkflowDiagramNodeState;
+}
+
+/** WorkflowTraceVO.Diagram 镜像：xml 为空表示定义原文不可用 */
+export interface WorkflowTraceDiagram {
+  xml: string | null;
+  nodes: WorkflowDiagramNode[];
 }
 
 /** WorkflowTraceVO 镜像 */
@@ -58,6 +74,7 @@ export interface WorkflowTraceVO {
   instance: WorkflowInstanceVO;
   steps: WorkflowTraceStep[];
   waiting: WorkflowTraceWaiting[];
+  diagram?: WorkflowTraceDiagram | null;
 }
 
 /** 发起流程 */
@@ -77,9 +94,16 @@ export function getInstance(instanceId: string): Promise<WorkflowInstanceVO> {
   return http<WorkflowInstanceVO>({ url: `/workflow/instance/${instanceId}`, method: 'GET' });
 }
 
-/** 流程轨迹（步骤 + 在途节点） */
-export function getInstanceTrace(instanceId: string): Promise<WorkflowTraceVO> {
-  return http<WorkflowTraceVO>({ url: `/workflow/instance/${instanceId}/trace`, method: 'GET' });
+/** 流程轨迹（步骤 + 在途节点）；需要流程图时显式带 diagram=true */
+export function getInstanceTrace(
+  instanceId: string,
+  options?: { diagram?: boolean }
+): Promise<WorkflowTraceVO> {
+  return http<WorkflowTraceVO>({
+    url: `/workflow/instance/${instanceId}/trace`,
+    method: 'GET',
+    params: options?.diagram ? { diagram: true } : undefined,
+  });
 }
 
 /** 撤销在途流程 */

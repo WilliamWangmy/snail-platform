@@ -14,6 +14,7 @@ import {
 } from '@/api/workflow/instance';
 import { pageModels, type WorkflowModelVO } from '@/api/workflow/model';
 import AppIcon from '@/components/AppIcon.vue';
+import InstanceFlowDiagram from '@/components/InstanceFlowDiagram.vue';
 import { useAuthStore } from '@/stores/auth';
 
 type InstanceFilter = 'all' | 'running' | 'approved' | 'rejected' | 'withdrawn';
@@ -242,6 +243,21 @@ const activeSteps = computed(() => activeTrace.value?.steps ?? []);
 const waitingTasks = computed(() => activeTrace.value?.waiting ?? []);
 const recentSteps = computed(() => activeSteps.value.slice(-4).reverse());
 const canWithdraw = computed(() => activeInstance.value?.status === 'RUNNING');
+const isEnded = computed(() => {
+  const status = activeInstance.value?.status;
+  return status === 'APPROVED' || status === 'REJECTED' || status === 'WITHDRAWN';
+});
+const endMeta = computed(() =>
+  statusMeta(activeInstance.value?.status ?? 'RUNNING')
+);
+
+function endTagType(): 'success' | 'danger' | 'warning' | 'info' {
+  const status = activeInstance.value?.status;
+  if (status === 'APPROVED') return 'success';
+  if (status === 'REJECTED') return 'danger';
+  if (status === 'WITHDRAWN') return 'warning';
+  return 'info';
+}
 
 const drawerFootnote = computed(() => {
   if (!activeInstance.value) return '';
@@ -266,7 +282,7 @@ async function loadActiveTrace(): Promise<void> {
   const seq = ++activeTraceSeq;
   drawerLoading.value = true;
   try {
-    const trace = await getInstanceTrace(target.instanceId);
+    const trace = await getInstanceTrace(target.instanceId, { diagram: true });
     if (seq !== activeTraceSeq) return;
     activeTrace.value = trace;
     activeInstance.value = trace.instance;
@@ -822,9 +838,17 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
           <div class="inspector-section">
             <h3 class="inspector-section-title">
               <span>已发生动作</span><span class="mono">{{ activeSteps.length }} STEPS</span>
+              <el-button
+                class="trace-jump"
+                size="small"
+                link
+                @click="drawerTab = 'diagram'"
+              >
+                <AppIcon name="workflow" />查看流程图
+              </el-button>
             </h3>
             <el-timeline
-              v-if="activeSteps.length"
+              v-if="activeSteps.length || isEnded"
               class="flow-timeline"
             >
               <el-timeline-item
@@ -855,6 +879,34 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
                   class="tl-note"
                 >
                   {{ step.comment }}
+                </div>
+              </el-timeline-item>
+              <el-timeline-item
+                v-if="isEnded"
+                class="trace-end"
+                :class="{ 'is-done': activeInstance?.status === 'APPROVED' }"
+              >
+                <template #dot>
+                  <span
+                    class="tl-dot"
+                    :class="{
+                      'tl-dot--rejected': activeInstance?.status === 'REJECTED',
+                      'tl-dot--withdrawn': activeInstance?.status === 'WITHDRAWN',
+                    }"
+                  />
+                </template>
+                <div class="tl-title">
+                  流程结束
+                  <el-tag
+                    class="flow-tag"
+                    :type="endTagType()"
+                    disable-transitions
+                  >
+                    {{ endMeta.label }}
+                  </el-tag>
+                </div>
+                <div class="tl-meta">
+                  {{ activeInstance?.endTime ? formatTime(activeInstance.endTime) : '未记录结束时刻' }}
                 </div>
               </el-timeline-item>
             </el-timeline>
@@ -893,12 +945,44 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
               </div>
             </div>
             <div
+              v-else-if="isEnded"
+              class="task-summary trace-end-card"
+            >
+              <span
+                class="tile"
+                :class="endMeta.tone"
+              >
+                <AppIcon :name="endMeta.icon" />
+              </span>
+              <div class="task-summary-copy">
+                <b>流程已结束 · {{ endMeta.label }}</b>
+                <span>{{ activeInstance.endTime ? `结束于 ${formatTime(activeInstance.endTime)}` : '结束时刻未记录' }}</span>
+              </div>
+              <el-tag
+                class="status-tag"
+                :class="endMeta.cls"
+                disable-transitions
+              >
+                {{ endMeta.label }}
+              </el-tag>
+            </div>
+            <div
               v-else
               class="drawer-empty"
             >
-              {{ activeInstance.status === 'RUNNING' ? '引擎暂未生成待办节点' : '流程已结束，无在途节点' }}
+              引擎暂未生成待办节点
             </div>
           </div>
+        </el-tab-pane>
+
+        <el-tab-pane
+          label="流程图"
+          name="diagram"
+        >
+          <InstanceFlowDiagram
+            :trace="activeTrace"
+            :loading="drawerLoading"
+          />
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -1299,6 +1383,29 @@ const asInstance = (row: unknown): WorkflowInstanceVO => row as WorkflowInstance
 .trace-task {
   color: var(--text-2);
   font-weight: 400;
+}
+
+.inspector-section-title .trace-jump {
+  margin-left: auto;
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.flow-timeline .trace-end .tl-dot--rejected {
+  border-color: var(--danger);
+  background: var(--danger);
+  box-shadow: 0 0 10px var(--danger-a4);
+}
+
+.flow-timeline .trace-end .tl-dot--withdrawn {
+  border-color: var(--amber);
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber-a35);
+}
+
+.trace-end-card {
+  border-style: dashed;
 }
 
 .start-vars {

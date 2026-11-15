@@ -6,6 +6,7 @@ import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.workflow.engine.WorkflowEngineGateway;
 import com.snail.platform.framework.workflow.engine.WorkflowInstance;
 import com.snail.platform.framework.workflow.engine.WorkflowTask;
+import com.snail.platform.framework.workflow.engine.WorkflowTraceStep;
 import com.snail.platform.function.system.api.UserBriefPort;
 import com.snail.platform.function.workflow.api.WorkflowApi;
 import com.snail.platform.function.workflow.api.WorkflowStartCommand;
@@ -47,6 +48,15 @@ public class WorkflowInstanceService implements WorkflowApi {
 
     /** 单据标题变量名:网关按它给实例命名,列表与提醒都读实例名 */
     private static final String VARIABLE_BUSINESS_TITLE = "businessTitle";
+
+    /** 引擎活动类型:只有用户任务可承载驳回动作 */
+    private static final String ACTIVITY_TYPE_USER_TASK = "userTask";
+
+    /** 流程图节点状态:已通过 / 当前停留 / 驳回路径 / 撤销终止点 */
+    private static final String NODE_DONE = "DONE";
+    private static final String NODE_ACTIVE = "ACTIVE";
+    private static final String NODE_REJECTED = "REJECTED";
+    private static final String NODE_WITHDRAWN = "WITHDRAWN";
 
     /** 流程引擎网关 */
     private final WorkflowEngineGateway gateway;
@@ -159,15 +169,17 @@ public class WorkflowInstanceService implements WorkflowApi {
     /**
      * 轨迹页:已发生的动作读台账(快照口径),当前停在哪里读引擎(现值口径)。
      * 两段拼在一屏是刻意的——"当时谁办的"与"现在卡在谁手里"是两个问题,用同一张表答必然有一个是错的。
+     * includeDiagram 由详情页显式打开:列表摘要只要步骤数与在途节点,不该为每一行付出定义原文的代价。
      */
-    public WorkflowTraceVO trace(String instanceId) {
+    public WorkflowTraceVO trace(String instanceId, boolean includeDiagram) {
         WorkflowInstance instance = gateway.requireInstance(instanceId);
         List<WorkflowTraceVO.Step> steps = recordService.listByInstance(instance.id()).stream()
                 .map(WorkflowInstanceService::stepOf)
                 .toList();
-        List<WorkflowTask> waiting = gateway.findTasksOfInstance(instance.id());
-        return new WorkflowTraceVO(WorkflowInstanceVO.of(instance, statusOf(instance)), steps,
-                waitingOf(waiting));
+        WorkflowStatus status = statusOf(instance);
+        List<WorkflowTraceVO.Waiting> waiting = waitingOf(gateway.findTasksOfInstance(instance.id()));
+        return new WorkflowTraceVO(WorkflowInstanceVO.of(instance, status), steps, waiting,
+                includeDiagram ? diagramOf(instance, status, steps, waiting) : null);
     }
 
     /** 撤销的共同路径:发起人校验→抓在册任务→终止引擎→落台账→通知当时在等的人→派发结果 */
@@ -292,10 +304,117 @@ public class WorkflowInstanceService implements WorkflowApi {
         return tasks.stream()
                 .map(task -> {
                     Long assigneeId = parseUserId(task.assignee());
-                    return new WorkflowTraceVO.Waiting(task.id(), task.name(), assigneeId,
-                            assigneeId == null ? null : names.get(assigneeId));
+                    return new WorkflowTraceVO.Waiting(task.id(), task.taskDefinitionKey(), task.name(),
+                            assigneeId, assigneeId == null ? null : names.get(assigneeId));
                 })
                 .toList();
+    }
+
+    /**
+     * 流程图数据:定义原文 + 已发生节点的状态。
+     * 节点状态按实例结果推导——通过把走过的节点全标完成;驳回从驳回任务起把后续路径染成驳回;
+     * 撤销把最后停留的用户任务标成终止点;在途实例按历史活动是否有结束时刻区分已完成与当前节点。
+     * 定义原文读取失败只让流程图降级为空态,不拖垮轨迹主体。
+     */
+    private WorkflowTraceVO.Diagram diagramOf(WorkflowInstance instance, WorkflowStatus status,
+                                              List<WorkflowTraceVO.Step> steps,
+                                              List<WorkflowTraceVO.Waiting> waiting) {
+        List<WorkflowTraceStep> activities = gateway.findTrace(instance.id()).stream()
+                .filter(activity -> activity.activityId() != null && !activity.activityId().isBlank())
+                .toList();
+        Map<String, String> states = new LinkedHashMap<>();
+        if (status == WorkflowStatus.RUNNING) {
+            activities.forEach(activity -> mergeNodeState(states, activity.activityId(),
+                    activity.endTime() == null ? NODE_ACTIVE : NODE_DONE));
+            waiting.forEach(task -> mergeNodeState(states, task.activityId(), NODE_ACTIVE));
+        } else if (status == WorkflowStatus.REJECTED) {
+            int rejectIndex = rejectActivityIndex(activities, steps);
+            for (int i = 0; i < activities.size(); i++) {
+                mergeNodeState(states, activities.get(i).activityId(),
+                        i >= rejectIndex ? NODE_REJECTED : NODE_DONE);
+            }
+        } else if (status == WorkflowStatus.WITHDRAWN) {
+            int endIndex = lastUserTaskIndex(activities);
+            for (int i = 0; i < activities.size(); i++) {
+                mergeNodeState(states, activities.get(i).activityId(),
+                        i == endIndex ? NODE_WITHDRAWN : NODE_DONE);
+            }
+        } else {
+            activities.forEach(activity -> mergeNodeState(states, activity.activityId(), NODE_DONE));
+        }
+
+        List<WorkflowTraceVO.Node> nodes = states.entrySet().stream()
+                .map(entry -> new WorkflowTraceVO.Node(entry.getKey(), entry.getValue()))
+                .toList();
+        String xml = null;
+        try {
+            xml = gateway.findDefinitionXml(instance.definitionId());
+        } catch (RuntimeException ignored) {
+            // 定义原文缺失或不可读:流程图空态,轨迹主体与在途节点照常展示
+        }
+        return new WorkflowTraceVO.Diagram(xml, nodes);
+    }
+
+    /** 驳回任务在活动历史里的位置:优先按任务 ID 对齐,退而按节点名找最后一个同名用户任务 */
+    private static int rejectActivityIndex(List<WorkflowTraceStep> activities, List<WorkflowTraceVO.Step> steps) {
+        WorkflowTraceVO.Step reject = null;
+        for (WorkflowTraceVO.Step step : steps) {
+            if (WorkflowTaskRecordService.ACTION_REJECT.equals(step.action())) {
+                reject = step;
+            }
+        }
+        if (reject == null) {
+            return activities.size();
+        }
+        if (reject.taskId() != null) {
+            for (int i = 0; i < activities.size(); i++) {
+                if (reject.taskId().equals(activities.get(i).taskId())) {
+                    return i;
+                }
+            }
+        }
+        if (reject.taskName() != null) {
+            for (int i = activities.size() - 1; i >= 0; i--) {
+                WorkflowTraceStep activity = activities.get(i);
+                if (ACTIVITY_TYPE_USER_TASK.equals(activity.type())
+                        && reject.taskName().equals(activity.name())) {
+                    return i;
+                }
+            }
+        }
+        return Math.max(lastUserTaskIndex(activities), 0);
+    }
+
+    /** 最后一个用户任务的位置:撤销发生在哪个节点,就把它标成终止点 */
+    private static int lastUserTaskIndex(List<WorkflowTraceStep> activities) {
+        for (int i = activities.size() - 1; i >= 0; i--) {
+            if (ACTIVITY_TYPE_USER_TASK.equals(activities.get(i).type())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** 同一节点多次经过时保留语义更强的一次:当前 > 驳回 > 撤销 > 已通过 */
+    private static void mergeNodeState(Map<String, String> states, String activityId, String state) {
+        if (activityId == null || activityId.isBlank()) {
+            return;
+        }
+        states.merge(activityId, state,
+                (current, next) -> nodeStateRank(next) >= nodeStateRank(current) ? next : current);
+    }
+
+    private static int nodeStateRank(String state) {
+        if (NODE_ACTIVE.equals(state)) {
+            return 3;
+        }
+        if (NODE_REJECTED.equals(state)) {
+            return 2;
+        }
+        if (NODE_WITHDRAWN.equals(state)) {
+            return 1;
+        }
+        return 0;
     }
 
     /** 引擎身份字符串 → 平台用户 ID;非数字按缺失处理,不让一行展示因为一个脏 id 整页失败 */

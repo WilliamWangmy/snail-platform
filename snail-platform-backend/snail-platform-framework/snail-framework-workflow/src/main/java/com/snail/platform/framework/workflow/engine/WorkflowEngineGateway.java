@@ -601,8 +601,8 @@ public class WorkflowEngineGateway {
                 .processInstanceId(instance.id())
                 .orderByHistoricActivityInstanceStartTime().asc()
                 .list().stream()
-                .map(activity -> new WorkflowTraceStep(activity.getActivityId(), activity.getActivityName(),
-                        activity.getActivityType(), activity.getAssignee(),
+                .map(activity -> new WorkflowTraceStep(activity.getActivityId(), activity.getTaskId(),
+                        activity.getActivityName(), activity.getActivityType(), activity.getAssignee(),
                         WorkflowTimes.ofEngine(activity.getStartTime()),
                         WorkflowTimes.ofEngine(activity.getEndTime()), activity.getDurationInMillis()))
                 .toList());

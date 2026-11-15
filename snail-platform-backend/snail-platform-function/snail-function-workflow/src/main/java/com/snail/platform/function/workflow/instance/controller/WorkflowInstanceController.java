@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -61,10 +62,11 @@ public class WorkflowInstanceController {
     }
 
     @PreAuthorize("hasAuthority('system:workflow-instance:list')")
-    @Operation(summary = "流程轨迹")
+    @Operation(summary = "流程轨迹(可选携带流程图数据)")
     @GetMapping("/{instanceId}/trace")
-    public R<WorkflowTraceVO> trace(@PathVariable String instanceId) {
-        return R.ok(instanceService.trace(instanceId));
+    public R<WorkflowTraceVO> trace(@PathVariable String instanceId,
+                                    @RequestParam(value = "diagram", defaultValue = "false") boolean diagram) {
+        return R.ok(instanceService.trace(instanceId, diagram));
     }
 
     @PreAuthorize("hasAuthority('system:workflow-instance:withdraw')")

@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus';
 import { pageUsers } from '@/api/system/user';
 import {
   getInstanceTrace,
+  type WorkflowStatus,
   type WorkflowTraceStep,
   type WorkflowTraceVO,
 } from '@/api/workflow/instance';
@@ -19,6 +20,7 @@ import {
   type WorkflowTodoVO,
 } from '@/api/workflow/task';
 import AppIcon from '@/components/AppIcon.vue';
+import InstanceFlowDiagram from '@/components/InstanceFlowDiagram.vue';
 import { useAuthStore } from '@/stores/auth';
 
 type TabKey = 'todo' | 'done';
@@ -52,6 +54,14 @@ const ACTION_LABELS: Record<string, string> = {
   reject: '驳回',
   transfer: '转办',
   withdraw: '撤销流程',
+};
+
+const TRACE_STATUS_META: Record<WorkflowStatus, { label: string; cls: string; tone: string; icon: string }> = {
+  RUNNING: { label: '运行中', cls: 'status-tag--teal', tone: '', icon: 'activity' },
+  APPROVED: { label: '已通过', cls: 'status-tag--blue', tone: '', icon: 'check-circle' },
+  REJECTED: { label: '已驳回', cls: 'status-tag--danger', tone: 'tile--danger', icon: 'x-circle' },
+  WITHDRAWN: { label: '已撤销', cls: 'status-tag--amber', tone: 'tile--amber', icon: 'x-circle' },
+  NONE: { label: '未启动', cls: 'status-tag--slate', tone: 'tile--amber', icon: 'pause' },
 };
 
 const auth = useAuthStore();
@@ -338,6 +348,21 @@ let traceSeq = 0;
 
 const traceSteps = computed(() => trace.value?.steps ?? []);
 const waitingTasks = computed(() => trace.value?.waiting ?? []);
+const traceIsEnded = computed(() => {
+  const status = trace.value?.instance.status;
+  return status === 'APPROVED' || status === 'REJECTED' || status === 'WITHDRAWN';
+});
+const traceEndMeta = computed(() =>
+  TRACE_STATUS_META[trace.value?.instance.status ?? 'RUNNING']
+);
+
+function traceEndTagType(): 'success' | 'danger' | 'warning' | 'info' {
+  const status = trace.value?.instance.status;
+  if (status === 'APPROVED') return 'success';
+  if (status === 'REJECTED') return 'danger';
+  if (status === 'WITHDRAWN') return 'warning';
+  return 'info';
+}
 const doneStep = computed<WorkflowTraceStep | null>(() => {
   const current = activeTask.value;
   if (!current || activeKind.value !== 'done') return null;
@@ -377,7 +402,7 @@ async function loadActiveTrace(): Promise<void> {
   traceLoading.value = true;
   traceFailed.value = false;
   try {
-    const result = await getInstanceTrace(current.instanceId);
+    const result = await getInstanceTrace(current.instanceId, { diagram: true });
     if (seq !== traceSeq) return;
     trace.value = result;
   } catch {
@@ -1205,9 +1230,17 @@ async function confirmTransfer(): Promise<void> {
           <div class="inspector-section">
             <h3 class="inspector-section-title">
               <span>已发生动作</span><span class="mono">{{ traceSteps.length }} STEPS</span>
+              <el-button
+                class="trace-jump"
+                size="small"
+                link
+                @click="drawerTab = 'diagram'"
+              >
+                <AppIcon name="workflow" />查看流程图
+              </el-button>
             </h3>
             <el-timeline
-              v-if="traceSteps.length"
+              v-if="traceSteps.length || traceIsEnded"
               class="flow-timeline"
             >
               <el-timeline-item
@@ -1248,6 +1281,34 @@ async function confirmTransfer(): Promise<void> {
                   {{ step.comment }}
                 </div>
               </el-timeline-item>
+              <el-timeline-item
+                v-if="traceIsEnded"
+                class="trace-end"
+                :class="{ 'is-done': trace?.instance.status === 'APPROVED' }"
+              >
+                <template #dot>
+                  <span
+                    class="tl-dot"
+                    :class="{
+                      'tl-dot--rejected': trace?.instance.status === 'REJECTED',
+                      'tl-dot--withdrawn': trace?.instance.status === 'WITHDRAWN',
+                    }"
+                  />
+                </template>
+                <div class="tl-title">
+                  流程结束
+                  <el-tag
+                    class="flow-tag"
+                    :type="traceEndTagType()"
+                    disable-transitions
+                  >
+                    {{ traceEndMeta.label }}
+                  </el-tag>
+                </div>
+                <div class="tl-meta">
+                  {{ trace?.instance.endTime ? formatTime(trace.instance.endTime) : '未记录结束时刻' }}
+                </div>
+              </el-timeline-item>
             </el-timeline>
             <div
               v-else
@@ -1284,12 +1345,44 @@ async function confirmTransfer(): Promise<void> {
               </div>
             </div>
             <div
+              v-else-if="traceIsEnded"
+              class="task-summary trace-end-card"
+            >
+              <span
+                class="tile"
+                :class="traceEndMeta.tone"
+              >
+                <AppIcon :name="traceEndMeta.icon" />
+              </span>
+              <div class="task-summary-copy">
+                <b>流程已结束 · {{ traceEndMeta.label }}</b>
+                <span>{{ trace?.instance.endTime ? `结束于 ${formatTime(trace.instance.endTime)}` : '结束时刻未记录' }}</span>
+              </div>
+              <el-tag
+                class="status-tag"
+                :class="traceEndMeta.cls"
+                disable-transitions
+              >
+                {{ traceEndMeta.label }}
+              </el-tag>
+            </div>
+            <div
               v-else
               class="drawer-empty"
             >
               {{ traceLoading ? '正在读取在途节点…' : '当前没有在途节点' }}
             </div>
           </div>
+        </el-tab-pane>
+
+        <el-tab-pane
+          label="流程图"
+          name="diagram"
+        >
+          <InstanceFlowDiagram
+            :trace="trace"
+            :loading="traceLoading"
+          />
         </el-tab-pane>
       </el-tabs>
     </template>
@@ -1692,6 +1785,35 @@ async function confirmTransfer(): Promise<void> {
 .trace-task {
   color: var(--text-2);
   font-weight: 400;
+}
+
+.inspector-section-title .trace-jump {
+  margin-left: auto;
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.flow-timeline .trace-end .tl-dot--rejected {
+  border-color: var(--danger);
+  background: var(--danger);
+  box-shadow: 0 0 10px var(--danger-a4);
+}
+
+.flow-timeline .trace-end .tl-dot--withdrawn {
+  border-color: var(--amber);
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber-a35);
+}
+
+.trace-end-card {
+  border-style: dashed;
+}
+
+.tile.tile--danger {
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+  color: var(--danger-bright);
 }
 
 @media (max-width: 860px) {

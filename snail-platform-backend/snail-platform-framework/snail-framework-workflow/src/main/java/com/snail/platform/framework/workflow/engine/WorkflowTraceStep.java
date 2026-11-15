@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 public record WorkflowTraceStep(
         /** 节点标识(BPMN 元素 id) */
         String activityId,
+        /** 节点实例对应的任务 ID;事件与网关为 null,用于和审批台账的行对齐 */
+        String taskId,
         /** 节点展示名 */
         String name,
         /** 活动类型,如 userTask / exclusiveGateway / startEvent */

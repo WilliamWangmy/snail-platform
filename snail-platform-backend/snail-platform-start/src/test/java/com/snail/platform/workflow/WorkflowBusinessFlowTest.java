@@ -168,6 +168,11 @@ class WorkflowBusinessFlowTest {
         assertEquals(3, orderFlowStatus(fixture.orderNo()), "驳回要把单据退回未通过");
         assertEquals(WorkflowStatus.REJECTED, workflowApi.status(BUSINESS_TYPE, fixture.orderNo()));
 
+        WorkflowTraceVO rejectedTrace = instanceService.trace(first.instanceId(), true);
+        assertEquals(WorkflowStatus.REJECTED, rejectedTrace.instance().status());
+        assertEquals("REJECTED", stateOf(rejectedTrace.diagram(), "approve"),
+                "驳回任务在流程图上是驳回路径起点");
+
         LoginUserContextHolder.set(initiator());
         StartResult second = startOrder(fixture);
         assertTrue(!second.instanceId().equals(first.instanceId()), "驳回后允许重新提交");
@@ -267,7 +272,7 @@ class WorkflowBusinessFlowTest {
         // 签收人用种子超管:在途节点要回查档案取现值,档案里没这个人就只能取到空
         taskService.claim(todoIdOf(initiator(), started.instanceId()), new WorkflowHandleRequest("我来跟进"));
 
-        WorkflowTraceVO trace = instanceService.trace(started.instanceId());
+        WorkflowTraceVO trace = instanceService.trace(started.instanceId(), false);
         assertEquals(WorkflowStatus.RUNNING, trace.instance().status(), "已签收未办结仍是在途");
         assertEquals("超级管理员", trace.steps().get(0).operatorName(), "发起步的人名是台账快照");
         assertEquals(List.of(WorkflowTaskRecordService.ACTION_START, WorkflowTaskRecordService.ACTION_CLAIM),
@@ -276,6 +281,13 @@ class WorkflowBusinessFlowTest {
         assertEquals(REAL_USER_ID, trace.waiting().get(0).assigneeId(), "签收后在途节点的办理人是签收人");
         assertEquals("超级管理员", trace.waiting().get(0).assigneeName(),
                 "在途节点的姓名回查档案取现值,与台账步的快照名各走各的来源");
+        assertNull(trace.diagram(), "未显式请求流程图时不装配定义原文与节点状态");
+
+        WorkflowTraceVO withDiagram = instanceService.trace(started.instanceId(), true);
+        assertNotNull(withDiagram.diagram(), "显式请求时返回流程图数据");
+        assertNotNull(withDiagram.diagram().xml(), "当前租户的定义原文应可读取");
+        assertEquals("DONE", stateOf(withDiagram.diagram(), "start"), "已走过的开始事件标为完成");
+        assertEquals("ACTIVE", stateOf(withDiagram.diagram(), "approve"), "在途用户任务标为当前");
 
         List<WorkflowInstanceVO> startedRows = instanceService
                 .pageStarted(new WorkflowInstanceQuery(1, 50, fixture.key())).rows();
@@ -445,6 +457,15 @@ class WorkflowBusinessFlowTest {
                 .toList();
         assertEquals(1, matched.size(), "台账应有且只有一条 " + action);
         return matched.get(0);
+    }
+
+    /** 流程图里指定节点的状态;节点缺失即判失败,避免"没数据也算过" */
+    private static String stateOf(WorkflowTraceVO.Diagram diagram, String activityId) {
+        return diagram.nodes().stream()
+                .filter(node -> activityId.equals(node.activityId()))
+                .map(WorkflowTraceVO.Node::state)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("流程图缺少节点:" + activityId));
     }
 
     private int orderFlowStatus(String orderNo) {
