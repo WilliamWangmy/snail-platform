@@ -1,0 +1,40 @@
+:root {
+  font-family: 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--app-ink, #17302f);
+  background: var(--app-bg, #f3f7f7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+.page {
+  padding: 16px 20px 28px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.page-sub {
+  font-size: 12px;
+  color: var(--app-muted, #728583);
+  margin: 0 0 16px;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', Consolas, Menlo, monospace;
+  font-size: 12px;
+}
