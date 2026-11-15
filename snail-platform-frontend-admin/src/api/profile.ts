@@ -19,7 +19,7 @@ export function fetchProfile(): Promise<Profile> {
 }
 
 /** 自助改资料只开 nickname/email/phone 三字段;org、状态不在契约内,改不到也不需要权限码 */
-export function updateProfile(payload: { nickname: string; email: string | null; phone: string | null }): Promise<void> {
+export function updateProfile(payload: { nickname: string; email: string; phone: string }): Promise<void> {
   return put<void>('/system/profile', payload);
 }
 

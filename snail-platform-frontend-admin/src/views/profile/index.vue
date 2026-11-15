@@ -70,10 +70,14 @@ const profileRules = {
     { required: true, message: '请输入显示名', trigger: 'blur' },
     { max: 30, message: '显示名至多 30 字', trigger: 'blur' },
   ],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' },
+  ],
   phone: [
-    // 空值跳过规则(async-validator 惯例),选填;位数上限由输入框 maxlength 双保险
-    { pattern: /^1\d{10}$/, message: '请输入 11 位手机号', trigger: 'blur' },
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    // 与后端 UpdateProfileRequest 的 1[3-9] 口径一致,避免本地放过、服务端再拒
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入 11 位手机号', trigger: 'blur' },
   ],
 };
 
@@ -94,8 +98,8 @@ async function submitProfile(): Promise<void> {
   try {
     await updateProfile({
       nickname: profileForm.nickname.trim(),
-      email: profileForm.email.trim() || null,
-      phone: profileForm.phone.trim() || null,
+      email: profileForm.email.trim(),
+      phone: profileForm.phone.trim(),
     });
     ElMessage.success('资料已更新');
     await auth.loadSession();
@@ -232,7 +236,7 @@ function signOutLocal(): void {
                   class="mono-input"
                   maxlength="11"
                   show-word-limit
-                  placeholder="选填"
+                  placeholder="请输入 11 位手机号"
                 />
               </ElFormItem>
               <ElFormItem
@@ -242,7 +246,7 @@ function signOutLocal(): void {
               >
                 <ElInput
                   v-model="profileForm.email"
-                  placeholder="选填"
+                  placeholder="请输入邮箱"
                 />
               </ElFormItem>
             </div>
