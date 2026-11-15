@@ -35,7 +35,7 @@ public record FileVO(
         @Schema(description = "业务域标签")
         String bizType,
 
-        @Schema(description = "文件类型,内置字典 sys_file_type 的值,platform=平台文件")
+        @Schema(description = "文件类型,内置字典 sys_file_type 的值,platform=平台文件、avatar=头像")
         String fileType,
 
         @Schema(description = "关联业务 ID")

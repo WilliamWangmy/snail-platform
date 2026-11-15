@@ -9,6 +9,7 @@ import TabBar from '@/components/TabBar.vue';
 import { fetchUnreadCount, pageInbox, type NotifyInboxItem } from '@/api/notify';
 import { useNotifyPush } from '@/composables/useNotifyPush';
 import { useAuthStore } from '@/stores/auth';
+import { useAvatarStore } from '@/stores/avatar';
 import { useLayoutStore } from '@/stores/layout';
 import { useTabsStore } from '@/stores/tabs';
 import { resetMenuRoutes } from '@/router/menuRoutes';
@@ -16,6 +17,7 @@ import { resetMenuRoutes } from '@/router/menuRoutes';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const avatar = useAvatarStore();
 const tabs = useTabsStore();
 const layout = useLayoutStore();
 
@@ -178,6 +180,8 @@ function openInbox(): void {
 onMounted(() => {
   window.addEventListener('resize', handleResize);
   window.addEventListener('notify:pushed', onPushed);
+  const userId = auth.user?.userId;
+  if (userId) void avatar.load(userId);
   if (auth.has('system:notify:list')) {
     void pollUnread();
     unreadTimer = window.setInterval(() => void pollUnread(), 30_000);
@@ -442,10 +446,20 @@ onBeforeUnmount(() => {
               tabindex="0"
               :aria-label="`账号菜单，当前：${auth.user?.nickname ?? auth.user?.username ?? ''}`"
             >
-              <span class="avatar">{{ avatarText }}</span>
+              <span
+                class="avatar"
+                aria-hidden="true"
+              >
+                <img
+                  v-if="avatar.url"
+                  :src="avatar.url"
+                  class="avatar-img"
+                  alt=""
+                />
+                <template v-else>{{ avatarText }}</template>
+              </span>
               <span class="header-user-copy">
                 <span class="header-user-name">{{ auth.user?.nickname ?? auth.user?.username }}</span>
-                <span class="header-user-role">{{ auth.user?.tenantName ?? auth.roleNames }}</span>
               </span>
               <AppIcon
                 class="user-caret"
@@ -881,6 +895,13 @@ onBeforeUnmount(() => {
   color: var(--app-on-primary);
   font-size: 12.5px;
   font-weight: 700;
+  overflow: hidden;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .header-user .avatar {
@@ -906,13 +927,6 @@ onBeforeUnmount(() => {
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.header-user-role {
-  display: block;
-  margin-top: 1px;
-  color: color-mix(in srgb, var(--app-muted) 82%, transparent);
-  font-size: 9.5px;
 }
 
 .user-caret {

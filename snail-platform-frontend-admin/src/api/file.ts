@@ -13,7 +13,7 @@ export interface FileVO {
   /** sftp | s3 */
   storageType: string;
   bizType: string | null;
-  /** 文件类型,内置字典 sys_file_type 的值,platform=平台文件 */
+  /** 文件类型,内置字典 sys_file_type 的值,platform=平台文件、avatar=头像 */
   fileType: string;
   bizId: number | null;
   uploadBy: number | null;
@@ -71,4 +71,16 @@ export function downloadFile(file: FileVO): Promise<void> {
 /** 预览取原始字节:与下载同端点同权限(system:file:download),格式解析全在浏览器内完成。 */
 export function fetchFileBlob(fileId: number): Promise<Blob> {
   return getBlob(`/system/file/${fileId}/raw`);
+}
+
+/** 本人头像:只要求登录;未设置时后端回 204,前端拿到空 Blob 即回退姓名缩写。 */
+export function fetchMyAvatar(): Promise<Blob> {
+  return getBlob('/system/file/avatar');
+}
+
+/** 本人头像上传:后端固定 bizType/fileType=avatar(字典内置值),仅收 JPG/PNG/GIF/WEBP 且限 2MB。 */
+export function uploadMyAvatar(file: File): Promise<FileVO> {
+  const form = new FormData();
+  form.append('file', file);
+  return post<FileVO>('/system/file/avatar', form);
 }

@@ -1,7 +1,7 @@
 -- =========================================================
 -- 文件存储域全量脚本:建表 + 内置文件类型字典 + 菜单权限种子,一个文件装齐
 -- 干什么:sys_file 元数据表(含 file_type);sys_dict_type 加 is_system 内置标记;
---         种子内置字典 sys_file_type(文件类型)与默认值 平台文件(platform);
+--         种子内置字典 sys_file_type(文件类型)与内置值 平台文件(platform)、头像(avatar);
 --         文件管理/平台文件菜单与权限码;默认租户 admin 平台面补授
 -- 能否重跑:不能;Flyway 版本迁移仅执行一次,重放需整库重建
 -- 前置条件:先跑 V1(系统域,含 sys_dict_type),菜单挂在 sys_menu 的 1/2 号目录下
@@ -73,5 +73,10 @@ VALUES (1, '文件类型', 'sys_file_type', 0, 1, '内置字典:文件管理的�
 
 INSERT INTO sys_dict_data (tenant_id, dict_id, dict_label, dict_value, sort, status, remark, create_time)
 SELECT 1, dict_id, '平台文件', 'platform', 0, 0, '内置默认值,不可删除', NOW()
+FROM sys_dict_type
+WHERE tenant_id = 1 AND dict_type = 'sys_file_type' AND deleted = 0;
+
+INSERT INTO sys_dict_data (tenant_id, dict_id, dict_label, dict_value, sort, status, remark, create_time)
+SELECT 1, dict_id, '头像', 'avatar', 1, 0, '个人中心头像上传,内置值不可删除', NOW()
 FROM sys_dict_type
 WHERE tenant_id = 1 AND dict_type = 'sys_file_type' AND deleted = 0;

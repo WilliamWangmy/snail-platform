@@ -19,6 +19,7 @@ import com.snail.platform.function.storage.mapper.SysFileMapper;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -81,6 +82,18 @@ public class FileStorageService {
      * sys_file.file_type 列默认值三方同码——字典值建后不可改且内置项不许删,该码终身稳定。
      */
     private static final String DEFAULT_FILE_TYPE = "platform";
+
+    /** 头像业务域:与 bizId=用户ID 一起定位本人头像 */
+    private static final String AVATAR_BIZ_TYPE = "avatar";
+
+    /** 头像文件类型:内置字典 sys_file_type 的内置值 avatar(头像),上传时固定使用 */
+    private static final String AVATAR_FILE_TYPE = "avatar";
+
+    /** 头像只收图片扩展名,与 FileController 的图片响应类型映射对齐 */
+    private static final Set<String> AVATAR_EXT_WHITELIST = Set.of("jpg", "jpeg", "png", "gif", "webp");
+
+    /** 头像单文件上限:小图即可,避免头像拖垮列表渲染与带宽 */
+    private static final long AVATAR_MAX_BYTES = 2L * BYTES_PER_MB;
 
     /** 写入端口缺席时的统一文案 */
     private static final String STORAGE_NOT_CONFIGURED = "文件存储未配置";
@@ -184,6 +197,51 @@ public class FileStorageService {
     }
 
     /**
+     * 本人头像上传:业务域与文件类型固定为 avatar(字典内置值),只收图片扩展名且限 2MB。
+     * 新图落库成功后再清旧行——反过来先删后传,一旦写存储失败用户头像就丢了。
+     */
+    public FileVO uploadAvatar(MultipartFile file) {
+        Long userId = LoginUserContextHolder.userId();
+        if (file == null || file.isEmpty()) {
+            throw BizException.badRequest("上传文件为空");
+        }
+        String ext = extOf(cleanFileName(file.getOriginalFilename()));
+        if (ext == null || !AVATAR_EXT_WHITELIST.contains(ext)) {
+            throw BizException.badRequest("头像仅支持 JPG/PNG/GIF/WEBP 图片");
+        }
+        if (file.getSize() > AVATAR_MAX_BYTES) {
+            throw BizException.badRequest("头像大小不能超过 2MB");
+        }
+        FileVO created = upload(file, AVATAR_BIZ_TYPE, userId, AVATAR_FILE_TYPE);
+        for (SysFile row : avatarRows(userId)) {
+            if (!row.getFileId().equals(created.fileId())) {
+                removeRow(row);
+            }
+        }
+        return created;
+    }
+
+    /** 本人头像内容:未设置返回 null(接口层回 204),按 bizType+bizId=当前用户 取最新一条 */
+    public StorageDownload avatar(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        SysFile file = avatarRows(userId).stream().findFirst().orElse(null);
+        if (file == null) {
+            return null;
+        }
+        return new StorageDownload(file, requirePortOf(file).get(file.getStorageKey()));
+    }
+
+    private List<SysFile> avatarRows(Long userId) {
+        return fileMapper.selectList(Wrappers.<SysFile>lambdaQuery()
+                .eq(SysFile::getBizType, AVATAR_BIZ_TYPE)
+                .eq(SysFile::getBizId, userId)
+                .eq(SysFile::getFileType, AVATAR_FILE_TYPE)
+                .orderByDesc(SysFile::getFileId));
+    }
+
+    /**
      * 下载:本租户语义——selectById 被租户拦截器圈定,跨租户/已删一律按不存在拒绝
      * (存在性即租户隐私,与 OperLogService.detail 同口径);
      * 再判文件级可见性,最后按元数据记录的 storage_type 取端口;内容流由调用方负责关闭。
@@ -198,12 +256,16 @@ public class FileStorageService {
 
     /** 删除:逻辑删即时生效;物理删按记录类型路由,失败或后端未配置只告警,残留由 GC 任务清扫 */
     public void remove(Long fileId) {
-        SysFile file = requireFile(fileId);
-        fileMapper.deleteById(fileId);
+        removeRow(requireFile(fileId));
+    }
+
+    /** 已知行直接删:头像替换传入的是刚查出的旧行,并发重复删天然幂等,不必再做存在性检查 */
+    private void removeRow(SysFile file) {
+        fileMapper.deleteById(file.getFileId());
         storageRegistry.of(file.getStorageType()).ifPresentOrElse(
                 port -> deleteObjectQuietly(port, file.getStorageKey(), "逻辑删除后清理"),
                 () -> log.warn("文件 {} 所属存储后端 {} 未配置,对象留待 GC 清扫",
-                        fileId, file.getStorageType()));
+                        file.getFileId(), file.getStorageType()));
     }
 
     /** 本租户文件分页,租户拦截器圈定 */

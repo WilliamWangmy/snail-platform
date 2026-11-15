@@ -13,11 +13,14 @@ import {
   type Profile,
   type UserIdentity,
 } from '@/api/profile';
+import { uploadMyAvatar } from '@/api/file';
 import { useAuthStore } from '@/stores/auth';
+import { useAvatarStore } from '@/stores/avatar';
 import AppIcon from '@/components/AppIcon.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
+const avatarStore = useAvatarStore();
 
 const profile = ref<Profile | null>(null);
 
@@ -86,6 +89,7 @@ onMounted(async () => {
   profileForm.nickname = profile.value.nickname;
   profileForm.email = profile.value.email ?? '';
   profileForm.phone = profile.value.phone ?? '';
+  void avatarStore.load(profile.value.userId);
   await loadIdentities();
 });
 
@@ -105,6 +109,41 @@ async function submitProfile(): Promise<void> {
     await auth.loadSession();
   } finally {
     savingProfile.value = false;
+  }
+}
+
+const AVATAR_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+
+const avatarInput = ref<HTMLInputElement | null>(null);
+const uploadingAvatar = ref(false);
+
+function pickAvatar(): void {
+  if (!uploadingAvatar.value) avatarInput.value?.click();
+}
+
+async function onAvatarChange(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  if (!AVATAR_EXTS.has(ext)) {
+    ElMessage.warning('头像仅支持 JPG/PNG/GIF/WEBP 图片');
+    return;
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    ElMessage.warning('头像大小不能超过 2MB');
+    return;
+  }
+  uploadingAvatar.value = true;
+  try {
+    await uploadMyAvatar(file);
+    const userId = profile.value?.userId;
+    if (userId) await avatarStore.refresh(userId);
+    ElMessage.success('头像已更新');
+  } finally {
+    uploadingAvatar.value = false;
   }
 }
 
@@ -142,13 +181,36 @@ function signOutLocal(): void {
       </div>
     </div>
 
-    <!-- 身份卡:主题渐变头像 + 名称/角色胶囊 + 等宽标识行 + 归属事实区,与租户详情抽屉同一视觉母题 -->
+    <!-- 身份卡:可点击更换的头像 + 名称/角色胶囊 + 等宽标识行 + 归属事实区,与租户详情抽屉同一视觉母题 -->
     <ElCard
       shadow="never"
       class="hero-card"
     >
       <div class="hero">
-        <span class="p-avatar">{{ profile?.nickname?.charAt(0) || '?' }}</span>
+        <button
+          class="p-avatar"
+          type="button"
+          title="点击更换头像"
+          :aria-label="uploadingAvatar ? '头像上传中' : '更换头像'"
+          :disabled="uploadingAvatar"
+          @click="pickAvatar"
+        >
+          <img
+            v-if="avatarStore.url"
+            :src="avatarStore.url"
+            class="p-avatar-img"
+            alt=""
+          />
+          <template v-else>{{ profile?.nickname?.charAt(0) || '?' }}</template>
+          <span class="p-avatar-mask">{{ uploadingAvatar ? '上传中…' : '更换头像' }}</span>
+        </button>
+        <input
+          ref="avatarInput"
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          hidden
+          @change="onAvatarChange"
+        />
         <div class="p-meta">
           <div class="p-name-row">
             <h2>{{ profile?.nickname ?? '—' }}</h2>
@@ -368,17 +430,52 @@ function signOutLocal(): void {
 }
 
 .p-avatar {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 56px;
   height: 56px;
   flex: none;
+  padding: 0;
+  border: 0;
   border-radius: 14px;
+  overflow: hidden;
   color: var(--app-on-primary);
   background: linear-gradient(135deg, var(--app-primary), var(--app-primary-tint));
   box-shadow: 0 6px 16px rgba(var(--app-primary-rgb), 0.28);
+  cursor: pointer;
+  font-family: inherit;
   font-size: 22px;
   font-weight: 700;
+}
+
+.p-avatar:disabled {
+  cursor: default;
+}
+
+.p-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.p-avatar-mask {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 3px 0;
+  background: rgba(0, 0, 0, 0.52);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.16s;
+}
+
+.p-avatar:hover .p-avatar-mask,
+.p-avatar:focus-visible .p-avatar-mask {
+  opacity: 1;
 }
 
 .p-meta {

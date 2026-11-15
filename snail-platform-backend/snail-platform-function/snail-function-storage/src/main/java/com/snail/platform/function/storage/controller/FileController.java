@@ -1,5 +1,6 @@
 package com.snail.platform.function.storage.controller;
 
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
@@ -31,10 +32,10 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import org.springframework.web.util.UriUtils;
 
 /**
- * 职责:租户文件管理入口——上传、本租户分页、流式下载与删除。
+ * 职责:租户文件管理入口——上传、本租户分页、流式下载与删除;另含本人头像的上传与读取。
  * 下载要求 system:file:download,文件级可见性再由 FileAccessPolicy 判定;
- * 上传/删除是写操作挂 system:file:* 权限码并留痕。
- * 上游:文件管理页面;下游:FileStorageService。
+ * 上传/删除是写操作挂 system:file:* 权限码并留痕;头像属于自助能力,只要求登录且只作用于本人。
+ * 上游:文件管理页面、个人中心;下游:FileStorageService。
  */
 @Tag(name = "文件管理")
 @RestController
@@ -91,6 +92,35 @@ public class FileController {
         return R.ok(fileStorageService.page(query));
     }
 
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "上传本人头像(文件类型固定 avatar,仅图片,≤2MB)")
+    @OperLog(module = "个人中心", businessType = BusinessType.UPDATE)
+    @PostMapping("/avatar")
+    public R<FileVO> uploadAvatar(@RequestPart("file") MultipartFile file) {
+        return R.ok(fileStorageService.uploadAvatar(file));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "读取本人头像(未设置返回 204)")
+    @GetMapping("/avatar")
+    public ResponseEntity<StreamingResponseBody> avatar() {
+        FileStorageService.StorageDownload download =
+                fileStorageService.avatar(LoginUserContextHolder.userId());
+        if (download == null) {
+            return ResponseEntity.noContent().build();
+        }
+        StreamingResponseBody body = output -> {
+            try (InputStream content = download.content()) {
+                content.transferTo(output);
+            }
+        };
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        inlineDisposition(download.file().getFileName()))
+                .contentType(MediaType.parseMediaType(contentTypeOf(download.file().getFileName())))
+                .body(body);
+    }
+
     @PreAuthorize("hasAuthority('system:file:download')")
     @Operation(summary = "下载文件(本租户 + 文件级可见性)")
     @OperLog(module = "文件管理", businessType = BusinessType.EXPORT)
@@ -122,6 +152,12 @@ public class FileController {
     /** RFC 5987 形态的下载名:filename*=UTF-8'',与前端 http.ts 的双正则解析对齐 */
     private static String contentDisposition(String fileName) {
         return "attachment; filename*=UTF-8''"
+                + UriUtils.encode(fileName, StandardCharsets.UTF_8);
+    }
+
+    /** 头像走 inline:语义上是页面内图片展示,不是附件下载 */
+    private static String inlineDisposition(String fileName) {
+        return "inline; filename*=UTF-8''"
                 + UriUtils.encode(fileName, StandardCharsets.UTF_8);
     }
 

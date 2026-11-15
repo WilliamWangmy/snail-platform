@@ -78,6 +78,10 @@ public class TenantService {
     private static final String FILE_TYPE_DEFAULT_LABEL = "平台文件";
     private static final String FILE_TYPE_DEFAULT_VALUE = "platform";
 
+    /** 内置文件类型字典的头像数据项:个人中心头像上传固定使用 avatar */
+    private static final String FILE_TYPE_AVATAR_LABEL = "头像";
+    private static final String FILE_TYPE_AVATAR_VALUE = "avatar";
+
     /** 租户表读写,ignore 表 */
     private final SysTenantMapper tenantMapper;
 
@@ -508,7 +512,7 @@ public class TenantService {
     }
 
     /**
-     * 复制内置文件类型字典,取值与 V2 种子逐列对齐(类型 sys_file_type + 默认数据项 平台文件/platform)。
+     * 复制内置文件类型字典,取值与 V2 种子逐列对齐(类型 sys_file_type + 数据项 平台文件/platform、头像/avatar)。
      * is_system 恒为 1:内置字典只有种子与本处能造,DictService 的删除接口对内置类型与数据项一律拒绝;
      * 字典值仍可维护(新增/改标签/启停),文件管理上传与筛选按这个类型取下拉。
      */
@@ -521,13 +525,20 @@ public class TenantService {
         type.setRemark("内置字典:文件管理的文件类型,可维护字典值但不可删除");
         dictTypeMapper.insert(type);
 
+        insertBuiltinFileTypeData(type.getDictId(), FILE_TYPE_DEFAULT_LABEL, FILE_TYPE_DEFAULT_VALUE, 0,
+                "内置默认值,不可删除");
+        insertBuiltinFileTypeData(type.getDictId(), FILE_TYPE_AVATAR_LABEL, FILE_TYPE_AVATAR_VALUE, 1,
+                "个人中心头像上传,内置值不可删除");
+    }
+
+    private void insertBuiltinFileTypeData(Long dictId, String label, String value, int sort, String remark) {
         SysDictData data = new SysDictData();
-        data.setDictId(type.getDictId());
-        data.setDictLabel(FILE_TYPE_DEFAULT_LABEL);
-        data.setDictValue(FILE_TYPE_DEFAULT_VALUE);
-        data.setSort(0);
+        data.setDictId(dictId);
+        data.setDictLabel(label);
+        data.setDictValue(value);
+        data.setSort(sort);
         data.setStatus(0);
-        data.setRemark("内置默认值,不可删除");
+        data.setRemark(remark);
         dictDataMapper.insert(data);
     }
 }

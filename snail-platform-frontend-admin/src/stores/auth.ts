@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { fetchLoginUser, login as loginRequest, logout as logoutRequest, type LoginPayload, type LoginResult, type LoginUser } from '@/api/auth';
 import { fetchCurrentMenus, type MenuRoute } from '@/api/menu';
 import { clearToken, getToken, setToken } from '@/utils/token';
+import { useAvatarStore } from './avatar';
 
 /** 会话状态:令牌、登录人快照与站内导航菜单;权限判定唯一入口 has()。 */
 export const useAuthStore = defineStore('auth', () => {
@@ -53,6 +54,8 @@ export const useAuthStore = defineStore('auth', () => {
     menus.value = [];
     pendingPasswordChange.value = false;
     clearToken();
+    // 头像是用户态数据:所有登出路径都经这里,统一清掉,避免换号登录后闪现上一账号头像
+    useAvatarStore().clear();
   }
 
   /** 先吊销服务端令牌,再清本地;网络失败不阻断本地登出。 */
