@@ -170,8 +170,11 @@
       </div>
     </div>
 
-    <!-- 数据库面板(照原型 db-row:池卡 + 慢 SQL Top5) -->
-    <div class="db-row">
+    <!-- 数据库面板(照原型 db-row:池卡 + 慢 SQL Top5);platform:monitor:db 门控(§4.8) -->
+    <div
+      v-if="canDb"
+      class="db-row"
+    >
       <div class="card">
         <div class="card-title">
           数据库连接池
@@ -388,8 +391,13 @@ import { fetchActiveAlerts, type MonitorAlert } from '@/api/monitor/alert';
 import Sparkline from '@/components/Sparkline.vue';
 import SvgLineChart from '@/components/SvgLineChart.vue';
 import SvgBarChart from '@/components/SvgBarChart.vue';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
+const auth = useAuthStore();
+
+/** DB 面板权限门控(§4.8 v-permission 口径):无 platform:monitor:db 时不渲染也不发请求,避免 403 弹窗。 */
+const canDb = computed(() => auth.has('platform:monitor:db'));
 
 /** 指标卡 6 张(照原型);th 为告警阈值芯片,着色阈值同原型 80%/100% 两档。 */
 interface CardMetric {
@@ -665,7 +673,7 @@ async function loadAll(): Promise<void> {
   lastUpdate.value = [now.getHours(), now.getMinutes(), now.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':');
   summary.value = await fetchOverviewSummary().catch(() => summary.value);
   trends.value = await fetchOverviewTrends(7).catch(() => trends.value);
-  db.value = await fetchDbSummary().catch(() => db.value);
+  if (canDb.value) db.value = await fetchDbSummary().catch(() => db.value);
   recentAlerts.value = (await fetchActiveAlerts().catch(() => recentAlerts.value as MonitorAlert[])).slice(0, 5);
   await loadCharts();
 }

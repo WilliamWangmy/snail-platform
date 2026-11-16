@@ -38,10 +38,12 @@
               :class="overallChip(report.overall)"
             >{{ overallText(report.overall) }}</span>
             <el-button
+              v-permission="'platform:monitor:threads'"
               size="small"
               @click="threadsDrawer = true; loadThreads()"
             >线程快照</el-button>
             <el-button
+              v-permission="'platform:monitor:env'"
               size="small"
               @click="envDrawer = true; loadEnv()"
             >环境快照</el-button>
@@ -168,8 +170,9 @@
         </div>
       </el-tab-pane>
 
-      <!-- Arthas 在线诊断 -->
+      <!-- Arthas 在线诊断:platform:monitor:arthas 门控,无权限不渲染(§9.4) -->
       <el-tab-pane
+        v-if="canArthas"
         label="Arthas 在线诊断"
         name="arthas"
       >
@@ -332,6 +335,8 @@
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
+import { useRoute } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 import {
   downloadThreads,
   fetchEnv,
@@ -344,6 +349,12 @@ import {
   type ThreadSnapshot,
 } from '@/api/monitor/diag';
 import ArthasConsole from './components/ArthasConsole.vue';
+
+const route = useRoute();
+const auth = useAuthStore();
+
+/** Arthas 权限门控:无 platform:monitor:arthas 不渲染 tab、不发状态请求(§9.4)。 */
+const canArthas = computed(() => auth.has('platform:monitor:arthas'));
 
 const activeTab = ref('check');
 
@@ -453,6 +464,8 @@ function onRefresh(): void {
 let refreshListener: (() => void) | undefined;
 
 onMounted(() => {
+  // 数据源抽屉 Arthas 行跳 /diag?tab=arthas(§9.3):query 存在且有权限时激活对应 tab
+  if (route.query.tab === 'arthas' && canArthas.value) activeTab.value = 'arthas';
   void loadReports(1);
   refreshListener = onRefresh;
   window.addEventListener('monitor-refresh', refreshListener);

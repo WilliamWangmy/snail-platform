@@ -73,10 +73,12 @@
             <template #default="{ row }">
               <el-button
                 v-if="row.status === 'firing'"
+                v-permission="'platform:monitor:ack'"
                 size="small"
                 @click="doAck(row as MonitorAlert)"
               >确认</el-button>
               <el-button
+                v-permission="'platform:monitor:silence'"
                 size="small"
                 @click="openSilence(row as MonitorAlert)"
               >静默</el-button>
@@ -152,7 +154,7 @@
           </el-select>
           <el-button size="small" type="primary" :loading="rulesLoading" @click="loadRules(1)">查询</el-button>
           <span style="flex: 1" />
-          <el-button size="small" type="primary" v-permission="'platform:monitor:alert:rule'" @click="openRuleEditor()">
+          <el-button size="small" type="primary" v-permission="'platform:monitor:rule'" @click="openRuleEditor()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px"><path d="M12 5v14M5 12h14" /></svg>
             新建规则
           </el-button>
@@ -188,7 +190,7 @@
             <template #default="{ row }">
               <el-switch
                 :model-value="row.enabled === 1"
-                :disabled="row.isSystem === 1 || !auth.has('platform:monitor:alert:rule')"
+                :disabled="row.isSystem === 1 || !auth.has('platform:monitor:rule')"
                 @change="(v: string | number | boolean) => doToggleRule(row as AlertRule, Boolean(v))"
               />
             </template>
@@ -196,8 +198,8 @@
           <el-table-column label="操作" align="right" width="130">
             <template #default="{ row }">
               <template v-if="row.isSystem !== 1">
-                <el-button size="small" v-permission="'platform:monitor:alert:rule'" @click="openRuleEditor(row as AlertRule)">编辑</el-button>
-                <el-button size="small" type="danger" plain v-permission="'platform:monitor:alert:rule'" @click="doDeleteRule(row as AlertRule)">删除</el-button>
+                <el-button size="small" v-permission="'platform:monitor:rule'" @click="openRuleEditor(row as AlertRule)">编辑</el-button>
+                <el-button size="small" type="danger" plain v-permission="'platform:monitor:rule'" @click="doDeleteRule(row as AlertRule)">删除</el-button>
               </template>
               <span v-else class="muted" style="font-size: 11px">内置</span>
             </template>

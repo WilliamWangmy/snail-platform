@@ -74,7 +74,8 @@ async function pollStatus(): Promise<void> {
 
 function gotoDiag(): void {
   dsDrawer.value = false;
-  void router.push('/diag');
+  // §9.3:Arthas 行跳诊断页并直接激活 Arthas tab
+  void router.push('/diag?tab=arthas');
 }
 
 // ---------- 工具区(照流程端 header-tools 顺序) ----------
