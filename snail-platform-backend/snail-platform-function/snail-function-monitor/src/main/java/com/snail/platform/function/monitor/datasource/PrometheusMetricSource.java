@@ -37,9 +37,16 @@ public class PrometheusMetricSource implements MetricSource {
     private final MonitorProperties properties;
     private final ObjectMapper objectMapper;
 
+    /** 连接层复用(切 prometheus 源后每 tick ~23 键并发查询,HttpClient 每键新建会耗尽端口/句柄);
+     *  connect 超时取配置值,请求级超时仍按 timeout-ms 每次设置 */
+    private final java.net.http.HttpClient client;
+
     public PrometheusMetricSource(MonitorProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.client = java.net.http.HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(properties.getMetrics().getPrometheus().getTimeoutMs()))
+                .build();
     }
 
     @Override
@@ -94,9 +101,6 @@ public class PrometheusMetricSource implements MetricSource {
         try {
             String url = properties.getMetrics().getPrometheus().getBaseUrl()
                     + "/api/v1/query?query=" + URLEncoder.encode(promql, StandardCharsets.UTF_8);
-            java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(properties.getMetrics().getPrometheus().getTimeoutMs()))
-                    .build();
             java.net.http.HttpRequest.Builder request = java.net.http.HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofMillis(properties.getMetrics().getPrometheus().getTimeoutMs()))

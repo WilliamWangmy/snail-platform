@@ -8,8 +8,9 @@ snail:
     # 采样 tick 间隔(秒),同时驱动评估与数据源状态刷新
     sample-interval-seconds: 60
     metrics:
-      # builtin=进程内置采集;prometheus=外部源,未映射/失败键回退内置
-      source: builtin
+      # builtin=进程内置采集;prometheus=外部源,未映射/失败键回退内置(DD-06)
+      # 已切 prometheus:等后端重启、Prometheus Targets 页 snail-platform 转 UP 即全链路生效
+      source: prometheus
       prometheus:
         base-url: ${SNAIL_MONITOR_PROM_URL:http://localhost:9090}
         username: ${SNAIL_MONITOR_PROM_USER:}

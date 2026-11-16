@@ -445,8 +445,23 @@ onUnmounted(() => {
         <div class="kv">
           <div>配置值 / 生效值</div><div class="mono">{{ status.metrics.configured }} → {{ status.metrics.active }}</div>
           <div>查询延迟</div><div>{{ status.metrics.latencyMs === null ? '内置采集，无外部调用' : `${status.metrics.latencyMs} ms` }}</div>
-          <div>映射键</div><div class="mono">{{ status.metrics.mappedKeys }} / {{ status.metrics.totalKeys }}</div>
-          <div>base-url</div><div class="mono">{{ status.metrics.baseUrl || '未配置' }}</div>
+          <div>映射键</div><div class="mono">{{ status.metrics.mappedKeys }} / {{ status.metrics.totalKeys }}<span
+            class="muted"
+            style="font-size: 11px"
+          > · 未映射键由内置采集兜底</span></div>
+          <div>base-url</div><div>
+            <a
+              v-if="status.metrics.baseUrl && status.metrics.configured === 'prometheus'"
+              class="link mono"
+              :href="status.metrics.baseUrl"
+              target="_blank"
+              rel="noopener"
+            >{{ status.metrics.baseUrl }}</a>
+            <span
+              v-else
+              class="mono"
+            >{{ status.metrics.baseUrl || '未配置' }}</span>
+          </div>
           <div>最近错误</div><div>{{ status.metrics.lastError || '无' }}</div>
         </div>
         <div
