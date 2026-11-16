@@ -45,12 +45,14 @@ let timer: number | undefined;
 const statusLabel = computed(() => {
   if (!status.value) return '数据源 …';
   const metricsOk = status.value.metrics.active === 'builtin' || status.value.metrics.reachable;
-  const logsOk = status.value.logs.configured === 'file' || status.value.logs.reachable;
+  const logsOk = status.value.logs.active !== 'unavailable';
   return `数据源 ${status.value.metrics.active} / ${status.value.logs.active}${metricsOk && logsOk ? '' : ' · 降级'}`;
 });
 
+/** 三色(§9.3):正常/降级/不可达(logs.active=unavailable 为红色)。 */
 const statusClass = computed(() => {
   if (!status.value) return 'unknown';
+  if (status.value.logs.active === 'unavailable') return 'unavailable';
   const metricsOk = status.value.metrics.active === 'builtin' || status.value.metrics.reachable;
   const logsOk = status.value.logs.configured === 'file' || status.value.logs.reachable;
   return metricsOk && logsOk ? '' : 'degraded';

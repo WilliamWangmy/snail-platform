@@ -195,6 +195,11 @@
   background: rgba(var(--app-warning-rgb), 0.12);
 }
 
+.status-chip.unavailable {
+  color: var(--app-danger);
+  background: rgba(var(--app-danger-rgb), 0.12);
+}
+
 .status-chip.unknown {
   color: var(--app-muted);
   background: var(--app-soft-2);

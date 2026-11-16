@@ -1,9 +1,16 @@
 <template>
   <div class="card">
     <el-tabs v-model="activeTab">
-      <!-- 应用日志:时间/级别/traceId/关键字过滤 + 实时 tail(D-05) -->
+      <!-- 应用日志:文件(file)/selector(loki)/时间/级别/traceId/关键字过滤 + 实时 tail(D-05,§7.4) -->
       <el-tab-pane label="应用日志" name="app">
         <div class="filter-bar">
+          <template v-if="logSource === 'file'">
+            <label>文件</label>
+            <el-select v-model="fileId" size="small" style="width: 200px" @change="loadAppPage(1)">
+              <el-option v-for="f in files" :key="f.fileId" :label="f.name" :value="f.fileId" />
+            </el-select>
+          </template>
+          <span v-else class="chip chip-info mono" :title="files[0]?.name">Loki · {{ files[0]?.name || 'selector' }}</span>
           <label>时间</label>
           <el-select v-model="rangeMinutes" size="small" style="width: 110px">
             <el-option label="近 15 分钟" :value="15" />
@@ -34,7 +41,7 @@
           :data="appVo?.rows ?? []"
           v-loading="appLoading"
           size="default"
-          @row-click="(row: LogLine) => openLogDetail(row)"
+          @row-click="(row: LogLine) => logSource === 'file' && openLogDetail(row)"
         >
           <el-table-column label="时间" width="160">
             <template #default="{ row }"><span class="mono" style="font-size: 11.5px">{{ row.time }}</span></template>
@@ -219,6 +226,7 @@
 
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   fetchLogDetail,
   fetchLogFiles,
@@ -233,6 +241,8 @@ import {
 
 const activeTab = ref('app');
 
+const route = useRoute();
+
 // ---------- 应用日志 ----------
 const files = ref<{ fileId: string; name: string }[]>([]);
 const appVo = ref<AppLogPageVO | null>(null);
@@ -242,23 +252,28 @@ const rangeMinutes = ref(60);
 const appLevel = ref('');
 const appTrace = ref('');
 const appKeyword = ref('');
+/** 日志源模式(§7.4):file 显示文件下拉、行可点开上下文;loki 显示 selector、隐藏行上下文入口。 */
+const logSource = ref('file');
+const fileId = ref('');
 
 const activeFileName = computed(() => {
-  const f = files.value.find((item) => item.fileId === appVo.value?.source);
+  const f = files.value.find((item) => item.fileId === (fileId.value || appVo.value?.source));
   return f ? `${f.name}（active）` : appVo.value?.source || '—';
 });
 
 async function loadFiles(): Promise<void> {
   const vo = await fetchLogFiles();
+  logSource.value = vo.source;
   files.value = vo.files;
+  fileId.value = vo.files[0]?.fileId ?? 'active';
 }
 
 function rangeToParams(): Record<string, unknown> {
   const params: Record<string, unknown> = {
-    fileId: files.value[0]?.fileId ?? 'active',
     page: appPager.current,
     size: appPager.size,
   };
+  if (logSource.value === 'file') params.fileId = fileId.value || files.value[0]?.fileId || 'active';
   if (appLevel.value) params.level = appLevel.value;
   if (appTrace.value.trim()) params.traceId = appTrace.value.trim();
   if (appKeyword.value.trim()) params.keyword = appKeyword.value.trim();
@@ -298,18 +313,27 @@ function filterByTrace(traceId: string): void {
   void loadAppPage(1);
 }
 
-/** 追踪模式:5s 轮询 tail,新行追加到顶部,最多保留 200 行(§6.8)。 */
+/** 追踪模式:5s 轮询 tail,新行追加到顶部,最多保留 200 行(§6.8);页面隐藏暂停、恢复立即补拉(DD-24)。 */
 const tailOn = ref(false);
 let tailTimer: number | undefined;
 let tailSince = 0;
 
+function onVisibility(): void {
+  if (!document.hidden && tailOn.value) void pollTail();
+}
+
 watch(tailOn, (on) => {
   if (on) {
     tailSince = Date.now();
-    tailTimer = window.setInterval(() => void pollTail(), 5000);
+    tailTimer = window.setInterval(() => {
+      if (document.hidden) return;
+      void pollTail();
+    }, 5000);
+    document.addEventListener('visibilitychange', onVisibility);
   } else if (tailTimer) {
     window.clearInterval(tailTimer);
     tailTimer = undefined;
+    document.removeEventListener('visibilitychange', onVisibility);
   }
 });
 
@@ -405,6 +429,13 @@ function onRefresh(): void {
 
 onMounted(async () => {
   await loadFiles();
+  // DD-21:/log?traceId=xxx 自动切应用日志 tab、填参并查询;时间窗放宽到 24h 提高命中率
+  const queryTrace = route.query.traceId;
+  if (typeof queryTrace === 'string' && queryTrace) {
+    activeTab.value = 'app';
+    appTrace.value = queryTrace;
+    rangeMinutes.value = 1440;
+  }
   await loadAppPage(1);
   await loadOperPage(1);
   await loadLoginPage(1);

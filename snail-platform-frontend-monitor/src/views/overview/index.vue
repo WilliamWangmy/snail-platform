@@ -395,11 +395,13 @@
             width="130"
           >
             <template #default="{ row }">
-              <span
+              <a
                 v-if="row.traceId"
                 class="link mono"
                 style="font-size: 10.5px"
-              >{{ row.traceId }}</span>
+                title="跳日志页按 traceId 查询(DD-21)"
+                @click="router.push(`/log?traceId=${encodeURIComponent(row.traceId)}`)"
+              >{{ row.traceId }}</a>
               <span
                 v-else
                 class="muted"

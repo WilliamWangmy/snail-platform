@@ -1,11 +1,15 @@
 <template>
   <div class="card">
     <el-tabs v-model="activeTab">
-      <!-- 当前告警:级别权重排序(§6.7),徽标计数 -->
+      <!-- 当前告警:级别权重排序(§6.7),徽标计数;30s 轮询(DD-24)可开关 -->
       <el-tab-pane name="active">
         <template #label>
           当前告警 <span class="cnt">{{ openCount }}</span>
         </template>
+        <div class="filter-bar" style="margin-bottom: 8px">
+          <span style="flex: 1" />
+          <span class="muted" style="font-size: 11.5px">自动刷新（30s）<el-switch v-model="autoRefresh" size="small" /></span>
+        </div>
         <el-table
           :data="activeList"
           v-loading="activeLoading"
@@ -345,6 +349,7 @@ import {
   type AlertRule,
 } from '@/api/monitor/alert';
 import { useAuthStore } from '@/stores/auth';
+import { usePolling } from '@/composables/usePolling';
 import SvgLineChart from '@/components/SvgLineChart.vue';
 
 const auth = useAuthStore();
@@ -590,6 +595,11 @@ function onRefresh(): void {
   if (activeTab.value === 'history') void loadHistory(historyPage.current);
   if (activeTab.value === 'rules') void loadRules(rulePage.current);
 }
+
+/** 当前告警 30s 轮询(DD-24):usePolling 自动刷新 + visibilitychange 暂停;仅在当前告警 tab 生效。 */
+const { autoRefresh } = usePolling(() => {
+  if (activeTab.value === 'active') void loadActive();
+}, 30000);
 
 onMounted(() => {
   void loadActive();
