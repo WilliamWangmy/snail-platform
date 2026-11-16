@@ -71,6 +71,17 @@ public class MetricSampler {
     }
 
     /**
+     * 按 name() 取源:注入 Map 的 key 是 Spring Bean 名(builtinMetricSource/prometheusMetricSource),
+     * 与来源名(builtin/prometheus)是两回事——按 Bean 名 get 会永远 miss 且被 if(null) 静默跳过,
+     * 采样空转无任何日志(线上事故复盘 2026-11-16,勿改回 sources.get)。
+     */
+    private MetricSource sourceByName(String name) {
+        return sources.values().stream()
+                .filter(s -> name.equals(s.name()))
+                .findFirst().orElse(null);
+    }
+
+    /**
      * 采样 tick:initialDelay 10s,间隔由 snail.monitor.sample-interval-seconds 驱动(评估/状态刷新同 tick 消费)。
      */
     @Scheduled(initialDelayString = "10000",
@@ -82,7 +93,7 @@ public class MetricSampler {
         try {
             long now = System.currentTimeMillis();
             Set<String> allKeys = MetricKey.all();
-            MetricSource external = sources.get("prometheus");
+            MetricSource external = sourceByName("prometheus");
             Map<String, String> promQueries = properties.getMetrics().getPrometheus().getQueries();
             boolean usePrometheus = "prometheus".equals(properties.getMetrics().getSource())
                     && external != null && !promQueries.isEmpty();
@@ -101,7 +112,7 @@ public class MetricSampler {
             }
             Set<String> builtinKeys = new java.util.LinkedHashSet<>(allKeys);
             builtinKeys.removeAll(values.keySet());
-            MetricSource builtin = sources.get("builtin");
+            MetricSource builtin = sourceByName("builtin");
             if (builtin != null) {
                 values.putAll(builtin.fetch(builtinKeys));
             }

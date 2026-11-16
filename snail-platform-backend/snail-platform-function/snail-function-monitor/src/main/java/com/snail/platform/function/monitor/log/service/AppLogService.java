@@ -35,11 +35,14 @@ public class AppLogService {
         this.sources = sources;
     }
 
-    /** 当前来源 */
+    /** 当前来源:按 name() 匹配——注入 Map 的 key 是 Spring Bean 名,与来源名(file/loki)是两回事 */
     private LogSource source() {
-        LogSource source = sources.get(properties.getLogs().getSource());
+        String configured = properties.getLogs().getSource();
+        LogSource source = sources.values().stream()
+                .filter(s -> configured.equals(s.name()))
+                .findFirst().orElse(null);
         if (source == null) {
-            throw BizException.badRequest("日志源配置非法: " + properties.getLogs().getSource());
+            throw BizException.badRequest("日志源配置非法: " + configured);
         }
         return source;
     }
