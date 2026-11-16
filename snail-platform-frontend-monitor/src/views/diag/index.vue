@@ -170,13 +170,13 @@
         </div>
       </el-tab-pane>
 
-      <!-- Arthas 在线诊断:platform:monitor:arthas 门控,无权限不渲染(§9.4) -->
+      <!-- Arthas 在线诊断:platform:monitor:arthas 门控;enabled=false 时不渲染(§9.4) -->
       <el-tab-pane
-        v-if="canArthas"
+        v-if="canArthas && arthasEnabled !== false"
         label="Arthas 在线诊断"
         name="arthas"
       >
-        <ArthasConsole />
+        <ArthasConsole @enabled="onArthasEnabled" />
       </el-tab-pane>
     </el-tabs>
 
@@ -355,6 +355,14 @@ const auth = useAuthStore();
 
 /** Arthas 权限门控:无 platform:monitor:arthas 不渲染 tab、不发状态请求(§9.4)。 */
 const canArthas = computed(() => auth.has('platform:monitor:arthas'));
+
+/** enabled=false 时收起 Arthas tab(§9.4);若正停在该 tab 则回落体检。 */
+const arthasEnabled = ref<boolean | null>(null);
+
+function onArthasEnabled(enabled: boolean): void {
+  arthasEnabled.value = enabled;
+  if (!enabled && activeTab.value === 'arthas') activeTab.value = 'check';
+}
 
 const activeTab = ref('check');
 

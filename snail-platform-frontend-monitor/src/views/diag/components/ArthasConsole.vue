@@ -112,8 +112,15 @@
         <iframe
           :src="iframeUrl"
           class="arthas-iframe"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
+          referrerpolicy="no-referrer"
+          @load="frameLoaded = true"
         />
+        <p
+          v-if="frameBlocked"
+          class="diag-sug"
+          style="padding: 0 12px 10px"
+        >iframe 未能加载：检查构建期 <span class="mono">VITE_MONITOR_ARTHAS_ORIGIN</span> 与 tunnel HTTPS/WSS（CSP frame-src 白名单 / 混合内容拦截）</p>
       </div>
       <p
         class="muted"
@@ -145,13 +152,20 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { fetchArthasStatus, type ArthasStatus } from '@/api/monitor/arthas';
+
+/** enabled 状态上报父级:enabled=false 时不渲染本 tab(§9.4)。 */
+const emit = defineEmits<{ enabled: [boolean] }>();
 
 const status = ref<ArthasStatus | null>(null);
 const loading = ref(false);
 const activeAgentId = ref('');
 const iframeUrl = ref('');
+/** CSP/混合内容拦截兜底:8s 未 load 视为被拦(§9.4 提示文案)。 */
+const frameLoaded = ref(false);
+const frameBlocked = ref(false);
+let blockTimer: number | undefined;
 
 const statusChipClass = computed(() => {
   if (!status.value) return 'chip-muted';
@@ -187,6 +201,7 @@ async function loadStatus(): Promise<void> {
   loading.value = true;
   try {
     status.value = await fetchArthasStatus();
+    emit('enabled', Boolean(status.value?.enabled));
   } finally {
     loading.value = false;
   }
@@ -198,12 +213,23 @@ function openConsole(agentId: string): void {
   if (!base) return;
   activeAgentId.value = agentId;
   iframeUrl.value = `${base.replace(/\/$/, '')}?agentId=${encodeURIComponent(agentId)}&iframe=true`;
+  frameLoaded.value = false;
+  frameBlocked.value = false;
+  window.clearTimeout(blockTimer);
+  blockTimer = window.setTimeout(() => {
+    if (!frameLoaded.value) frameBlocked.value = true;
+  }, 8000);
 }
 
 function closeConsole(): void {
   iframeUrl.value = '';
   activeAgentId.value = '';
+  window.clearTimeout(blockTimer);
 }
+
+onUnmounted(() => {
+  window.clearTimeout(blockTimer);
+});
 
 onMounted(() => {
   void loadStatus();

@@ -147,16 +147,17 @@ public class OverviewService {
                 (System.currentTimeMillis() - startTime) / 1000);
     }
 
-    /** agent 探活动作(诊断子域接入前占位:URL 空 skip;非空时 HTTP 探测由 Step 6 的探针复用) */
+    /** agent 探活动作(诊断子域接入前占位:URL 空 skip;非空时 HTTP 探测由 Step 6 的探针复用);client 复用避免每次新建 */
+    private static final java.net.http.HttpClient AGENT_HTTP_CLIENT = java.net.http.HttpClient.newHttpClient();
+
     private boolean agentReachable() {
         // 一期 agent 探针由 snail-platform-agent /health 提供;此处用 HTTP GET + 200 判定
         try {
-            var client = java.net.http.HttpClient.newHttpClient();
             var request = java.net.http.HttpRequest.newBuilder()
                     .uri(java.net.URI.create(properties.getDiag().getAgentHealthUrl()))
                     .timeout(java.time.Duration.ofMillis(500))
                     .GET().build();
-            var response = client.send(request, java.net.http.HttpResponse.BodyHandlers.discarding());
+            var response = AGENT_HTTP_CLIENT.send(request, java.net.http.HttpResponse.BodyHandlers.discarding());
             return response.statusCode() == 200;
         } catch (Exception e) {
             return false;
