@@ -11,17 +11,45 @@ snail:
       # builtin=进程内置采集;prometheus=外部源,未映射/失败键回退内置
       source: builtin
       prometheus:
-        base-url: ${SNAIL_MONITOR_PROM_URL:}
+        base-url: ${SNAIL_MONITOR_PROM_URL:http://localhost:9090}
         username: ${SNAIL_MONITOR_PROM_USER:}
         password: ${SNAIL_MONITOR_PROM_PASSWORD:}
         timeout-ms: 3000
         # 单 tick 外部查询总预算(DD-06)
         total-timeout-ms: 5000
-        # MetricKey → PromQL 映射;未映射键回退 builtin。示例三条,其余键同理
+        # MetricKey → PromQL 映射;未映射键回退 builtin。聚合口径(sum/avg/max 跨实例),
+        # 平台总览/曲线/告警 UI 零改动;exporter 指标名以部署版本为准,不匹配的键删行即回退
         queries:
+          # ── system(node_exporter) ──
           system.cpu.usage: 'avg(rate(node_cpu_seconds_total{mode!="idle"}[1m]))*100'
+          process.cpu.usage: 'avg(process_cpu_usage)*100'
+          disk.usage.percent: '100*(1-avg(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay",mountpoint="/"})/avg(node_filesystem_size_bytes{fstype!~"tmpfs|overlay",mountpoint="/"}))'
+          # ── jvm(Micrometer,多实例聚合;实例拆分见方案批次 D) ──
+          jvm.heap.used.percent: 'sum(jvm_memory_used_bytes{area="heap"})/sum(jvm_memory_max_bytes{area="heap"})*100'
+          jvm.heap.used.mb: 'sum(jvm_memory_used_bytes{area="heap"})/1048576'
+          jvm.nonheap.used.mb: 'sum(jvm_memory_used_bytes{area="nonheap"})/1048576'
+          jvm.threads.live: 'sum(jvm_threads_live_threads)'
+          jvm.gc.pause.ms: 'sum(rate(jvm_gc_pause_seconds_sum[1m]))*1000'
+          # ── http ──
+          http.server.qps: 'sum(rate(http_server_requests_seconds_count[1m]))'
+          http.server.rt.avg.ms: 'sum(rate(http_server_requests_seconds_sum[1m]))/sum(rate(http_server_requests_seconds_count[1m]))*1000'
+          http.server.error.rate: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[1m]))/sum(rate(http_server_requests_seconds_count[1m]))*100'
+          # ── db 池(HikariCP) ──
           db.pool.active: 'sum(hikaricp_connections_active)'
-          disk.usage.percent: 'max(node_filesystem_size_bytes{fstype!="tmpfs"})'
+          db.pool.idle: 'sum(hikaricp_connections_idle)'
+          db.pool.pending: 'sum(hikaricp_connections_pending)'
+          db.pool.usage.percent: 'sum(hikaricp_connections_active)/(sum(hikaricp_connections_active)+sum(hikaricp_connections_idle))*100'
+          # ── MySQL(mysqld_exporter) ──
+          db.sql.qps: 'sum(rate(mysql_global_status_queries[1m]))'
+          db.sql.slow.5m: 'sum(increase(mysql_global_status_slow_queries[5m]))'
+          db.mysql.threads.connected: 'max(mysql_global_status_threads_connected)'
+          db.mysql.threads.running: 'max(mysql_global_status_threads_running)'
+          db.mysql.row.lock.waits: 'sum(rate(mysql_global_status_innodb_row_lock_waits[1m]))*60'
+          # ── up 探针 ──
+          db.up: 'max(up{job="mysql"})'
+          valkey.up: 'max(up{job="valkey"})'
+          # 不映射:online.users / login.fail.5m 业务内存键,Prometheus 无对应,
+          # DD-06 未映射回退 builtin 自动补齐
     logs:
       # file=本地日志文件检索;loki=外部日志源(不可达报错,不静默回退 file)
       source: file
@@ -69,10 +97,19 @@ snail:
       batch-size: 1000
       max-batches: 200
 
-# actuator 只放 health 端点(主方案 §4.1):本模块声明 starter、start 传递获得(DD-02);
+# actuator 暴露 health + prometheus(Prometheus 方案 §2.2):本模块声明 starter、start 传递获得(DD-02);
 # /actuator/health 不进安全白名单,同样走 JWT;业务数据一律经 /monitor/**。
+# /actuator/prometheus 是 Prometheus 服务端抓取入口,已在安全白名单放行(生产建议独立
+# management.server.port + 内网安全组收敛暴露面,见 docs/方案_Prometheus监控接入.md §2.3)。
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
+  endpoint:
+    prometheus:
+      access: read-only
+  # 统一业务标签:Prometheus/Grafana 按 application 维度聚合
+  metrics:
+    tags:
+      application: ${spring.application.name:snail-platform}

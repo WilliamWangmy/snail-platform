@@ -66,6 +66,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Prometheus 拉取端点 /actuator/prometheus(方案_Prometheus监控接入.md §2.1):
+             Micrometer registry,Boot 4.1 工件名不变;无 prometheus 专属 starter,手动加 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
         <!-- 单测:JUnit5 + Mockito + MockHttp(照 snail-function-storage) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

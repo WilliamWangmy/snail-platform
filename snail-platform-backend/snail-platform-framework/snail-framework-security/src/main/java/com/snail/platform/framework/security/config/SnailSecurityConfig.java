@@ -46,7 +46,10 @@ public class SnailSecurityConfig {
             "/system/auth/sms-captcha",
             "/system/auth/login-sms",
             "/system/auth/login-sms/pick",
-            "/system/auth/oauth/**"
+            "/system/auth/oauth/**",
+            // Prometheus 抓取端点:服务端定时拉取不带 JWT,不进白名单则恒 401(方案_Prometheus监控接入.md §2.3);
+            // 生产环境建议改走独立 management.server.port + 内网安全组,勿在此链暴露
+            "/actuator/prometheus"
     };
 
     /** 接口文档白名单:仅在 springdoc 实际启用时拼入,生产忘关文档端点也不会裸奔 */
