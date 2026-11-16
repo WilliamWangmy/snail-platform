@@ -32,7 +32,25 @@
       </div>
     </div>
 
-    <!-- 指标 6 卡(照原型 metric-row:名称+阈值芯片、大数值着色、较上小时增量、迷你线) -->
+    <!-- 指标源状态行:degraded 徽标(§4.8)+ 全局自动刷新开关 -->
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
+      <span
+        class="chip"
+        :class="summary?.degraded ? 'chip-warning' : 'chip-success'"
+      >指标源 {{ summary?.metricsSource ?? '—' }}</span>
+      <span
+        v-if="summary?.degraded"
+        class="chip chip-danger"
+      >外部指标源降级 · 已回退内置采集</span>
+      <span style="flex: 1" />
+      <span class="muted">最后更新 {{ lastUpdate }}</span>
+      <span style="font-size: 12px">自动刷新 <el-switch
+        v-model="autoRefresh"
+        size="small"
+      /></span>
+    </div>
+
+    <!-- 指标 8 卡(§4.8:CPU/堆/线程/QPS/错误率/RT/在线/磁盘;照原型样式) -->
     <div class="metric-row">
       <div
         v-for="m in metricCards"
@@ -65,45 +83,68 @@
       </div>
     </div>
 
-    <!-- 双趋势图(照原型 chart-row:图例 + 实时/24h/7d 分段) -->
+    <!-- 实时曲线(指标多选,§4.8 默认 cpu/heap/qps/rt)+ 历史曲线(指标+快捷档 1h/6h/24h/7d) -->
     <div class="chart-row">
       <div class="card">
         <div class="card-title">
-          CPU / 堆内存趋势
-          <span class="sub">{{ rangeLabel }}</span>
-          <span class="right">
-            <span class="legend">
-              <span><i style="background: var(--app-chart-1)" />CPU</span>
-              <span><i style="background: var(--app-chart-3)" />堆内存</span>
-            </span>
-            <el-segmented
-              v-model="range"
-              :options="RANGE_OPTIONS"
-              size="small"
-              @change="loadCharts"
-            />
-          </span>
+          实时曲线
+          <span class="sub">环形缓冲 · 近 60 分钟</span>
         </div>
+        <el-select
+          v-model="rtMetrics"
+          multiple
+          collapse-tags
+          collapse-tags-tooltip
+          size="small"
+          style="width: 100%; margin-bottom: 10px"
+          @change="loadRealtime"
+        >
+          <el-option
+            v-for="o in CHART_OPTIONS"
+            :key="o.value"
+            :label="o.label"
+            :value="o.value"
+          />
+        </el-select>
         <SvgLineChart
-          :series="cpuSeries"
+          :series="rtSeries"
           :labels="chartLabels"
-          :min="0"
-          :max="100"
-          :fmt="(v: number) => `${Math.round(v)}%`"
+          zero
         />
       </div>
       <div class="card">
         <div class="card-title">
-          请求量 / 错误率
+          历史曲线
+          <span class="sub">{{ historyLabel }}</span>
           <span class="right">
-            <span class="legend">
-              <span><i style="background: var(--app-chart-4)" />QPS</span>
-              <span><i style="background: var(--app-danger)" />5xx 率</span>
-            </span>
+            <el-select
+              v-model="historyMetric"
+              size="small"
+              style="width: 140px"
+              @change="loadHistory"
+            >
+              <el-option
+                v-for="o in CHART_OPTIONS"
+                :key="o.value"
+                :label="o.label"
+                :value="o.value"
+              />
+            </el-select>
+            <el-segmented
+              v-model="historyRange"
+              :options="HISTORY_OPTIONS"
+              size="small"
+              @change="loadHistory"
+            />
           </span>
         </div>
+        <div
+          v-if="historyHint"
+          class="muted"
+          style="font-size: 11px; margin-bottom: 8px"
+        >{{ historyHint }}</div>
         <SvgLineChart
-          :series="qpsSeries"
+          :series="historySeries"
           :labels="chartLabels"
           zero
         />
@@ -161,11 +202,7 @@
         <SvgBarChart :groups="trendGroups" />
         <div class="overview-foot">
           <span>当前在线 <b style="color: var(--app-ink)">{{ trends?.onlineNow ?? '—' }}</b> 人</span>
-          <span>自动刷新 <el-switch
-            v-model="autoRefresh"
-            size="small"
-          /></span>
-          <span class="muted">最后更新 {{ lastUpdate }}</span>
+          <span class="muted">sys_login_log 聚合 · 缺失日补 0</span>
         </div>
       </div>
     </div>
@@ -392,6 +429,7 @@ import Sparkline from '@/components/Sparkline.vue';
 import SvgLineChart from '@/components/SvgLineChart.vue';
 import SvgBarChart from '@/components/SvgBarChart.vue';
 import { useAuthStore } from '@/stores/auth';
+import { usePolling } from '@/composables/usePolling';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -399,7 +437,7 @@ const auth = useAuthStore();
 /** DB 面板权限门控(§4.8 v-permission 口径):无 platform:monitor:db 时不渲染也不发请求,避免 403 弹窗。 */
 const canDb = computed(() => auth.has('platform:monitor:db'));
 
-/** 指标卡 6 张(照原型);th 为告警阈值芯片,着色阈值同原型 80%/100% 两档。 */
+/** 指标卡 8 张(§4.8);th 为告警阈值芯片,着色阈值同原型 80%/100% 两档。 */
 interface CardMetric {
   key: string;
   name: string;
@@ -413,7 +451,9 @@ const metricCards = ref<CardMetric[]>([
   { key: 'jvm.threads.live', name: '活跃线程', unit: '个', th: 500 },
   { key: 'http.server.qps', name: 'QPS', unit: '次/s' },
   { key: 'http.server.error.rate', name: '5xx 错误率', unit: '%', th: 5 },
+  { key: 'http.server.rt.avg.ms', name: '平均 RT', unit: 'ms' },
   { key: 'online.users', name: '在线用户', unit: '人' },
+  { key: 'disk.usage.percent', name: '磁盘使用率', unit: '%', th: 90 },
 ]);
 
 const summary = ref<OverviewSummary | null>(null);
@@ -421,23 +461,46 @@ const trends = ref<TrendsVO | null>(null);
 const db = ref<DbSummary | null>(null);
 const recentAlerts = ref<MonitorAlert[]>([]);
 const lastUpdate = ref('--:--:--');
-const autoRefresh = ref(true);
 
-/** 趋势分段:实时(环形缓冲)/24h(1h 聚合)/7d(1h 聚合,后端 step 白名单 60/300/3600)。 */
-const RANGE_OPTIONS = [
-  { label: '实时', value: 'rt' },
+/** 曲线可选指标(照 MetricKey 白名单挑常用 10 键);默认 cpu/heap/qps/rt(§4.8)。 */
+const CHART_OPTIONS = [
+  { label: 'CPU 使用率', value: 'system.cpu.usage' },
+  { label: '堆使用率', value: 'jvm.heap.used.percent' },
+  { label: '活跃线程', value: 'jvm.threads.live' },
+  { label: 'QPS', value: 'http.server.qps' },
+  { label: '5xx 错误率', value: 'http.server.error.rate' },
+  { label: '平均 RT', value: 'http.server.rt.avg.ms' },
+  { label: '在线用户', value: 'online.users' },
+  { label: '磁盘使用率', value: 'disk.usage.percent' },
+  { label: '池使用率', value: 'db.pool.usage.percent' },
+  { label: 'SQL 平均 RT', value: 'db.sql.rt.avg.ms' },
+] as { label: string; value: string }[];
+
+/** 历史快捷档(§4.8);步长映射后端白名单 60/300/3600,7 天 3600 步 = 168 点。 */
+const HISTORY_OPTIONS = [
+  { label: '1h', value: '1h' },
+  { label: '6h', value: '6h' },
   { label: '24h', value: '24h' },
   { label: '7d', value: '7d' },
 ] as { label: string; value: string }[];
-const range = ref('rt');
+const STEP_BY_RANGE: Record<string, number> = { '1h': 60, '6h': 300, '24h': 3600, '7d': 3600 };
+const SPAN_HOURS_BY_RANGE: Record<string, number> = { '1h': 1, '6h': 6, '24h': 24, '7d': 24 * 7 };
+
+const rtMetrics = ref<string[]>(['system.cpu.usage', 'jvm.heap.used.percent', 'http.server.qps', 'http.server.rt.avg.ms']);
+const rtSeries = ref<{ name: string; values: number[]; color: string; area?: boolean; unit?: string }[]>([]);
+const historyMetric = ref('system.cpu.usage');
+const historyRange = ref('24h');
+const historySeries = ref<{ name: string; values: number[]; color: string; area?: boolean; unit?: string }[]>([]);
+const historyHint = ref('');
 const chartLabels = ref<string[]>([]);
-const cpuSeries = ref<{ name: string; values: number[]; color: string; area?: boolean; unit?: string }[]>([]);
-const qpsSeries = ref<{ name: string; values: number[]; color: string; area?: boolean; unit?: string }[]>([]);
 const sparkData = ref<Record<string, number[]>>({});
 
-const rangeLabel = computed(() =>
-  range.value === 'rt' ? '实时 · 近 60 分钟' : range.value === '24h' ? '近 24 小时 · 1 小时聚合' : '近 7 天 · 1 小时聚合',
-);
+const historyLabel = computed(() => {
+  const step = STEP_BY_RANGE[historyRange.value] ?? 3600;
+  const span = SPAN_HOURS_BY_RANGE[historyRange.value] ?? 24;
+  const agg = step >= 3600 ? '1 小时' : `${step / 60} 分钟`;
+  return span >= 24 ? `近 ${span / 24} 天 · ${agg}聚合` : `近 ${span} 小时 · ${agg}聚合`;
+});
 
 // ---------- 健康卡 ----------
 const HEALTH_META: { key: string; name: string; icon: string }[] = [
@@ -600,63 +663,75 @@ function toValues(points: MetricPoint[]): number[] {
   return points.map((p) => Math.round(p.v * 100) / 100);
 }
 
-function timeLabels(points: MetricPoint[]): string[] {
+function timeLabels(points: MetricPoint[], withDate = false): string[] {
   const step = Math.max(1, Math.round(points.length / 8));
   return points.map((p, i) => {
     if (i % step !== 0) return '';
     const d = new Date(p.t);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    if (!withDate) return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
 }
 
-async function loadCharts(): Promise<void> {
-  const c1 = 'var(--app-chart-1)';
-  const c3 = 'var(--app-chart-3)';
-  const c4 = 'var(--app-chart-4)';
-  if (range.value === 'rt') {
-    const vo = await fetchRealtime(60);
-    const cpu = vo.series.find((s) => s.metric === 'system.cpu.usage');
-    const heap = vo.series.find((s) => s.metric === 'jvm.heap.used.percent');
-    const qps = vo.series.find((s) => s.metric === 'http.server.qps');
-    const err = vo.series.find((s) => s.metric === 'http.server.error.rate');
-    chartLabels.value = cpu ? timeLabels(cpu.points) : [];
-    cpuSeries.value = [
-      { name: 'CPU', values: toValues(cpu?.points ?? []), color: c1, area: true, unit: '%' },
-      { name: '堆内存', values: toValues(heap?.points ?? []), color: c3, area: true, unit: '%' },
-    ];
-    qpsSeries.value = [
-      { name: 'QPS', values: toValues(qps?.points ?? []), color: c4, area: true },
-      { name: '5xx 率', values: toValues(err?.points ?? []).map((v) => v * 10), color: 'var(--app-danger)', unit: '%' },
-    ];
-    collectSparks(vo.series);
-    return;
-  }
-  // 24h/7d:DB 聚合,step 3600(后端 step 白名单 60/300/3600)
+const SERIES_COLORS = ['var(--app-chart-1)', 'var(--app-chart-3)', 'var(--app-chart-4)', 'var(--app-info)', 'var(--app-warning)', 'var(--app-danger)'];
+
+function labelOf(key: string): string {
+  return CHART_OPTIONS.find((o) => o.value === key)?.label ?? key;
+}
+
+// ---------- 实时曲线(§4.8:指标多选,环形缓冲 60 分钟) ----------
+async function loadRealtime(): Promise<void> {
+  const vo = await fetchRealtime(60);
+  const selected = rtMetrics.value.length ? rtMetrics.value : ['system.cpu.usage'];
+  const series = selected
+    .map((key) => vo.series.find((s) => s.metric === key))
+    .filter((s): s is MetricSeries => Boolean(s));
+  chartLabels.value = series[0] ? timeLabels(series[0].points) : [];
+  rtSeries.value = series.map((s, i) => ({
+    name: labelOf(s.metric),
+    values: toValues(s.points),
+    color: SERIES_COLORS[i % SERIES_COLORS.length]!,
+    area: i === 0,
+  }));
+  collectSparks(vo.series);
+}
+
+// ---------- 历史曲线(§4.8:快捷档 1h/6h/24h/7d;2000 点保护 400 → 自动降 5 分钟步长重查) ----------
+async function loadHistory(): Promise<void> {
+  historyHint.value = '';
   const end = new Date();
-  const begin = new Date(end.getTime() - (range.value === '24h' ? 24 : 24 * 7) * 3600 * 1000);
+  const begin = new Date(end.getTime() - (SPAN_HOURS_BY_RANGE[historyRange.value] ?? 24) * 3600 * 1000);
   const fmt = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
   };
-  const keys = ['system.cpu.usage', 'jvm.heap.used.percent', 'http.server.qps', 'http.server.error.rate'];
-  const results = await Promise.all(
-    keys.map((k) => fetchHistory(k, fmt(begin), fmt(end), 3600).then((vo) => ({ metric: vo.metric, points: vo.points })).catch(() => null)),
-  );
-  const valid = results.filter((r): r is { metric: string; points: MetricPoint[] } => r !== null);
-  const cpu = valid.find((r) => r.metric === 'system.cpu.usage');
-  const heap = valid.find((r) => r.metric === 'jvm.heap.used.percent');
-  const qps = valid.find((r) => r.metric === 'http.server.qps');
-  const err = valid.find((r) => r.metric === 'http.server.error.rate');
-  chartLabels.value = cpu ? timeLabels(cpu.points) : [];
-  cpuSeries.value = [
-    { name: 'CPU', values: cpu ? toValues(cpu.points) : [], color: c1, area: true, unit: '%' },
-    { name: '堆内存', values: heap ? toValues(heap.points) : [], color: c3, area: true, unit: '%' },
+  const step = STEP_BY_RANGE[historyRange.value] ?? 3600;
+  let points: MetricPoint[] | null = null;
+  try {
+    points = (await fetchHistory(historyMetric.value, fmt(begin), fmt(end), step)).points;
+  } catch (e) {
+    if (step < 300) {
+      // 2000 点保护:后端 400 时把步长提到 300 重查一次(§4.8)
+      try {
+        points = (await fetchHistory(historyMetric.value, fmt(begin), fmt(end), 300)).points;
+        historyHint.value = '数据点超限，已自动切换 5 分钟步长';
+      } catch (err) {
+        historyHint.value = `查询失败：${err instanceof Error ? err.message : '未知错误'}`;
+      }
+    } else {
+      historyHint.value = `查询失败：${e instanceof Error ? e.message : '未知错误'}`;
+    }
+  }
+  chartLabels.value = points ? timeLabels(points, (SPAN_HOURS_BY_RANGE[historyRange.value] ?? 24) > 24) : [];
+  historySeries.value = [
+    {
+      name: labelOf(historyMetric.value),
+      values: points ? toValues(points) : [],
+      color: 'var(--app-chart-1)',
+      area: true,
+    },
   ];
-  qpsSeries.value = [
-    { name: 'QPS', values: qps ? toValues(qps.points) : [], color: c4, area: true },
-    { name: '5xx 率', values: err ? toValues(err.points).map((v) => v * 10) : [], color: 'var(--app-danger)', unit: '%' },
-  ];
-  collectSparks(valid as MetricSeries[]);
 }
 
 function collectSparks(series: { metric: string; points: MetricPoint[] }[]): void {
@@ -667,7 +742,7 @@ function collectSparks(series: { metric: string; points: MetricPoint[] }[]): voi
   sparkData.value = map;
 }
 
-// ---------- 加载与轮询 ----------
+// ---------- 加载与轮询(usePolling:自动刷新开关 + visibilitychange 暂停,§4.8) ----------
 async function loadAll(): Promise<void> {
   const now = new Date();
   lastUpdate.value = [now.getHours(), now.getMinutes(), now.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':');
@@ -675,28 +750,20 @@ async function loadAll(): Promise<void> {
   trends.value = await fetchOverviewTrends(7).catch(() => trends.value);
   if (canDb.value) db.value = await fetchDbSummary().catch(() => db.value);
   recentAlerts.value = (await fetchActiveAlerts().catch(() => recentAlerts.value as MonitorAlert[])).slice(0, 5);
-  await loadCharts();
+  await loadRealtime();
 }
 
-let autoTimer: number | undefined;
+const { autoRefresh } = usePolling(loadAll, 30000);
+
 let refreshListener: (() => void) | undefined;
 
-function restartAuto(): void {
-  if (autoTimer) window.clearInterval(autoTimer);
-  autoTimer = window.setInterval(() => {
-    if (autoRefresh.value) void loadAll();
-  }, 30000);
-}
-
 onMounted(() => {
-  void loadAll();
-  restartAuto();
+  void loadHistory();
   refreshListener = () => void loadAll();
   window.addEventListener('monitor-refresh', refreshListener);
 });
 
 onBeforeUnmount(() => {
-  if (autoTimer) window.clearInterval(autoTimer);
   if (refreshListener) window.removeEventListener('monitor-refresh', refreshListener);
 });
 </script>
