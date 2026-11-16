@@ -559,16 +559,14 @@ function relTime(t: string | null): string {
   background: var(--app-soft-2);
 }
 
-/* 统计图标沿用 mini-icon 尺寸口径,色板覆写 */
-.mini-icon.tone-primary,
-.mini-icon.tone-danger,
-.mini-icon.tone-success {
-  color: inherit;
-}
-
-.mini-icon.tone-success {
-  color: var(--app-success);
-  background: rgba(var(--app-success-rgb), 0.12);
+/* 统计图标:沿用全局 mini-icon 尺寸口径,色板由 .tone-* 提供。
+   全局 .mini-stat span(display:block+margin-top)优先级高于 .mini-icon,
+   会把图标框压成 block 使 place-items 失效——这里以 (0,2,0) 夺回网格居中。 */
+.stat-grid .mini-icon {
+  display: inline-grid;
+  place-items: center;
+  margin-top: 0;
+  flex: none;
 }
 
 /* ---------- 收件箱卡片头:标题 + 胶囊筛选 ---------- */
