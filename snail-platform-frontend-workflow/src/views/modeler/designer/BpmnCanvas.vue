@@ -102,8 +102,9 @@ function localizeContextPad(event: { current?: { html?: HTMLElement } }): void {
   if (!html) return;
   for (const el of Array.from(html.querySelectorAll('.entry'))) {
     const icon = Array.from(el.classList).find((c) => CONTEXT_PAD_TITLES[c]);
-    if (icon) {
-      el.setAttribute('title', CONTEXT_PAD_TITLES[icon]);
+    const title = icon ? CONTEXT_PAD_TITLES[icon] : undefined;
+    if (title) {
+      el.setAttribute('title', title);
     }
   }
 }

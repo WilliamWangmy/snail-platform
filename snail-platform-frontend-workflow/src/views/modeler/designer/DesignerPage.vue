@@ -18,6 +18,7 @@ import AppIcon from '@/components/AppIcon.vue';
 import { useAuthStore } from '@/stores/auth';
 
 import BpmnCanvas from './BpmnCanvas.vue';
+import { DEMO_LEAVE_XML } from './demoFlow';
 import { validateModel, validateXmlSize, type ValidationIssue } from './bpmnValidator';
 import { blankXml } from './flowType';
 import type { FlowElementLike } from './flowableExtension';
@@ -91,6 +92,94 @@ const validated = ref(false);
 const validationVisible = ref(false);
 const publishVisible = ref(false);
 const inspectorTab = ref<'properties' | 'checks'>('properties');
+
+/* ---------------------------------- 查看 XML ---------------------------------- */
+
+const xmlVisible = ref(false);
+const xmlContent = ref('');
+const xmlLoading = ref(false);
+
+/** 轻量 XML 高亮：单遍 tokenizer，避免嵌套替换互相污染 */
+function highlightXml(source: string): string {
+  const escaped = source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const tokenRe =
+    /(&lt;!--[\s\S]*?--&gt;)|(&lt;\?[\s\S]*?\?&gt;)|(&lt;\/?)([\w:.-]+)|([\w:.-]+)="([^"]*)"/g;
+  return escaped.replace(
+    tokenRe,
+    (
+      match: string,
+      comment: string | undefined,
+      decl: string | undefined,
+      open: string | undefined,
+      tagName: string | undefined,
+      attrName: string | undefined,
+      attrValue: string | undefined,
+    ) => {
+      if (comment) return `<span class="tok-comment">${comment}</span>`;
+      if (decl) return `<span class="tok-decl">${decl}</span>`;
+      if (open && tagName) return `${open}<span class="tok-tag">${tagName}</span>`;
+      if (attrName && attrValue !== undefined) {
+        return `<span class="tok-attr">${attrName}</span>=<span class="tok-str">"${attrValue}"</span>`;
+      }
+      return match;
+    },
+  );
+}
+
+const highlightedXml = computed(() => highlightXml(xmlContent.value));
+const xmlStats = computed(() => {
+  if (!xmlContent.value) return '暂无内容';
+  const lines = xmlContent.value.split('\n').length;
+  return `${lines} 行 · ${xmlContent.value.length} 字符`;
+});
+
+async function openXmlViewer(): Promise<void> {
+  xmlVisible.value = true;
+  xmlLoading.value = true;
+  try {
+    const exported = await canvasRef.value?.exportXml();
+    xmlContent.value = exported ?? '';
+  } catch (error) {
+    xmlContent.value = '';
+    ElMessage.error(error instanceof Error ? error.message : 'XML 导出失败');
+  } finally {
+    xmlLoading.value = false;
+  }
+}
+
+async function copyXml(): Promise<void> {
+  if (!xmlContent.value) return;
+  try {
+    await navigator.clipboard.writeText(xmlContent.value);
+    ElMessage.success('XML 已复制到剪贴板');
+  } catch {
+    ElMessage.error('复制失败，请手动选择复制');
+  }
+}
+
+/* ---------------------------------- 加载示例 ---------------------------------- */
+
+/** 加载示例流程：覆盖当前画布内容（画布监听 xml 变化自动重建导入），并标记为未保存 */
+async function loadDemo(): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      '加载示例将覆盖当前流程设计，未保存的修改将丢失。是否继续？',
+      '加载示例',
+      {
+        type: 'warning',
+        confirmButtonText: '加载并覆盖',
+        cancelButtonText: '取消',
+      },
+    );
+  } catch {
+    return;
+  }
+  xml.value = DEMO_LEAVE_XML;
+  dirty.value = true;
+  selectedId.value = null;
+  selectedType.value = null;
+  ElMessage.success('示例流程已加载，请记得保存草稿');
+}
 
 const activeTool = ref('pointer');
 const createType = ref('');
@@ -426,6 +515,32 @@ function goBack(): void {
       </div>
 
       <div class="designer-actions">
+        <el-tooltip
+          content="加载示例流程（覆盖当前设计）"
+          placement="bottom"
+        >
+          <el-button
+            size="small"
+            class="badge-btn"
+            :disabled="loading"
+            @click="loadDemo"
+          >
+            <AppIcon name="layers" /><span class="btn-label">加载示例</span>
+          </el-button>
+        </el-tooltip>
+        <el-tooltip
+          content="查看当前流程 XML"
+          placement="bottom"
+        >
+          <el-button
+            size="small"
+            class="badge-btn"
+            :disabled="loading"
+            @click="openXmlViewer"
+          >
+            <AppIcon name="code" /><span class="btn-label">查看XML</span>
+          </el-button>
+        </el-tooltip>
         <el-tooltip
           content="本地校验结果"
           placement="bottom"
@@ -917,6 +1032,69 @@ function goBack(): void {
     </el-dialog>
 
     <el-dialog
+      v-model="xmlVisible"
+      class="flow-dialog xml-dialog"
+      width="720px"
+      align-center
+      :show-close="false"
+    >
+      <template #header>
+        <div class="dialog-head">
+          <div class="dialog-head-copy">
+            <div class="dialog-kicker">
+              BPMN XML
+            </div>
+            <h2 class="dialog-title">
+              查看 XML
+            </h2>
+            <p class="dialog-desc">
+              {{ model?.name || '流程模型' }} · 当前画布实时导出
+            </p>
+          </div>
+          <button
+            class="icon-btn dialog-close"
+            type="button"
+            aria-label="关闭"
+            @click="xmlVisible = false"
+          >
+            <AppIcon name="x" />
+          </button>
+        </div>
+      </template>
+
+      <div
+        v-loading="xmlLoading"
+        class="xml-body"
+      >
+        <!-- 内容已在 highlightXml 中整体转义（& < >），仅注入自产 span 标签，无 XSS 风险 -->
+        <!-- eslint-disable vue/no-v-html -->
+        <pre
+          class="xml-code"
+          v-html="highlightedXml"
+        ></pre>
+        <!-- eslint-enable vue/no-v-html -->
+      </div>
+
+      <template #footer>
+        <div class="dialog-foot">
+          <span class="foot-note">{{ xmlStats }}</span>
+          <el-button
+            :disabled="!xmlContent"
+            @click="copyXml"
+          >
+            <AppIcon name="copy" />复制 XML
+          </el-button>
+          <el-button
+            type="primary"
+            @click="xmlVisible = false"
+          >
+            关闭
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="publishVisible"
       class="flow-dialog"
       width="580px"
@@ -1181,6 +1359,50 @@ function goBack(): void {
 
 .publish-summary {
   margin-bottom: 15px;
+}
+
+/* XML 查看弹框 */
+.xml-body {
+  min-height: 120px;
+}
+
+.xml-code {
+  max-height: 56vh;
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-family: 'JetBrains Mono', Consolas, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  tab-size: 2;
+  white-space: pre;
+
+  .tok-tag {
+    color: #0b5cad;
+    font-weight: 600;
+  }
+
+  .tok-attr {
+    color: #a34d0c;
+  }
+
+  .tok-str {
+    color: #14713d;
+  }
+
+  .tok-comment {
+    color: #8b93a1;
+    font-style: italic;
+  }
+
+  .tok-decl {
+    color: #7d52c4;
+    font-weight: 600;
+  }
 }
 
 @media (max-width: 860px) {
