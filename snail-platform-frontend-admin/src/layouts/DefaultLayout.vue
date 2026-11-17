@@ -6,7 +6,7 @@ import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue';
 import NotifyToast from '@/components/NotifyToast.vue';
 import SidebarMenu from '@/components/SidebarMenu.vue';
 import TabBar from '@/components/TabBar.vue';
-import { fetchUnreadCount, pageInbox, type NotifyInboxItem } from '@/api/notify';
+import { fetchUnreadCount, markAllRead, pageInbox, type NotifyInboxItem } from '@/api/notify';
 import { useNotifyPush } from '@/composables/useNotifyPush';
 import { useAuthStore } from '@/stores/auth';
 import { useAvatarStore } from '@/stores/avatar';
@@ -100,9 +100,9 @@ const isPlatformTenant = computed(() => auth.user?.tenantId === 1);
 const systems = computed(() => {
   const features = auth.user?.tenantFeatures;
   return [
-    { key: 'flow', name: '流程系统', desc: '流程控制台', icon: 'flow', url: FLOW_URL, enabled: features?.workflowEnabled === true },
-    { key: 'monitor', name: '监控系统', desc: '运行监控与诊断', icon: 'monitor', url: MONITOR_URL, enabled: isPlatformTenant.value },
-    { key: 'screen', name: '数据大屏', desc: '三维态势可视化', icon: 'chart', url: SCREEN_URL, enabled: features?.dashboardEnabled === true },
+    { key: 'flow', name: '流程系统', desc: '流程控制台', icon: 'flow', tone: 'primary', url: FLOW_URL, enabled: features?.workflowEnabled === true },
+    { key: 'monitor', name: '监控系统', desc: '运行监控与诊断', icon: 'monitor', tone: 'info', url: MONITOR_URL, enabled: isPlatformTenant.value },
+    { key: 'screen', name: '数据大屏', desc: '三维态势可视化', icon: 'chart', tone: 'accent', url: SCREEN_URL, enabled: features?.dashboardEnabled === true },
   ].filter((item) => item.enabled);
 });
 
@@ -158,12 +158,47 @@ function onPushed(): void {
   });
 }
 
-/** 顶栏只预览最新几条,正文与清已读仍在通知中心页做。 */
+/** 顶栏预览最新未读,面板可视区固定 5 行,超出部分在面板内滚动查看。 */
 async function loadLatestUnread(): Promise<void> {
   try {
-    latestUnread.value = (await pageInbox({ pageNum: 1, pageSize: 6, readStatus: 0 })).rows;
+    latestUnread.value = (await pageInbox({ pageNum: 1, pageSize: 20, readStatus: 0 })).rows;
   } catch {
     latestUnread.value = [];
+  }
+}
+
+/** 类型元信息:与通知中心 bizMetaOf 同口径(关键词匹配 → 图标/色调),悬浮面板复用同一套语义色。 */
+function bizMetaOf(item: NotifyInboxItem): { icon: string; tone: string } {
+  const t = (item.bizType ?? '').toLowerCase();
+  if (t.includes('announce') || t.includes('notice') || t.includes('公告')) {
+    return { icon: 'spark', tone: 'accent' };
+  }
+  if (t.includes('alert') || t.includes('warn') || t.includes('告警')) {
+    return { icon: 'alert', tone: 'danger' };
+  }
+  if (t.includes('task') || t.includes('flow') || t.includes('workflow') || t.includes('审批')) {
+    return { icon: 'flow', tone: 'info' };
+  }
+  if (t.includes('system') || t.includes('sys')) {
+    return { icon: 'settings', tone: 'muted' };
+  }
+  return { icon: 'bell', tone: 'primary' };
+}
+
+/** 全部已读:成功后就地清空面板列表与角标(面板只收未读,清空即转空态),失败静默不打断悬浮浏览。 */
+const markingAll = ref(false);
+
+async function handleMarkAllRead(): Promise<void> {
+  if (markingAll.value) return;
+  markingAll.value = true;
+  try {
+    await markAllRead();
+    unread.value = 0;
+    latestUnread.value = [];
+  } catch {
+    // 保持现值,由下次轮询/推送自愈
+  } finally {
+    markingAll.value = false;
   }
 }
 
@@ -334,7 +369,7 @@ onBeforeUnmount(() => {
             ref="messagePopover"
             trigger="hover"
             placement="bottom-end"
-            :width="316"
+            :width="380"
             popper-class="msg-popper"
             @before-enter="loadLatestUnread"
           >
@@ -358,8 +393,23 @@ onBeforeUnmount(() => {
             </template>
 
             <div class="msg-head">
-              <b>消息</b>
-              <span class="msg-head-count">{{ unread > 0 ? `${unread} 条未读` : '没有未读' }}</span>
+              <span
+                class="msg-head-tile"
+                aria-hidden="true"
+              >
+                <AppIcon
+                  name="bell"
+                  :size="17"
+                />
+              </span>
+              <span class="msg-head-copy">
+                <b>消息中心</b>
+                <small>MESSAGES · UNREAD FEED</small>
+              </span>
+              <span
+                class="msg-head-pill"
+                :class="{ 'is-zero': unread === 0 }"
+              >{{ unread > 0 ? `${unread} 条未读` : '没有未读' }}</span>
             </div>
             <ul
               v-if="latestUnread.length"
@@ -370,23 +420,63 @@ onBeforeUnmount(() => {
                 :key="item.recipientId"
                 class="msg-item"
               >
-                <span class="msg-item-title">{{ item.title }}</span>
-                <span class="msg-item-meta">{{ item.senderName || '系统' }} · {{ shortTime(item.sendTime) }}</span>
+                <span
+                  class="msg-item-bar"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  class="msg-item-tile"
+                  :class="`tone-${bizMetaOf(item).tone}`"
+                  aria-hidden="true"
+                >
+                  <AppIcon
+                    :name="bizMetaOf(item).icon"
+                    :size="15"
+                  />
+                </span>
+                <span class="msg-item-copy">
+                  <span class="msg-item-title">{{ item.title }}</span>
+                  <span class="msg-item-meta">{{ item.senderName || '系统' }} · {{ shortTime(item.sendTime) }}</span>
+                </span>
+                <span
+                  class="msg-item-dot"
+                  aria-hidden="true"
+                ></span>
               </li>
             </ul>
             <p
               v-else
               class="msg-empty"
             >
+              <AppIcon
+                name="check"
+                :size="18"
+              />
               暂无未读消息
             </p>
             <div class="msg-foot">
               <button
-                class="msg-link"
+                class="msg-foot-ghost"
+                type="button"
+                :disabled="unread === 0 || markingAll"
+                @click="handleMarkAllRead"
+              >
+                <AppIcon
+                  name="check"
+                  :size="13"
+                />
+                全部已读
+              </button>
+              <span
+                class="msg-foot-spacer"
+                aria-hidden="true"
+              ></span>
+              <button
+                class="msg-foot-primary"
                 type="button"
                 @click="openInbox"
               >
-                查看全部
+                查看全部消息
                 <AppIcon
                   name="arrow-right"
                   :size="13"
@@ -419,13 +509,26 @@ onBeforeUnmount(() => {
                   :command="item.key"
                 >
                   <span class="system-item">
-                    <AppIcon
-                      :name="item.icon"
-                      :size="14"
-                    />
-                    <b>{{ item.name }}</b>
-                    <small>{{ item.desc }}</small>
+                    <span
+                      class="system-item-tile"
+                      :class="`tone-${item.tone}`"
+                      aria-hidden="true"
+                    >
+                      <AppIcon
+                        :name="item.icon"
+                        :size="15"
+                      />
+                    </span>
+                    <span class="system-item-copy">
+                      <b>{{ item.name }}</b>
+                      <small>{{ item.desc }}</small>
+                    </span>
                   </span>
+                  <AppIcon
+                    class="system-item-go"
+                    name="chevron-right"
+                    :size="14"
+                  />
                 </ElDropdownItem>
               </ElDropdownMenu>
             </template>
