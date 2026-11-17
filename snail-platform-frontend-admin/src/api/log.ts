@@ -77,6 +77,11 @@ export function pageOperLogs(query: OperLogQuery): Promise<PageResult<OperLogLis
   return get<PageResult<OperLogListVO>>('/system/log/oper/page', query);
 }
 
+/** 本人操作日志分页(个人中心):后端按登录名+本租户钉死只看自己,查询参数仅分页生效。 */
+export function pageMyOperLogs(query: PageParams): Promise<PageResult<OperLogListVO>> {
+  return get<PageResult<OperLogListVO>>('/system/log/oper/my', query);
+}
+
 /** 详情:非平台侧取别的租户的行按"日志不存在"处理,存在性本身算租户隐私。 */
 export function getOperLog(id: number): Promise<OperLogDetailVO> {
   return get<OperLogDetailVO>(`/system/log/oper/${id}`);
@@ -90,6 +95,11 @@ export function exportOperLogs(query: OperLogQuery): Promise<void> {
 /** 登录日志分页:写路径在 auth 登录链,这里只读。 */
 export function pageLoginLogs(query: LoginLogQuery): Promise<PageResult<LoginLogVO>> {
   return get<PageResult<LoginLogVO>>('/system/log/login/page', query);
+}
+
+/** 本人登录日志分页(个人中心):后端按登录上下文钉死只看自己,查询参数仅分页生效。 */
+export function pageMyLoginLogs(query: PageParams): Promise<PageResult<LoginLogVO>> {
+  return get<PageResult<LoginLogVO>>('/system/log/login/my', query);
 }
 
 /** 导出登录日志,行数上限口径与操作日志一致。 */

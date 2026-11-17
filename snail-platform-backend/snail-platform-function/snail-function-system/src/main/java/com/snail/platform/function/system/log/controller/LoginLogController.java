@@ -1,5 +1,6 @@
 package com.snail.platform.function.system.log.controller;
 
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
@@ -43,6 +44,17 @@ public class LoginLogController {
     @GetMapping("/page")
     public R<PageResult<LoginLogVO>> page(@Valid LoginLogQuery query) {
         return R.ok(loginLogService.page(query));
+    }
+
+    /**
+     * 本人登录日志分页(个人中心):userId 恒来自登录上下文,只看自己;
+     * 与 /page 不同,这里不要求日志管理权限码——看自己的留痕对"改自己"没有增量价值(ProfileController 同口径)。
+     */
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "本人登录日志分页(只看自己,查询参数仅分页生效)")
+    @GetMapping("/my")
+    public R<PageResult<LoginLogVO>> my(@Valid LoginLogQuery query) {
+        return R.ok(loginLogService.pageMine(query, LoginUserContextHolder.userId()));
     }
 
     @PreAuthorize("hasAuthority('system:loginlog:export')")

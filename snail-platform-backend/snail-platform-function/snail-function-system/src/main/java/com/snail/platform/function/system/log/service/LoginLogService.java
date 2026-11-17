@@ -58,6 +58,20 @@ public class LoginLogService {
         return PageResult.of(result.getRecords().stream().map(LoginLogVO::of).toList(), result.getTotal());
     }
 
+    /**
+     * 本人登录日志分页(个人中心):userId 恒由控制器从登录上下文传入,越权面不存在;
+     * 该表在租户拦截器豁免清单,租户边界用 userId 全局唯一兜住——只见自己,不见同租户他人。
+     * 查询参数只认 pageNum/pageSize,管理页那套筛选(用户名/IP/租户)在本人视角没有意义,一概不生效。
+     */
+    public PageResult<LoginLogVO> pageMine(LoginLogQuery query, Long userId) {
+        Page<SysLoginLog> page = PageAssembler.from(query);
+        IPage<SysLoginLog> result = loginLogMapper.selectPage(page,
+                Wrappers.<SysLoginLog>lambdaQuery()
+                        .eq(SysLoginLog::getUserId, userId)
+                        .orderByDesc(SysLoginLog::getId));
+        return PageResult.of(result.getRecords().stream().map(LoginLogVO::of).toList(), result.getTotal());
+    }
+
     /** 导出:口径与操作日志导出一致——先数后取、超上限拒而不是截断,谓词与分页完全同构 */
     public void export(HttpServletResponse response, LoginLogQuery query) throws IOException {
         Long counted = loginLogMapper.selectCount(buildWrapper(query));

@@ -1,5 +1,7 @@
 package com.snail.platform.function.system.log.controller;
 
+import com.snail.platform.framework.core.context.LoginUser;
+import com.snail.platform.framework.core.context.LoginUserContextHolder;
 import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.core.response.R;
 import com.snail.platform.framework.log.BusinessType;
@@ -46,6 +48,18 @@ public class OperLogController {
     @GetMapping("/page")
     public R<PageResult<OperLogListVO>> page(@Valid OperLogQuery query) {
         return R.ok(operLogService.page(query));
+    }
+
+    /**
+     * 本人操作日志分页(个人中心):操作人恒来自登录上下文(登录名 + 本租户双条件钉死),
+     * 与 /page 不同,这里不要求日志管理权限码——看自己的留痕对"改自己"没有增量价值(ProfileController 同口径)。
+     */
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "本人操作日志分页(只看自己,查询参数仅分页生效)")
+    @GetMapping("/my")
+    public R<PageResult<OperLogListVO>> my(@Valid OperLogQuery query) {
+        LoginUser loginUser = LoginUserContextHolder.get();
+        return R.ok(operLogService.pageMine(query, loginUser.username()));
     }
 
     @PreAuthorize("hasAuthority('system:operlog:list')")

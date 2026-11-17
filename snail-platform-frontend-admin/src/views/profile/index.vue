@@ -13,9 +13,16 @@ import {
   type Profile,
   type UserIdentity,
 } from '@/api/profile';
+import {
+  pageMyLoginLogs,
+  pageMyOperLogs,
+  type LoginLogVO,
+  type OperLogListVO,
+} from '@/api/log';
 import { uploadMyAvatar } from '@/api/file';
 import { useAuthStore } from '@/stores/auth';
 import { useAvatarStore } from '@/stores/avatar';
+import { usePageList } from '@/composables/usePageList';
 import AppIcon from '@/components/AppIcon.vue';
 
 const router = useRouter();
@@ -47,6 +54,54 @@ async function loadIdentities(): Promise<void> {
 function formatTime(value: string | null): string {
   return value ? value.replace('T', ' ').slice(0, 19) : '—';
 }
+
+/* ----------------------- 本人日志(登录/操作)----------------------- */
+
+/** 登录端中文标签:与登录日志管理页 SCENE_OPTIONS 同口径,未登记的新端原样回显。 */
+const SCENE_LABELS: Record<string, string> = {
+  admin: '管理系统',
+  workflow: '流程系统',
+  app: '移动端',
+  miniapp: '移动端小程序',
+  dashboard: '数据大屏',
+  portal: '企业门户',
+};
+
+function sceneOf(scene: string): string {
+  return SCENE_LABELS[scene] ?? scene;
+}
+
+/** 业务类型标签:与后端 BusinessType 枚举同一份口径。 */
+const BUSINESS_TYPES: Record<number, string> = {
+  1: '新增',
+  2: '修改',
+  3: '删除',
+  4: '导出',
+  5: '导入',
+  9: '其他',
+};
+
+function businessOf(value: number): string {
+  return BUSINESS_TYPES[value] ?? String(value);
+}
+
+/** 本人登录日志:后端按登录上下文钉死只看自己,这里只管分页。 */
+const {
+  rows: loginLogRows,
+  total: loginLogTotal,
+  loading: loginLogLoading,
+  pageNum: loginLogPage,
+  refresh: refreshLoginLogs,
+} = usePageList<LoginLogVO>((page) => pageMyLoginLogs(page), 8);
+
+/** 本人操作日志:同上,按登录名+本租户钉死,只管分页。 */
+const {
+  rows: operLogRows,
+  total: operLogTotal,
+  loading: operLogLoading,
+  pageNum: operLogPage,
+  refresh: refreshOperLogs,
+} = usePageList<OperLogListVO>((page) => pageMyOperLogs(page), 8);
 
 /** 解绑后该第三方身份不能再登录本账号;账号密码登录不受影响,所以不需要二次保底 */
 async function handleUnbind(identity: UserIdentity): Promise<void> {
@@ -90,6 +145,8 @@ onMounted(async () => {
   profileForm.email = profile.value.email ?? '';
   profileForm.phone = profile.value.phone ?? '';
   void avatarStore.load(profile.value.userId);
+  void refreshLoginLogs();
+  void refreshOperLogs();
   await loadIdentities();
 });
 
@@ -201,7 +258,9 @@ function signOutLocal(): void {
             class="p-avatar-img"
             alt=""
           />
-          <template v-else>{{ profile?.nickname?.charAt(0) || '?' }}</template>
+          <template v-else>
+            {{ profile?.nickname?.charAt(0) || '?' }}
+          </template>
           <span class="p-avatar-mask">{{ uploadingAvatar ? '上传中…' : '更换头像' }}</span>
         </button>
         <input
@@ -413,6 +472,212 @@ function signOutLocal(): void {
         </ElCard>
       </ElCol>
     </ElRow>
+
+    <!-- 本人日志:登录/操作各一卡,只展示当前登录人的留痕;后端按上下文钉死,翻页在此分页取数 -->
+    <ElRow
+      :gutter="16"
+      class="log-row"
+    >
+      <ElCol
+        :xs="24"
+        :lg="12"
+      >
+        <ElCard
+          shadow="never"
+          class="section-card"
+        >
+          <template #header>
+            <div class="table-card-head">
+              <h3>
+                登录日志
+                <span>LOGIN LOGS</span>
+              </h3>
+              <span
+                v-if="loginLogTotal"
+                class="head-count"
+              >
+                共 {{ loginLogTotal }} 条
+              </span>
+            </div>
+          </template>
+          <div
+            v-if="!loginLogLoading && loginLogRows.length === 0"
+            class="log-empty"
+          >
+            暂无登录记录
+          </div>
+          <ElTable
+            v-else
+            v-loading="loginLogLoading"
+            :data="loginLogRows"
+            size="small"
+            class="log-table"
+          >
+            <ElTableColumn
+              label="登录端"
+              width="100"
+            >
+              <template #default="{ row }">
+                <span class="log-strong">{{ sceneOf(row.scene) }}</span>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="结果"
+              width="72"
+            >
+              <template #default="{ row }">
+                <ElTag
+                  size="small"
+                  effect="plain"
+                  :type="row.status === 1 ? 'success' : 'danger'"
+                >
+                  {{ row.status === 1 ? '成功' : '失败' }}
+                </ElTag>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="IP / 环境"
+              min-width="140"
+            >
+              <template #default="{ row }">
+                <span class="mono log-strong">{{ row.ip ?? '—' }}</span>
+                <span class="log-sub">{{ [row.browser, row.os].filter(Boolean).join(' · ') || '—' }}</span>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="说明"
+              min-width="120"
+              show-overflow-tooltip
+            >
+              <template #default="{ row }">
+                {{ row.msg || '—' }}
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="时间"
+              width="150"
+            >
+              <template #default="{ row }">
+                <span class="mono">{{ formatTime(row.loginTime) }}</span>
+              </template>
+            </ElTableColumn>
+          </ElTable>
+          <div
+            v-if="loginLogTotal"
+            class="log-foot"
+          >
+            <ElPagination
+              v-model:current-page="loginLogPage"
+              small
+              background
+              layout="prev, pager, next"
+              :total="loginLogTotal"
+              :page-size="8"
+              @current-change="refreshLoginLogs"
+            />
+          </div>
+        </ElCard>
+      </ElCol>
+      <ElCol
+        :xs="24"
+        :lg="12"
+      >
+        <ElCard
+          shadow="never"
+          class="section-card"
+        >
+          <template #header>
+            <div class="table-card-head">
+              <h3>
+                操作日志
+                <span>OPERATION LOGS</span>
+              </h3>
+              <span
+                v-if="operLogTotal"
+                class="head-count"
+              >
+                共 {{ operLogTotal }} 条
+              </span>
+            </div>
+          </template>
+          <div
+            v-if="!operLogLoading && operLogRows.length === 0"
+            class="log-empty"
+          >
+            暂无操作记录
+          </div>
+          <ElTable
+            v-else
+            v-loading="operLogLoading"
+            :data="operLogRows"
+            size="small"
+            class="log-table"
+          >
+            <ElTableColumn
+              label="模块"
+              min-width="110"
+              show-overflow-tooltip
+            >
+              <template #default="{ row }">
+                <span class="log-strong">{{ row.module }}</span>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="类型"
+              width="72"
+            >
+              <template #default="{ row }">
+                {{ businessOf(row.businessType) }}
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="结果"
+              width="72"
+            >
+              <template #default="{ row }">
+                <ElTag
+                  size="small"
+                  effect="plain"
+                  :type="row.status === 1 ? 'success' : 'danger'"
+                >
+                  {{ row.status === 1 ? '成功' : '失败' }}
+                </ElTag>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="耗时"
+              width="80"
+            >
+              <template #default="{ row }">
+                <span class="mono">{{ row.costTime == null ? '—' : `${row.costTime}ms` }}</span>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn
+              label="时间"
+              width="150"
+            >
+              <template #default="{ row }">
+                <span class="mono">{{ formatTime(row.operTime) }}</span>
+              </template>
+            </ElTableColumn>
+          </ElTable>
+          <div
+            v-if="operLogTotal"
+            class="log-foot"
+          >
+            <ElPagination
+              v-model:current-page="operLogPage"
+              small
+              background
+              layout="prev, pager, next"
+              :total="operLogTotal"
+              :page-size="8"
+              @current-change="refreshOperLogs"
+            />
+          </div>
+        </ElCard>
+      </ElCol>
+    </ElRow>
   </div>
 </template>
 
@@ -554,6 +819,54 @@ function signOutLocal(): void {
 
 .section-card {
   margin-bottom: 16px;
+}
+
+/* 卡片高度对齐:列内改弹性布局,左右两张卡拉伸到同一行高,边框线齐平 */
+.body-row :deep(.el-col),
+.log-row :deep(.el-col) {
+  display: flex;
+}
+
+.body-row .section-card,
+.log-row .section-card {
+  flex: 1;
+}
+
+/* 本人日志卡:紧凑小表 + 右下翻页;空态一行弱化文案,不另立大空态 */
+.log-table {
+  --el-table-border-color: var(--app-line);
+}
+
+.log-table :deep(.el-table__cell) {
+  padding: 7px 0;
+}
+
+.log-strong {
+  color: var(--app-ink);
+  font-size: 12.5px;
+}
+
+.log-sub {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--app-muted);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+}
+
+.log-empty {
+  padding: 26px 0;
+  color: var(--app-muted);
+  font-size: 11px;
+  text-align: center;
 }
 
 .head-count {

@@ -60,6 +60,21 @@ public class OperLogService {
         return PageResult.of(result.getRecords().stream().map(OperLogListVO::of).toList(), result.getTotal());
     }
 
+    /**
+     * 本人操作日志分页(个人中心):操作人恒由控制器从登录上下文传入,越权面不存在。
+     * 表无 userId 列,按"登录名 + 本租户"双条件钉——登录名跨租户可能重名,租户上下文兜住歧义;
+     * 查询参数只认 pageNum/pageSize,管理页那套筛选(模块/操作人/租户)在本人视角一概不生效。
+     */
+    public PageResult<OperLogListVO> pageMine(OperLogQuery query, String username) {
+        Page<SysOperLog> page = PageAssembler.from(query);
+        IPage<SysOperLog> result = operLogMapper.selectPage(page,
+                Wrappers.<SysOperLog>lambdaQuery()
+                        .eq(SysOperLog::getTenantId, TenantContextHolder.get())
+                        .eq(SysOperLog::getOperator, username)
+                        .orderByDesc(SysOperLog::getId));
+        return PageResult.of(result.getRecords().stream().map(OperLogListVO::of).toList(), result.getTotal());
+    }
+
     /** 详情:非平台租户跨租户取行按"不存在"处理——日志的存在性本身是租户隐私 */
     public OperLogDetailVO detail(Long id) {
         SysOperLog log = operLogMapper.selectById(id);
