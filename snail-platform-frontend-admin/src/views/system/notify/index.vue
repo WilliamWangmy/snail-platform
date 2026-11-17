@@ -571,7 +571,20 @@ function relTime(t: string | null): string {
 
 /* ---------- 收件箱卡片头:标题 + 胶囊筛选 ---------- */
 .inbox-card {
-  margin-bottom: 15px;
+  /* 与全局 .page > .table-card 同口径:卡片弹性占满页内剩余高度,消息流在自身内部滚动,
+     页面不再随收件箱条数拉长;统计行与筛选头恒在视野内 */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.inbox-card :deep(.el-card__body) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .inbox-head {
@@ -605,7 +618,10 @@ function relTime(t: string | null): string {
 
 /* ---------- 消息流列表 ---------- */
 .inbox-list {
-  min-height: 220px;
+  /* 弹性占满卡体剩余高度,超出即内部滚动;分页条留在卡底不动 */
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
 }
 
 .inbox-item {

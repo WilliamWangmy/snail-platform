@@ -649,7 +649,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .app-shell {
-  min-height: 100vh;
+  /* 视口定高:整个系统锁在当前屏幕内,滚动只发生在主区内容层,不再整页拉长 */
+  height: 100vh;
+  overflow: hidden;
   background: var(--app-bg);
 }
 
@@ -1043,6 +1045,12 @@ onBeforeUnmount(() => {
 }
 
 .page-main {
+  /* ElMain 自带 overflow:auto:纵向 flex 化后保留为页面级兜底滚动容器,
+     列表页在 .page 内弹性铺满不外溢,表单类页面超出时在这里滚,框架层恒定不动 */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   padding: 26px 30px 50px;
   background: var(--app-bg);
 }

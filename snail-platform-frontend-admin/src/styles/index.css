@@ -154,11 +154,32 @@ body {
   letter-spacing: 0.16em;
 }
 
-/* 页面骨架:布局层统一包一层 .page-wrap,各页只写业务内容。 */
+/* 页面骨架:布局层统一包一层 .page-wrap,各页只写业务内容。
+   系统框架(侧栏/顶栏)随浏览器视口固定,.page 在主区内纵向铺满:
+   列表卡片弹性占满剩余高度、在自身内部滚动,整页不再随数据量拉长;
+   表单/详情类页面内容真的放不下时,经 .page 的可见溢出交给 .page-main 的滚动兜底。 */
 .page-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   width: 100%;
   max-width: 1560px;
   margin: 0 auto;
+}
+
+.page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page > .table-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .page-head {
@@ -243,6 +264,10 @@ body {
 }
 
 .table-card > .el-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   padding: 0;
 }
 
@@ -471,10 +496,16 @@ body {
   background: var(--app-line);
 }
 
-/* 内缩用外边距而非内边距:el-table 按自身 clientWidth 计算列宽,内边距会让表体横向溢出;width:auto 让外边距真正参与宽度计算。 */
+/* 内缩用外边距而非内边距:el-table 按自身 clientWidth 计算列宽,内边距会让表体横向溢出;width:auto 让外边距真正参与宽度计算。
+   弹性高度:table 在卡体内 flex 占满剩余高度,数据多时表体在自身内部滚动、表头与分页条恒在视野内。 */
 .table-card .el-table {
   width: auto;
   margin: 0 6px;
+}
+
+.page .table-card .el-table {
+  flex: 1;
+  min-height: 0;
 }
 
 .el-button--primary:not(.is-plain):not(.is-link):not(.is-text) {

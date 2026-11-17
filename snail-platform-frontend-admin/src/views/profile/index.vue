@@ -682,6 +682,16 @@ function signOutLocal(): void {
 </template>
 
 <style scoped>
+/* 固定视口高度布局的收缩防线:.page 纵向铺满主区,页面块默认 flex-shrink:1 可被压缩,
+   而 ElCard 自带 overflow:hidden 令 flex 的 min-height 自动下限归零——内容一超屏,
+   身份卡会被压到近乎消失。这里钉死各块自然高度,放行溢出交给 .page-main 滚动兜底 */
+.page > .page-head,
+.page > .hero-card,
+.page > .body-row,
+.page > .log-row {
+  flex: none;
+}
+
 /* 身份卡:渐变头像同租户抽屉 t-avatar 母题,角色胶囊走主题主色系 */
 .hero-card {
   margin-bottom: 16px;
