@@ -104,6 +104,12 @@ export async function post<T>(url: string, body?: unknown): Promise<T> {
   return response.data.data;
 }
 
+/** multipart 上传(FormData 原样交 axios 设 multipart boundary),与 post 共用同一套信封拦截。 */
+export async function upload<T>(url: string, form: FormData): Promise<T> {
+  const response = await http.post<Envelope<T>>(url, form);
+  return response.data.data;
+}
+
 export async function put<T>(url: string, body?: unknown, params?: object): Promise<T> {
   const response = await http.put<Envelope<T>>(url, body, { params: prune(params) });
   return response.data.data;

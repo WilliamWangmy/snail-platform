@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  snail-framework-excel：fastexcel 的导出单点——行数据写 xlsx 直接挂 HTTP 响应。
-  不认识业务 DTO，只吃带 @ExcelProperty 的表头类与已筛好的行集合；导入通道尚未实现。
+  snail-framework-excel：fastexcel 的读写单点——导出经 ExcelExporter 行数据写 xlsx 直接挂 HTTP 响应，
+  导入经 ExcelImporter 把上传的表格流按 @ExcelProperty 头类读成行 Bean；业务侧只许碰这两个出口。
+  不认识业务 DTO，导入行数上限由调用方按业务口径传入。
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

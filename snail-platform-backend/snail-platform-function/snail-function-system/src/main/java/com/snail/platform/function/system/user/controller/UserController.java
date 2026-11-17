@@ -9,6 +9,7 @@ import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.function.system.user.dto.AssignRolesRequest;
 import com.snail.platform.function.system.user.dto.UserCreateRequest;
 import com.snail.platform.function.system.user.dto.UserCreatedVO;
+import com.snail.platform.function.system.user.dto.UserImportVO;
 import com.snail.platform.function.system.user.dto.ResetPasswordRequest;
 import com.snail.platform.function.system.user.dto.UserIdentityVO;
 import com.snail.platform.function.system.user.dto.UserQuery;
@@ -17,12 +18,15 @@ import com.snail.platform.function.system.user.dto.UserVO;
 import com.snail.platform.function.system.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,9 +40,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 职责:用户管理入口——分页、详情、新增、修改、重置口令、停用/启用、删除、角色全量覆盖分配;作用域本租户。
+ * 职责:用户管理入口——分页、详情、新增、批量导入、修改、重置口令、停用/启用、删除、角色全量覆盖分配;作用域本租户。
  * 上游:用户管理页面;下游:UserService。出参一律走 UserVO,密文在类型层面出不了门。
  */
 @Tag(name = "用户管理")
@@ -91,6 +96,25 @@ public class UserController {
     @PostMapping
     public R<UserCreatedVO> create(@Valid @RequestBody UserCreateRequest request) {
         return R.ok(userService.create(request));
+    }
+
+    @PreAuthorize("hasAuthority('system:user:import')")
+    @Operation(summary = "下载用户导入模板(仅表头,列名即口径;与导入解析同一张行头类,永不漂移)")
+    @GetMapping("/import-template")
+    public void importTemplate(HttpServletResponse response) throws IOException {
+        userService.importTemplate(response);
+    }
+
+    @PreAuthorize("hasAuthority('system:user:import')")
+    @Operation(summary = "批量导入用户(口令与组织全批共用;全量校验,任一行不合法即整批不入库并逐行回报原因)")
+    @OperLog(module = "用户管理", businessType = BusinessType.IMPORT)
+    @PostMapping("/import")
+    public R<UserImportVO> importUsers(@RequestParam("file") MultipartFile file,
+                                       @RequestParam @NotBlank(message = "请输入初始密码")
+                                       @Size(min = 8, max = 20, message = "密码长度需 8-20 位")
+                                       String password,
+                                       @RequestParam @NotNull(message = "请选择所属组织") Long orgId) throws IOException {
+        return R.ok(userService.importUsers(file.getInputStream(), password, orgId));
     }
 
     @PreAuthorize("hasAuthority('system:user:update')")

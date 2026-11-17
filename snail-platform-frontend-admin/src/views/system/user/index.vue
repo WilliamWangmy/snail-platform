@@ -2,7 +2,7 @@
 /** 组件名与路由 meta.viewName 对应,多页签 KeepAlive include 依此缓存。 */
 defineOptions({ name: 'SystemUser' });
 import { computed, onMounted, reactive, ref } from 'vue';
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadRawFile, type UploadUserFile } from 'element-plus';
 import dayjs from 'dayjs';
 import AppIcon from '@/components/AppIcon.vue';
 import { fetchOrgTree, type OrgNode } from '@/api/org';
@@ -13,13 +13,16 @@ import {
   checkUsername,
   createUser,
   deleteUser,
+  downloadImportTemplate,
   fetchUserIdentities,
   forceLogoutUser,
   getUser,
+  importUsers,
   pageUsers,
   resetUserPassword,
   updateUser,
   type UserIdentity,
+  type UserImportResult,
   type UserQuery,
   type UserVO,
 } from '@/api/user';
@@ -184,11 +187,11 @@ function sanitizePhone(): void {
 }
 
 /** 复制成功的瞬时反馈:图标短暂变 ✓,1.6s 后还原 */
-const copiedField = ref<'form' | 'reset' | null>(null);
+const copiedField = ref<'form' | 'reset' | 'import' | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** 口令敏感,只进剪贴板不落日志;非安全上下文(如 http 内网直连)时降级为手动复制 */
-async function copyPassword(value: string, field: 'form' | 'reset'): Promise<void> {
+async function copyPassword(value: string, field: 'form' | 'reset' | 'import'): Promise<void> {
   if (!value) {
     ElMessage.warning('还没有可复制的密码,请先点刷新图标生成');
     return;
@@ -329,6 +332,72 @@ async function submitAssignRoles(): Promise<void> {
   roleVisible.value = false;
 }
 
+/* -------------------------------- 批量导入 -------------------------------- */
+
+/**
+ * 批量导入弹窗:口令与组织全批共用(文件只带五列档案,口令不入文件、组织不写 ID),
+ * 后端全量校验、任一行不合法整批不入库并逐行回报原因——半截导入比整批拒绝更难善后。
+ */
+const importVisible = ref(false);
+const importOrgId = ref<number | null>(null);
+const importPassword = ref('');
+const importFileList = ref<UploadUserFile[]>([]);
+const importing = ref(false);
+/** 非 null 且带 failures 时在弹窗里整表回显失败行;全部成功直接关弹窗刷新列表 */
+const importResult = ref<UserImportResult | null>(null);
+
+function openImport(): void {
+  importOrgId.value = null;
+  importPassword.value = '';
+  importFileList.value = [];
+  importResult.value = null;
+  importVisible.value = true;
+}
+
+/** limit=1 下换文件:用新文件顶掉旧文件,不逼用户先点删除;on-exceed 给的是裸 File,收窄成 raw 形态 */
+function replaceImportFile(files: File[]): void {
+  const file = files[0];
+  if (file) importFileList.value = [{ name: file.name, raw: file as UploadRawFile }];
+}
+
+/** 模板只带表头,列名即口径;不带示例数据,防止示例被照抄成真实账号 */
+async function fetchTemplate(): Promise<void> {
+  await downloadImportTemplate();
+}
+
+async function submitImport(): Promise<void> {
+  const raw = importFileList.value[0]?.raw;
+  if (!raw) {
+    ElMessage.warning('请选择 xlsx 文件');
+    return;
+  }
+  if (importOrgId.value == null) {
+    ElMessage.warning('请选择所属组织');
+    return;
+  }
+  const message = validatePassword(importPassword.value);
+  if (message) {
+    ElMessage.warning(message);
+    return;
+  }
+  importing.value = true;
+  try {
+    const result = await importUsers(raw, importPassword.value, importOrgId.value);
+    if (result.failures.length) {
+      // 整批未入库:失败行回显在弹窗里,改完再传
+      importResult.value = result;
+      ElMessage.warning(`全部未导入,共 ${result.failures.length} 行不合法,请修正后重新上传`);
+    } else {
+      importResult.value = null;
+      ElMessage.success(`已导入 ${result.successCount} 个用户,初始口令请线下告知本人`);
+      importVisible.value = false;
+      await refresh();
+    }
+  } finally {
+    importing.value = false;
+  }
+}
+
 /* --------------------------------- 删除 ----------------------------------- */
 
 async function remove(row: UserVO): Promise<void> {
@@ -406,6 +475,16 @@ async function kickUser(row: UserVO): Promise<void> {
         <h1>用户管理</h1>
       </div>
       <div class="head-actions">
+        <ElButton
+          v-permission="'system:user:import'"
+          @click="openImport"
+        >
+          <AppIcon
+            name="download"
+            :size="15"
+          />
+          批量导入
+        </ElButton>
         <ElButton
           v-permission="'system:user:create'"
           type="primary"
@@ -813,6 +892,156 @@ async function kickUser(row: UserVO): Promise<void> {
     </ElDialog>
 
     <ElDialog
+      v-model="importVisible"
+      title="批量导入用户"
+      width="640px"
+    >
+      <div class="form-banner">
+        <AppIcon
+          name="alert"
+          :size="14"
+        />
+        <span>口令与组织全批共用;任一行不合法即整批不入库,失败原因会逐行回显</span>
+      </div>
+      <ElForm label-position="top">
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="lock"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">本批参数</span>
+            <span class="panel-hint">初始口令不入文件,导入成功后请线下告知本人</span>
+          </div>
+          <div class="form-grid">
+            <ElFormItem label="所属组织(全批共用)">
+              <ElTreeSelect
+                v-model="importOrgId"
+                :data="orgTree"
+                node-key="orgId"
+                :props="{ label: 'name', children: 'children' }"
+                check-strictly
+                placeholder="请选择组织"
+                class="full"
+              />
+            </ElFormItem>
+            <ElFormItem label="初始口令(全批共用)">
+              <PasswordHintInput
+                v-model="importPassword"
+                class="mono-pwd"
+                placeholder="导入用户统一使用的初始口令"
+              >
+                <template #suffix>
+                  <button
+                    class="pwd-action"
+                    type="button"
+                    title="重新生成"
+                    @click="importPassword = generatePassword()"
+                  >
+                    <AppIcon
+                      name="refresh"
+                      :size="15"
+                    />
+                  </button>
+                  <button
+                    class="pwd-action"
+                    :class="{ 'is-done': copiedField === 'import' }"
+                    type="button"
+                    :title="copiedField === 'import' ? '已复制' : '复制密码'"
+                    @click="copyPassword(importPassword, 'import')"
+                  >
+                    <AppIcon
+                      :name="copiedField === 'import' ? 'check' : 'copy'"
+                      :size="15"
+                    />
+                  </button>
+                </template>
+              </PasswordHintInput>
+            </ElFormItem>
+          </div>
+        </div>
+        <div class="form-panel">
+          <div class="panel-head">
+            <span class="panel-ico">
+              <AppIcon
+                name="download"
+                :size="13"
+              />
+            </span>
+            <span class="panel-title">导入文件</span>
+            <ElButton
+              link
+              type="primary"
+              @click="fetchTemplate"
+            >
+              下载模板
+            </ElButton>
+          </div>
+          <ElUpload
+            v-model:file-list="importFileList"
+            drag
+            accept=".xlsx"
+            :auto-upload="false"
+            :limit="1"
+            :on-exceed="replaceImportFile"
+          >
+            <AppIcon
+              name="download"
+              :size="28"
+            />
+            <div class="el-upload__text">
+              拖拽 xlsx 到此处,或 <em>点击选择文件</em>
+            </div>
+          </ElUpload>
+        </div>
+        <template v-if="importResult?.failures.length">
+          <ElAlert
+            type="error"
+            :closable="false"
+            show-icon
+            title="以下行不合法,本批全部未入库;修正后重新上传即可"
+          />
+          <ElTable
+            :data="importResult.failures"
+            size="small"
+            max-height="220"
+            class="import-fail-table"
+          >
+            <ElTableColumn
+              prop="rowNum"
+              label="行号"
+              width="70"
+              align="center"
+            />
+            <ElTableColumn
+              prop="username"
+              label="登录名"
+              width="160"
+            />
+            <ElTableColumn
+              prop="reason"
+              label="原因"
+            />
+          </ElTable>
+        </template>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="importVisible = false">
+          取消
+        </ElButton>
+        <ElButton
+          type="primary"
+          :loading="importing"
+          @click="submitImport"
+        >
+          开始导入
+        </ElButton>
+      </template>
+    </ElDialog>
+
+    <ElDialog
       v-model="resetVisible"
       :title="`重置密码 · ${resetTarget?.nickname ?? ''}`"
       width="420px"
@@ -947,6 +1176,10 @@ async function kickUser(row: UserVO): Promise<void> {
 <style scoped>
 .full {
   width: 100%;
+}
+
+.import-fail-table {
+  margin-top: 10px;
 }
 
 /* 弹窗面板/横幅/口令动作等公共样式在 styles/index.css 的「弹窗表单套件」一节,全局单点维护 */

@@ -11,6 +11,8 @@ import com.snail.platform.framework.core.response.PageResult;
 import com.snail.platform.framework.db.PageAssembler;
 import com.snail.platform.framework.db.datascope.DataScopeContextHolder;
 import com.snail.platform.framework.db.datascope.DataScopeFilter;
+import com.snail.platform.framework.excel.ExcelExporter;
+import com.snail.platform.framework.excel.ExcelImporter;
 import com.snail.platform.function.system.org.entity.SysOrg;
 import com.snail.platform.function.system.org.mapper.SysOrgMapper;
 import com.snail.platform.function.system.role.entity.SysRole;
@@ -24,6 +26,8 @@ import com.snail.platform.function.system.tenant.entity.SysTenant;
 import com.snail.platform.function.system.tenant.mapper.SysTenantMapper;
 import com.snail.platform.function.system.user.dto.UserCreateRequest;
 import com.snail.platform.function.system.user.dto.UserCreatedVO;
+import com.snail.platform.function.system.user.dto.UserImportRow;
+import com.snail.platform.function.system.user.dto.UserImportVO;
 import com.snail.platform.function.system.user.dto.UserQuery;
 import com.snail.platform.function.system.user.dto.UserUpdateRequest;
 import com.snail.platform.function.system.user.dto.UserIdentityVO;
@@ -32,15 +36,22 @@ import com.snail.platform.function.system.user.entity.SysUser;
 import com.snail.platform.function.system.user.entity.SysUserIdentity;
 import com.snail.platform.function.system.user.mapper.SysUserMapper;
 import com.snail.platform.function.system.user.mapper.SysUserIdentityMapper;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 职责:用户管理——分页检索、新增(含建号即授权)、修改、重置口令、停用/启用、逻辑删除、角色全量覆盖分配。
+ * 职责:用户管理——分页检索、新增(含建号即授权)、批量导入、修改、重置口令、停用/启用、逻辑删除、角色全量覆盖分配。
  * 关键口径:username 全表唯一且建后不可改,查重走无租户窄窗口(全表口径),撞库提示"登录名已存在";
  * 新增受租户 accountLimit 约束(锁 sys_tenant 行后计数,只拦新增不追认存量);
  * 删除同事务物理清 sys_user_role——人不在了授权就该空;
@@ -54,6 +65,18 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class UserService {
+
+    /** 单次导入行数上限:导入是低频管理操作,超限引导分批而不是静默截断 */
+    private static final int IMPORT_ROW_LIMIT = 1_000;
+
+    /** 登录名口径,与 UserCreateRequest 的 @Pattern 同源 */
+    private static final Pattern USERNAME_PATTERN = Pattern.compile("[A-Za-z0-9_.@-]+");
+
+    /** 手机号口径,与 UserCreateRequest 的 @Pattern 同源(非空分支) */
+    private static final Pattern PHONE_PATTERN = Pattern.compile("1[3-9]\\d{9}|0\\d{2,3}-?[1-9]\\d{6,7}");
+
+    /** 邮箱口径,与 UserCreateRequest 的 @Email 同区间的轻量判定 */
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+");
 
     /** 用户表读写 */
     private final SysUserMapper userMapper;
@@ -179,6 +202,166 @@ public class UserService {
             replaceRoles(user.getUserId(), resolveGrantable(request.roleIds()));
         }
         return new UserCreatedVO(user.getUserId());
+    }
+
+    /**
+     * 导入模板:与导入同一张行头类空表导出,列名即口径,模板与解析永不漂移;
+     * 文件不带示例数据,防止示例被照抄成真实账号。
+     */
+    public void importTemplate(HttpServletResponse response) throws IOException {
+        ExcelExporter.write(response, "用户导入模板", UserImportRow.class, List.of());
+    }
+
+    /**
+     * 批量导入:口令全批共用、组织全批共用(页面选定),文件只带五列档案,与新增用户的校验口径逐条对齐。
+     * 语义是"全量校验、任一行不合法即整批不入库"——半截导入比整批拒绝更难善后,失败行逐行回报行号与原因,
+     * 管理员改完再传;全部合法才进事务落库。
+     * 与建号同口径的部分:username 查重走无租户窄窗口(全表口径,deleted 行也占)、组织过两道闸、
+     * 状态一律建为正常、口令过 PasswordPolicy 后 BCrypt 落库(逐行独立加盐,绝不复用同一份密文);
+     * 导入不授角色:角色批量映射易错,导入只管把人建进来,授权在页面上逐人/批量做。
+     * 租户上限:与 checkAccountLimit 同一把 FOR UPDATE 锁,按"现有数 + 本批行数"一次判定,
+     * 不逐行锁计数(千行导入逐行锁是把同一个事务里可一次算完的事拆成两千次查询)。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public UserImportVO importUsers(InputStream input, String password, Long orgId) throws IOException {
+        PasswordPolicy.validate(password);
+        requireUsableOrg(orgId);
+        requireAssignableOrg(orgId);
+        List<UserImportRow> rows = ExcelImporter.read(input, UserImportRow.class, IMPORT_ROW_LIMIT);
+        // 整行空白(尾部手滑多敲的空行)静默剔除;剩下的才是要导入的数据
+        List<UserImportRow> effective = rows.stream()
+                .filter(r -> notBlank(r.getUsername()) || notBlank(r.getNickname()))
+                .toList();
+        if (effective.isEmpty()) {
+            throw BizException.badRequest("导入文件没有数据行,请按模板填写后上传");
+        }
+
+        List<UserImportVO.Failure> failures = new ArrayList<>();
+        Set<String> seenUsernames = new HashSet<>();
+        Set<String> seenPhones = new HashSet<>();
+        List<UserImportRow> validRows = new ArrayList<>();
+        List<Integer> validRowNums = new ArrayList<>();
+        for (int i = 0; i < effective.size(); i++) {
+            int rowNum = i + 2; // 第 1 行是表头,数据行号从 2 起,与 Excel 打开所见一致
+            UserImportRow row = effective.get(i);
+            String username = trimOrNull(row.getUsername());
+            row.setUsername(username);
+            String reason = usernameProblem(username, seenUsernames);
+            if (reason == null) {
+                String nickname = trimOrNull(row.getNickname());
+                row.setNickname(nickname);
+                reason = nickname == null ? "显示名为空"
+                        : nickname.length() > 30 ? "显示名过长" : null;
+            }
+            if (reason == null) {
+                String email = trimOrNull(row.getEmail());
+                row.setEmail(email);
+                reason = email != null && email.length() > 50 ? "邮箱过长"
+                        : email != null && !EMAIL_PATTERN.matcher(email).matches() ? "邮箱格式不正确" : null;
+            }
+            if (reason == null) {
+                String phone = trimOrNull(row.getPhone());
+                row.setPhone(phone);
+                if (phone != null) {
+                    reason = !PHONE_PATTERN.matcher(phone).matches() ? "手机号格式不正确"
+                            : !seenPhones.add(phone) ? "手机号在文件内重复" : null;
+                }
+            }
+            if (reason == null) {
+                String remark = trimOrNull(row.getRemark());
+                row.setRemark(remark);
+                reason = remark != null && remark.length() > 500 ? "备注过长" : null;
+            }
+            if (reason != null) {
+                failures.add(new UserImportVO.Failure(rowNum, username == null ? "" : username, reason));
+            } else {
+                validRows.add(row);
+                validRowNums.add(rowNum);
+            }
+        }
+        // 批量查库的两道占用闸:登录名全表口径(withoutTenant,与建号查重同窗)、手机号本租户口径
+        // (已删账号不占号,与 requirePhoneUniqueInTenant 同规)。逐文件各只查一次,不逐行打库。
+        List<String> usernames = validRows.stream().map(UserImportRow::getUsername).toList();
+        Set<String> takenUsernames = usernames.isEmpty() ? Set.of() : TenantContextHolder.withoutTenant(() ->
+                        userMapper.selectList(Wrappers.<SysUser>lambdaQuery().in(SysUser::getUsername, usernames)))
+                .stream().map(SysUser::getUsername).collect(java.util.stream.Collectors.toSet());
+        List<String> phones = validRows.stream().map(UserImportRow::getPhone).filter(Objects::nonNull).toList();
+        Set<String> takenPhones = phones.isEmpty() ? Set.of() : userMapper.selectList(
+                        Wrappers.<SysUser>lambdaQuery().in(SysUser::getPhone, phones))
+                .stream().map(SysUser::getPhone).collect(java.util.stream.Collectors.toSet());
+        for (int i = 0; i < validRows.size(); i++) {
+            UserImportRow row = validRows.get(i);
+            String reason = null;
+            if (takenUsernames.contains(row.getUsername())) {
+                reason = "登录名已存在";
+            } else if (row.getPhone() != null && takenPhones.contains(row.getPhone())) {
+                reason = "该手机号已绑定本租户其他账号";
+            }
+            if (reason != null) {
+                failures.add(new UserImportVO.Failure(validRowNums.get(i), row.getUsername(), reason));
+            }
+        }
+        if (!failures.isEmpty()) {
+            return new UserImportVO(0, failures);
+        }
+        checkAccountLimitFor(effective.size());
+        for (UserImportRow row : effective) {
+            SysUser user = new SysUser();
+            user.setUsername(row.getUsername());
+            user.setNickname(row.getNickname());
+            user.setPassword(BCrypt.hashpw(password));
+            user.setEmail(row.getEmail());
+            user.setPhone(row.getPhone());
+            user.setOrgId(orgId);
+            user.setStatus(0);
+            user.setRemark(row.getRemark());
+            try {
+                userMapper.insert(user);
+            } catch (DuplicateKeyException e) {
+                // 全表唯一键是最后一道闸:查重与插入之间的并发抢占(或已删行占用)由它兜住,整批回滚
+                throw BizException.badRequest("登录名已存在: " + row.getUsername());
+            }
+        }
+        return new UserImportVO(effective.size(), List.of());
+    }
+
+    /** 登录名行内三连闸:非空、格式长度、文件内重复;通过后追加全表占用查询 */
+    private String usernameProblem(String username, Set<String> seenUsernames) {
+        if (username == null) {
+            return "登录名为空";
+        }
+        if (username.length() < 3 || username.length() > 30) {
+            return "登录名长度需 3-30";
+        }
+        if (!USERNAME_PATTERN.matcher(username).matches()) {
+            return "登录名只允许字母、数字、下划线、点、@、连字符";
+        }
+        if (!seenUsernames.add(username)) {
+            return "登录名在文件内重复";
+        }
+        return null;
+    }
+
+    /**
+     * 租户账号上限的本批判定:与 checkAccountLimit 同一把租户行锁,一次算完"现有数 + 本批行数",
+     * 上限为 null 即不限;同事务内重复拿同一行锁无额外开销。
+     */
+    private void checkAccountLimitFor(int batchSize) {
+        Long tenantId = TenantContextHolder.get();
+        if (tenantId == null) {
+            return;
+        }
+        SysTenant tenant = tenantMapper.selectOne(Wrappers.<SysTenant>lambdaQuery()
+                .eq(SysTenant::getTenantId, tenantId)
+                .last("FOR UPDATE"));
+        if (tenant == null || tenant.getAccountLimit() == null) {
+            return;
+        }
+        long current = userMapper.selectCount(null);
+        if (current + batchSize > tenant.getAccountLimit()) {
+            throw BizException.badRequest("导入后账号数将超过租户上限:现有 " + current
+                    + ",上限 " + tenant.getAccountLimit() + ",本批 " + batchSize);
+        }
     }
 
     /**
@@ -480,5 +663,14 @@ public class UserService {
     /** 空白与 null 同义,都不参与拼句——否则一个空格会被当成真实的 like 条件 */
     private boolean notBlank(String s) {
         return s != null && !s.isBlank();
+    }
+
+    /** 导入行的取值清洗:去首尾空白,空白与 null 同归一,后续校验只面对两种形态 */
+    private static String trimOrNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String trimmed = s.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

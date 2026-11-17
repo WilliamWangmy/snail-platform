@@ -1,4 +1,4 @@
-import { del, get, post, put } from './http';
+import { del, download, get, post, put, upload } from './http';
 import type { PageParams, PageResult } from './types';
 
 export interface UserVO {
@@ -103,6 +103,35 @@ export function assignUserRoles(userId: number, roleIds: number[]): Promise<void
 /** 强制下线:令牌版本自增,该用户全部设备下一次请求即 401。 */
 export function forceLogoutUser(userId: number): Promise<void> {
   return post<void>(`/system/user/${userId}/force-logout`);
+}
+
+/* ------------------------------- 批量导入 ------------------------------- */
+
+/** 单行失败回执:rowNum 是 Excel 数据行号(表头为第 1 行,首条数据从 2 起) */
+export interface UserImportFailure {
+  rowNum: number;
+  username: string;
+  reason: string;
+}
+
+/** 导入结果口径:全量校验,任一行不合法即整批不入库,失败时 successCount 恒为 0 */
+export interface UserImportResult {
+  successCount: number;
+  failures: UserImportFailure[];
+}
+
+/** 批量导入:口令与组织全批共用,文件只带五列档案(登录名/显示名/邮箱/手机号/备注) */
+export function importUsers(file: File, password: string, orgId: number): Promise<UserImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('password', password);
+  form.append('orgId', String(orgId));
+  return upload<UserImportResult>('/system/user/import', form);
+}
+
+/** 导入模板:仅表头,列名与后端解析行头类同源 */
+export function downloadImportTemplate(): Promise<void> {
+  return download('/system/user/import-template', {}, '用户导入模板.xlsx');
 }
 
 /* ------------------------- 第三方绑定(只读) ------------------------- */
