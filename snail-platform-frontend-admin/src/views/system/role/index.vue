@@ -156,17 +156,48 @@ const menuTarget = ref<RoleVO | null>(null);
 const menuTree = ref<RoleMenuNode[]>([]);
 const menuSaving = ref(false);
 
-/** 只回填叶子:非叶子勾选状态由子节点推导,直接 set 会把整棵子树连带勾上。 */
-function leafCheckedKeys(nodes: RoleMenuNode[]): number[] {
+/** 严格模式(check-strictly)下节点独立勾选:所有 checked 的节点直接回填,不做叶子转换。 */
+function checkedKeysOf(nodes: RoleMenuNode[]): number[] {
   const keys: number[] = [];
   const walk = (list: RoleMenuNode[]): void => {
     for (const node of list) {
+      if (node.checked) keys.push(node.menuId);
       if (node.children.length) walk(node.children);
-      else if (node.checked) keys.push(node.menuId);
     }
   };
   walk(nodes);
   return keys;
+}
+
+/** 严格模式无半选概念:按勾选节点自动补齐祖先目录键,保证侧栏导航容器仍在授权行内。 */
+function withAncestors(nodes: RoleMenuNode[], checked: Set<number>, path: number[] = []): void {
+  for (const node of nodes) {
+    const nextPath = [...path, node.menuId];
+    if (checked.has(node.menuId)) nextPath.forEach((key) => checked.add(key));
+    if (node.children.length) withAncestors(node.children, checked, nextPath);
+  }
+}
+
+/** 收集节点自身与全部后代键,供「勾选/清空子级」一键操作。 */
+function subtreeKeys(node: RoleMenuNode): number[] {
+  const keys: number[] = [node.menuId];
+  const walk = (list: RoleMenuNode[]): void => {
+    for (const child of list) {
+      keys.push(child.menuId);
+      if (child.children.length) walk(child.children);
+    }
+  };
+  if (node.children.length) walk(node.children);
+  return keys;
+}
+
+/** 一键勾选/取消节点及其全部后代:严格模式不联动,批量操作在这里补位。 */
+function toggleSubtree(node: RoleMenuNode, checked: boolean): void {
+  const tree = menuTreeRef.value;
+  if (!tree) return;
+  const batch = new Set(tree.getCheckedKeys().map(Number));
+  subtreeKeys(node).forEach((key) => (checked ? batch.add(key) : batch.delete(key)));
+  tree.setCheckedKeys([...batch]);
 }
 
 async function openAssignMenus(row: RoleVO): Promise<void> {
@@ -175,19 +206,18 @@ async function openAssignMenus(row: RoleVO): Promise<void> {
   menuVisible.value = true;
   // 弹窗是 destroy-on-close:树实例要等打开后才存在,这步挪到 await 之前会拿到 undefined
   await nextTick();
-  menuTreeRef.value?.setCheckedKeys(leafCheckedKeys(menuTree.value));
+  menuTreeRef.value?.setCheckedKeys(checkedKeysOf(menuTree.value));
 }
 
 async function submitAssignMenus(): Promise<void> {
   const target = menuTarget.value;
   const tree = menuTreeRef.value;
   if (!target || !tree) return;
-  // getCheckedKeys 不含半选的父目录,要单独取:授权是全量替换,漏了它们等于把容器行从授权表里删掉
-  const checked = tree.getCheckedKeys();
-  const half = tree.getHalfCheckedKeys();
+  const checked = new Set(tree.getCheckedKeys().map(Number));
+  withAncestors(menuTree.value, checked);
   menuSaving.value = true;
   try {
-    await assignRoleMenus(target.roleId, [...checked, ...half].map((key) => Number(key)));
+    await assignRoleMenus(target.roleId, [...checked]);
     ElMessage.success(`已更新 ${target.roleName} 的菜单授权`);
     menuVisible.value = false;
   } finally {
@@ -543,6 +573,13 @@ function actionsOf(row: RoleVO): RowAction[] {
         class="grant-note"
         title="内置角色的租户面菜单为隐式全量授权,树内勾选只反映显式授权行。"
       />
+      <ElAlert
+        type="info"
+        :closable="false"
+        show-icon
+        class="grant-note"
+        title="节点独立勾选:勾选菜单即授予查询权限,按钮权限单独勾选互不联动;保存时自动补齐所选菜单的父目录。"
+      />
       <ElScrollbar height="420px">
         <ElTree
           ref="menuTreeRef"
@@ -550,8 +587,34 @@ function actionsOf(row: RoleVO): RowAction[] {
           node-key="menuId"
           :props="{ label: 'menuName', children: 'children' }"
           show-checkbox
+          check-strictly
           default-expand-all
-        />
+        >
+          <template #default="{ data }">
+            <span class="grant-node">
+              <span class="grant-node-label">{{ data.menuName }}</span>
+              <span
+                v-if="data.children.length"
+                class="grant-node-ops"
+              >
+                <el-link
+                  type="primary"
+                  :underline="false"
+                  @click.stop="toggleSubtree(data, true)"
+                >
+                  勾选子级
+                </el-link>
+                <el-link
+                  type="info"
+                  :underline="false"
+                  @click.stop="toggleSubtree(data, false)"
+                >
+                  清空子级
+                </el-link>
+              </span>
+            </span>
+          </template>
+        </ElTree>
       </ElScrollbar>
       <template #footer>
         <ElButton @click="menuVisible = false">
@@ -576,5 +639,32 @@ function actionsOf(row: RoleVO): RowAction[] {
 
 .grant-note {
   margin-bottom: 10px;
+}
+
+/* 树节点行:标签占满,子级批量操作悬浮才出现,避免挤占勾选热区 */
+.grant-node {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.grant-node-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grant-node-ops {
+  display: none;
+  flex: none;
+  gap: 6px;
+  font-size: 11px;
+}
+
+:deep(.el-tree-node__content:hover) .grant-node-ops {
+  display: inline-flex;
 }
 </style>
