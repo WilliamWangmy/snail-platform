@@ -62,49 +62,25 @@ function reset(): void {
 
 /* --------------------------------- 上传 ----------------------------------- */
 
-/** 上传先选文件类型再选文件:类型取内置字典下拉,缺省 平台文件(platform) */
-const uploadDialogVisible = ref(false);
-const uploadForm = reactive<{ fileType: string }>({ fileType: 'platform' });
-const pendingFile = ref<File | null>(null);
+/** 直传:不走弹窗,点上传按钮即开文件选择器,选中后立刻上传;
+ * 类型固定归入 平台文件(platform,内置字典默认项,后端缺省同码)。 */
 const uploading = ref(false);
 
 const fileInput = ref<HTMLInputElement | null>(null);
-
-function openUploadDialog(): void {
-  // 字典值建后不可改,platform(平台文件)是内置默认项;若被停用则落到第一个可用项
-  const hasDefault = fileTypeItems.value.some((item) => item.value === uploadForm.fileType);
-  if (!hasDefault && fileTypeItems.value.length > 0) {
-    uploadForm.fileType = fileTypeItems.value[0]!.value;
-  }
-  pendingFile.value = null;
-  uploadDialogVisible.value = true;
-}
 
 function pickFile(): void {
   fileInput.value?.click();
 }
 
-function onFileChange(event: Event): void {
+async function onFileChange(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = '';
-  if (file) pendingFile.value = file;
-}
-
-function clearPendingFile(): void {
-  pendingFile.value = null;
-}
-
-async function confirmUpload(): Promise<void> {
-  if (!pendingFile.value) {
-    ElMessage.warning('请先选择要上传的文件');
-    return;
-  }
+  if (!file) return;
   uploading.value = true;
   try {
-    await uploadFile(pendingFile.value, uploadForm.fileType);
+    await uploadFile(file, 'platform');
     ElMessage.success('已上传');
-    uploadDialogVisible.value = false;
     await refresh();
   } finally {
     uploading.value = false;
@@ -200,7 +176,8 @@ function rowActions(row: FileVO): RowAction[] {
         <ElButton
           v-permission="'system:file:upload'"
           type="primary"
-          @click="openUploadDialog"
+          :loading="uploading"
+          @click="pickFile"
         >
           <AppIcon
             name="plus"
@@ -385,184 +362,8 @@ function rowActions(row: FileVO): RowAction[] {
       :loading="previewLoading"
       @closed="closePreview"
     />
-
-    <ElDialog
-      v-model="uploadDialogVisible"
-      title="上传文件"
-      width="640px"
-    >
-      <div class="form-banner">
-        <AppIcon
-          name="alert"
-          :size="14"
-        />
-        <span>文件类型由内置字典维护,选项可在字典管理页扩充;不选择文件类型时默认归入 平台文件</span>
-      </div>
-      <ElForm
-        :model="uploadForm"
-        label-position="top"
-      >
-        <div class="form-panel">
-          <div class="panel-head">
-            <span class="panel-ico">
-              <AppIcon
-                name="receipt"
-                :size="13"
-              />
-            </span>
-            <span class="panel-title">上传内容</span>
-            <span class="panel-hint">扩展名须在白名单内,超限会被后端拒绝</span>
-          </div>
-          <ElFormItem label="文件类型">
-            <ElSelect v-model="uploadForm.fileType">
-              <ElOption
-                v-for="item in fileTypeItems"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </ElSelect>
-          </ElFormItem>
-          <ElFormItem label="文件">
-            <button
-              class="upload-zone"
-              :class="{ 'has-file': pendingFile }"
-              type="button"
-              @click="pickFile"
-            >
-              <template v-if="pendingFile">
-                <span class="zone-ico">
-                  <AppIcon
-                    name="box"
-                    :size="18"
-                  />
-                </span>
-                <span class="zone-body">
-                  <span class="zone-name">{{ pendingFile.name }}</span>
-                  <span class="zone-meta">{{ fileSize(pendingFile.size) }} · 点击可重新选择</span>
-                </span>
-                <span
-                  class="zone-clear"
-                  title="移除已选文件"
-                  @click.stop="clearPendingFile"
-                >
-                  <AppIcon
-                    name="close"
-                    :size="13"
-                  />
-                </span>
-              </template>
-              <template v-else>
-                <span class="zone-ico">
-                  <AppIcon
-                    name="plus"
-                    :size="18"
-                  />
-                </span>
-                <span class="zone-body">
-                  <span class="zone-name">点击选择文件</span>
-                  <span class="zone-meta">文件名保持原样,仅做安全清洗</span>
-                </span>
-              </template>
-            </button>
-          </ElFormItem>
-        </div>
-      </ElForm>
-      <template #footer>
-        <ElButton @click="uploadDialogVisible = false">
-          取消
-        </ElButton>
-        <ElButton
-          type="primary"
-          :loading="uploading"
-          @click="confirmUpload"
-        >
-          上传
-        </ElButton>
-      </template>
-    </ElDialog>
   </div>
 </template>
 
 <style scoped>
-/* 文件选区:与系统的虚线新增瓦片同款,选中后转为实心态并亮出移除按钮 */
-.upload-zone {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 13px 14px;
-  border: 1px dashed rgba(var(--app-primary-rgb), 0.4);
-  border-radius: 10px;
-  background: rgba(var(--app-primary-rgb), 0.03);
-  cursor: pointer;
-  text-align: left;
-  transition:
-    border-color 0.18s,
-    background-color 0.18s;
-}
-
-.upload-zone:hover {
-  border-color: var(--app-primary);
-  background: rgba(var(--app-primary-rgb), 0.08);
-}
-
-.upload-zone.has-file {
-  border-style: solid;
-  border-color: var(--app-line);
-  background: var(--app-soft, var(--app-bg));
-}
-
-.zone-ico {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: none;
-  place-items: center;
-  border-radius: 10px;
-  background: rgba(var(--app-primary-rgb), 0.12);
-  color: var(--app-primary);
-}
-
-.zone-body {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.zone-name {
-  overflow: hidden;
-  color: var(--app-ink);
-  font-size: 13px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.zone-meta {
-  color: var(--app-muted);
-  font-size: 11px;
-}
-
-.zone-clear {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  flex: none;
-  place-items: center;
-  border: 1px solid var(--app-line);
-  border-radius: 7px;
-  background: var(--app-card);
-  color: var(--app-muted);
-  transition:
-    color 0.16s,
-    border-color 0.16s;
-}
-
-.zone-clear:hover {
-  border-color: rgba(var(--app-danger-rgb), 0.45);
-  color: var(--app-danger);
-}
 </style>

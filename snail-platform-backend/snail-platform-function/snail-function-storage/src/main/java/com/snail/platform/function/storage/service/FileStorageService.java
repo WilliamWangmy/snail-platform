@@ -16,11 +16,17 @@ import com.snail.platform.function.storage.dto.FileQuery;
 import com.snail.platform.function.storage.dto.FileVO;
 import com.snail.platform.function.storage.entity.SysFile;
 import com.snail.platform.function.storage.mapper.SysFileMapper;
+import com.snail.platform.function.system.role.entity.SysRole;
+import com.snail.platform.function.system.role.entity.SysUserRole;
+import com.snail.platform.function.system.role.mapper.SysRoleMapper;
+import com.snail.platform.function.system.role.mapper.SysUserRoleMapper;
+import com.snail.platform.function.system.role.service.UserPermissionService;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -36,7 +42,8 @@ import org.springframework.web.multipart.MultipartFile;
  * 上游:FileController/FilePlatformController;下游:StoragePortRegistry(按类型取端口)、
  * FileQuotaService(配额预检与锁行入库)、FileAccessPolicy(文件级可见性)、sys_file 读写。
  * 口径:写入端口缺席(snail.storage.type 为空)一律 400"文件存储未配置";
- * 下载先过权限码(@PreAuthorize)再过文件级可见性;历史对象按 sys_file.storage_type 取端口,
+ * 下载先过权限码(@PreAuthorize)再过文件级可见性;删除同样先过权限码,数据面再按人收口——
+ * 超管可删本租户任意文件,其余持码人只能删自己上传的;历史对象按 sys_file.storage_type 取端口,
  * 类型未配置明确报错,绝不回退当前后端;物理删失败只告警不回滚,残留对象由将来的 GC 任务清扫。
  */
 @Service
@@ -107,6 +114,12 @@ public class FileStorageService {
     /** 文件元数据读写 */
     private final SysFileMapper fileMapper;
 
+    /** 用户-角色授权读:删除归属判定要先取当前登录人的角色 */
+    private final SysUserRoleMapper userRoleMapper;
+
+    /** 角色表读:与 isSuperAdmin 那把尺配套 */
+    private final SysRoleMapper roleMapper;
+
     /** 配额预检与锁行入库 */
     private final FileQuotaService quotaService;
 
@@ -124,11 +137,15 @@ public class FileStorageService {
 
     public FileStorageService(StoragePortRegistry storageRegistry,
                               SysFileMapper fileMapper,
+                              SysUserRoleMapper userRoleMapper,
+                              SysRoleMapper roleMapper,
                               FileQuotaService quotaService,
                               FileAccessPolicy accessPolicy,
                               SnailStorageProperties properties) {
         this.storageRegistry = storageRegistry;
         this.fileMapper = fileMapper;
+        this.userRoleMapper = userRoleMapper;
+        this.roleMapper = roleMapper;
         this.quotaService = quotaService;
         this.accessPolicy = accessPolicy;
         this.properties = properties;
@@ -254,9 +271,37 @@ public class FileStorageService {
         return new StorageDownload(file, requirePortOf(file).get(file.getStorageKey()));
     }
 
-    /** 删除:逻辑删即时生效;物理删按记录类型路由,失败或后端未配置只告警,残留由 GC 任务清扫 */
+    /**
+     * 删除:入口已挂 system:file:delete 权限码,数据面再按人收口——
+     * 租户超管(语义 A 的 isSuperAdmin 尺)可删本租户任意文件,其余持码人只能删自己上传的;
+     * 逻辑删即时生效;物理删按记录类型路由,失败或后端未配置只告警,残留由 GC 任务清扫。
+     */
     public void remove(Long fileId) {
-        removeRow(requireFile(fileId));
+        SysFile file = requireFile(fileId);
+        LoginUser user = LoginUserContextHolder.get();
+        boolean owner = user != null && Objects.equals(file.getUploadBy(), user.userId());
+        if (!owner && !isSuperAdmin(user == null ? null : user.userId())) {
+            throw BizException.forbidden("只能删除本人上传的文件");
+        }
+        removeRow(file);
+    }
+
+    /**
+     * 当前登录人是否租户超管:沿用 UserPermissionService.isSuperAdmin(role_code=admin 且 is_system=1),
+     * 不用 roleCode 裸判——自建租户可以造一个名叫 admin 的普通角色,宽一档口径已在该模块被移除过一次。
+     */
+    private boolean isSuperAdmin(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        List<Long> roleIds = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
+                        .eq(SysUserRole::getUserId, userId))
+                .stream().map(SysUserRole::getRoleId).distinct().toList();
+        if (roleIds.isEmpty()) {
+            return false;
+        }
+        return roleMapper.selectBatchIds(roleIds).stream()
+                .anyMatch(UserPermissionService::isSuperAdmin);
     }
 
     /** 已知行直接删:头像替换传入的是刚查出的旧行,并发重复删天然幂等,不必再做存在性检查 */
